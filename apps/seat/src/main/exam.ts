@@ -37,6 +37,7 @@ export class ExamSession implements SyncSource {
   #monoBase = 0;
   #runStart: number;
   #lastEntryAt: number;
+  #lastActive = 0;
 
   constructor(o: SessionOpts) {
     this.#o = o;
@@ -47,12 +48,16 @@ export class ExamSession implements SyncSource {
     this.#runStart = this.#lastEntryAt = this.#clock();
     const last = this.journal.headers.at(-1);
     // Resume: time between the last entry and the crash is not charged (at most IDLE_MS, thanks to idle entries).
-    if (last) { this.#activeBase = last.activeMs; this.#monoBase = last.tMonoMs; }
+    if (last) { this.#activeBase = this.#lastActive = last.activeMs; this.#monoBase = last.tMonoMs; }
   }
 
   get started(): boolean { return this.journal.head > 0; }
   get submitted(): boolean { return this.journal.headers.at(-1)?.kind === 'submit'; }
-  activeMs(): number { return this.started ? this.#activeBase + Math.round(this.#clock() - this.#runStart) : 0; }
+  /** Active time (plan §3.6): monotonic within this key epoch, even if the clock steps back. */
+  activeMs(): number {
+    if (!this.started) return 0;
+    return (this.#lastActive = Math.max(this.#lastActive, this.#activeBase + Math.round(this.#clock() - this.#runStart)));
+  }
   remainingMs(): number { return Math.max(0, this.#o.durationMs - this.activeMs()); }
 
   items(): Record<string, ItemState> {

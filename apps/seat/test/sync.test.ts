@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { ackMessage } from '@saakshi/core/ack';
 import { toHex } from '@saakshi/core/bytes';
 import { cellKey, devSeat, type KeysFile } from '@saakshi/core/dev';
+import type { WireBind } from '@saakshi/core/enrol';
 import { parseSignedLine } from '@saakshi/core/journal';
 import { signer, verifier } from '@saakshi/core/node';
 import { entryHash } from '@saakshi/core/protocol';
@@ -109,4 +110,21 @@ test('kick() drains a backlog larger than one batch without waiting for the time
     if (Date.now() - t0 > 20_000) assert.fail(`stuck at ${JSON.stringify(sync.view())}`);
     await new Promise((r) => setTimeout(r, 10));
   }
+});
+
+test('Stage 3 provisional: nothing leaves the seat until the binding exists; then the first request carries it', async () => {
+  const sim = new SimSeat(keys, 'C0001', cell.pub);
+  sim.add(3);
+  const seen: SyncReq[] = [];
+  let bind: WireBind | undefined;
+  const sync = new SeatSync(source(sim), async (req) => { seen.push(req); return { streams: [{ ...sim.ctx, head: 0, headH: '', need: false }], rejected: [] }; }, verifier(cell.pub), () => {}, { bind: () => bind });
+  await sync.round();
+  assert.equal(seen.length, 0);
+  assert.equal(sync.view().provisional, true);
+  bind = { cert: '["bind"]', sig: 'a'.repeat(128), cell: 'cell-1', pinBox: 'ab' };
+  await sync.round();
+  assert.deepEqual(seen[0].binds, [bind]);
+  assert.equal(sync.view().provisional, false);
+  await sync.round();
+  assert.equal(seen[1].binds, undefined);                                           // the relay knows us now
 });

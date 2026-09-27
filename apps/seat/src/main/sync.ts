@@ -1,5 +1,6 @@
 import { ackMessage } from '@saakshi/core/ack';
 import { hexToBytes } from '@saakshi/core/bytes';
+import type { WireBind } from '@saakshi/core/enrol';
 import type { Ctx } from '@saakshi/core/protocol';
 import type { Verify } from '@saakshi/core/sig';
 import { streamKey, type SyncReq, type SyncRes, type WireEntry } from '@saakshi/core/wire';
@@ -8,13 +9,15 @@ import type { SyncView } from '../shared/ipc.ts';
 export interface SyncSource { ctx: Ctx; head(): number; hashAt(seq: number): string; entriesAfter(after: number, limit: number): WireEntry[] }
 export type Send = (req: SyncReq) => Promise<SyncRes>;
 
+export interface SeatSyncOpts { /** Stage 3: the seat's cell-signed binding. While it is missing, nothing leaves the seat (provisional). */ bind?: () => WireBind | undefined }
+
 const BATCH = 500;
 const SIG_HEX = /^[0-9a-f]{128}$/;
 
-export function httpSend(relayUrl: string, timeoutMs = 5000): Send {
+export function httpSend(relayUrl: string, timeoutMs = 5000, f: typeof fetch = fetch): Send {
   const url = new URL('/v1/sync', relayUrl);
   return async (req) => {
-    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req), signal: AbortSignal.timeout(timeoutMs) });
+    const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req), signal: AbortSignal.timeout(timeoutMs) });
     if (!r.ok) throw new Error(`relay answered ${r.status}`);
     return (await r.json()) as SyncRes;
   };
@@ -30,6 +33,7 @@ export class SeatSync {
   #send: Send;
   #cellVerify: Verify;
   #onView: (v: SyncView) => void;
+  #bind?: () => WireBind | undefined;
   #cursor = -1;
   #relay = 0;
   #cell = 0;
@@ -39,17 +43,24 @@ export class SeatSync {
   #again = false;
   #timer: ReturnType<typeof setInterval> | undefined;
 
-  constructor(src: SyncSource, send: Send, cellVerify: Verify, onView: (v: SyncView) => void = () => {}) {
-    this.#src = src; this.#send = send; this.#cellVerify = cellVerify; this.#onView = onView;
+  constructor(src: SyncSource, send: Send, cellVerify: Verify, onView: (v: SyncView) => void = () => {}, opts: SeatSyncOpts = {}) {
+    this.#src = src; this.#send = send; this.#cellVerify = cellVerify; this.#onView = onView; this.#bind = opts.bind;
   }
 
-  view(): SyncView { return { local: this.#src.head(), relay: this.#relay, cell: this.#cell, online: this.#online, error: this.#error }; }
+  view(): SyncView {
+    const v: SyncView = { local: this.#src.head(), relay: this.#relay, cell: this.#cell, online: this.#online, error: this.#error };
+    return this.#bind ? { ...v, provisional: !this.#bind() } : v;
+  }
 
   async round(): Promise<void> {
+    const bind = this.#bind?.();
+    if (this.#bind && !bind) { this.#onView(this.view()); return; }              // provisional: ✓ only until the cell ratifies the seat
     const s = this.#src;
     const entries = this.#cursor < 0 ? [] : s.entriesAfter(this.#cursor, BATCH);
+    const req: SyncReq = { entries, streams: [{ ...s.ctx, head: s.head() }] };
+    if (bind && this.#cursor < 0) req.binds = [bind];
     let res: SyncRes;
-    try { res = await this.#send({ entries, streams: [{ ...s.ctx, head: s.head() }] }); }
+    try { res = await this.#send(req); }
     catch (e) { this.#online = false; this.#error = (e as Error).message; this.#onView(this.view()); return; }
     this.#online = true;
     this.#error = res.rejected.map((r) => `${r.code}: ${r.reason}`).join('; ');

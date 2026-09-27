@@ -175,3 +175,18 @@ test('test mode is never silent: an integrity entry follows the unlock; normal m
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('Stage 3 timer: remaining = D_i − activeMs, and activeMs never runs backwards within the epoch even if the clock does', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+  let t = 0;
+  const s = session(dir, () => t);
+  s.start();
+  t = 10_000; assert.equal((s.act(act('answer', 'I01', 'A', 'D')) as { activeMs: number }).activeMs, 10_000);
+  t = 4_000;                                                                       // the clock steps back
+  assert.equal(s.activeMs(), 10_000);
+  assert.equal((s.act(act('answer', 'I02', 'A', 'B')) as { activeMs: number }).activeMs, 10_000);
+  const a = s.journal.headers.map((h) => h.activeMs);
+  assert.deepEqual(a, [...a].sort((x, y) => x - y));
+  assert.equal(s.remainingMs(), D - 10_000);
+  s.close(); rmSync(dir, { recursive: true, force: true });
+});

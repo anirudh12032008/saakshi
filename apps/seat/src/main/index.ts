@@ -1,18 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, session, systemPreferences } from 'electron';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import { cellKey, DEV_EXAM, devForm, devPseud, devSeat, type KeysFile } from '@saakshi/core/dev';
-import { verifier } from '@saakshi/core/node';
-import keysJson from '../../../../fixtures/keys.json';
-import formsJson from '../../../../fixtures/paper/forms.json';
-import type { Action, ExamBoot, SubmitResult } from '../shared/ipc.ts';
+import { hexToBytes } from '@saakshi/core/bytes';
+import { DEV_EXAM } from '@saakshi/core/dev';
+import trustJson from '../../../../fixtures/trust-dev.json';
+import type { Action, EnrolInput } from '../shared/ipc.ts';
 import { resolveAppPath } from './app-path.ts';
 import { cameraEnabled } from './camera.ts';
-import { ExamSession } from './exam.ts';
 import type { Wrapper } from './journal-store.ts';
 import { pickWrapper, testMode } from './keystore.ts';
 import { runSelftest } from './probes.ts';
-import { httpSend, SeatSync } from './sync.ts';
+import { Seat } from './seat.ts';
 
 const argValue = (flag: string): string | undefined => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : undefined; };
 const setting = (flag: string, envName: string, dflt: string): string => argValue(flag) ?? process.env[envName] ?? dflt;
@@ -39,42 +37,33 @@ function start(): void {
   };
   const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'";
 
-  // DEV until Stage 3: the seat key and pinned cell key come from the bundled demo fixtures (which also hold private keys).
-  const keys = keysJson as KeysFile;
-  const forms = formsJson as unknown as Record<'F1' | 'F2', string[]> & { durationMin: number };
+  // Stage 3: the app carries only the exam authority's PUBLIC key. The seat key is made at enrolment; the cell key, D_i and the
+  // roster come from the signed policy; the paper comes encrypted and opens only with a key that matches kc_f.
+  const authorityPub = hexToBytes((trustJson as { authority: string }).authority);
   const cand = setting('--cand', 'SAAKSHI_CAND', 'C0001');
+  const seatId = setting('--seat', 'SAAKSHI_SEAT', 'CEN042-S01');
   const relayUrl = setting('--relay', 'SAAKSHI_RELAY', 'http://127.0.0.1:7070');
-  const seat = devSeat(keys, cand);
-  const cell = cellKey(keys, 'cell-1');
-  const form = devForm(cand);
-  const durationMs = forms.durationMin * 60_000;
   const camera = cameraEnabled(process.argv, process.env);
   const test = testMode(process.argv, process.env);
-  let exam: ExamSession | undefined;
-  let sync: SeatSync | undefined;
+  let seat: Seat | undefined;
   let win: BrowserWindow | undefined;
 
   const guard = <T>(fn: () => T): T | { ok: false; error: string } => { try { return fn(); } catch (e) { return { ok: false, error: (e as Error).message }; } };
-  ipcMain.handle('exam:load', (): ExamBoot => ({
-    cand, seatId: seat!.seatId, form, durationMs, activeMs: exam!.activeMs(), started: exam!.started, items: exam!.items(), sync: sync!.view(),
-    receipt: exam!.receipt(), camera, testMode: test,
-  }));
-  ipcMain.handle('exam:start', () => guard(() => { const r = exam!.start(); sync!.kick(); return r; }));
-  ipcMain.handle('exam:submit', (): SubmitResult => guard(() => { const r = exam!.submit(); sync!.kick(); return r; }));
-  ipcMain.handle('exam:act', (_e, a: Action) => guard(() => { const r = exam!.act(a); if (r.ok) sync!.kick(); return r; }));
+  ipcMain.handle('exam:load', () => seat!.boot());
+  ipcMain.handle('exam:enrol', (_e, x: EnrolInput) => seat!.enrol(x));
+  ipcMain.handle('exam:paper', () => seat!.paper());
+  ipcMain.handle('exam:start', () => guard(() => seat!.start()));
+  ipcMain.handle('exam:act', (_e, a: Action) => guard(() => seat!.act(a)));
+  ipcMain.handle('exam:submit', () => guard(() => seat!.submit()));
 
   app.whenReady().then(async () => {
-    if (!seat) { dialog.showErrorBox('Saakshi', `No DEV seat key for candidate ${cand}`); app.exit(1); return; }
     let wrap: Wrapper;
     try { wrap = pickWrapper({ testMode: test, safeStorage, dir: app.getPath('userData') }); }
     catch (e) { dialog.showErrorBox('Saakshi', (e as Error).message); app.exit(1); return; }
     if (test) console.warn('SAAKSHI TEST MODE — not for real exams (journal key not in the OS keychain)');
-    try {
-      exam = new ExamSession({ dir: join(app.getPath('userData'), 'journal'), ctx: { ...DEV_EXAM, cand }, keyEpoch: 1, seat, cellPub: cell.pub, wrap, durationMs, items: forms[form], form, pseud: devPseud(cand), testMode: test });
-    } catch (e) { dialog.showErrorBox('Saakshi — journal problem, please call the invigilator', (e as Error).message); app.exit(1); return; }
-    sync = new SeatSync(exam, httpSend(relayUrl), verifier(cell.pub), (v) => win?.webContents.send('sync', v));
-    sync.start(1000);
-    setInterval(() => exam!.tick(), 5000);
+    seat = new Seat({ dir: join(app.getPath('userData'), 'journal'), relayUrl, ctx: { ...DEV_EXAM, cand }, seatId, authorityPub, wrap, camera, testMode: test,
+      onBoot: (b) => win?.webContents.send('boot', b), onSync: (v) => win?.webContents.send('sync', v) });
+    await seat.open();
 
     protocol.handle('app', async (req) => {
       const p = resolveAppPath(RENDERER, new URL(req.url).pathname);
@@ -83,7 +72,7 @@ function start(): void {
         return new Response(await readFile(p), { headers: { 'content-type': MIME[extname(p)] ?? 'application/octet-stream', 'content-security-policy': CSP } });
       } catch { return new Response('not found', { status: 404 }); }
     });
-    // Camera off (test mode): no permission and no macOS prompt.
+    // Camera off (--no-camera or test mode): no permission and no macOS prompt.
     session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(camera && perm === 'media'));
     session.defaultSession.setPermissionCheckHandler((_wc, perm) => camera && perm === 'media');
     if (camera && process.platform === 'darwin') await systemPreferences.askForMediaAccess('camera');
@@ -99,5 +88,5 @@ function start(): void {
     const dev = process.env.ELECTRON_RENDERER_URL;
     await (dev && !app.isPackaged ? win.loadURL(dev) : win.loadURL('app://seat/index.html'));
   });
-  app.on('window-all-closed', () => { sync?.stop(); exam?.close(); app.quit(); });
+  app.on('window-all-closed', () => { seat?.close(); app.quit(); });
 }
