@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { hexToBytes } from '@saakshi/core/bytes';
@@ -50,7 +50,7 @@ test('every cell certificate and every policy verifies under the authority; each
     const cell = d.cells.find((c) => c.id === d.centres[centre].cell)!;
     expect(p.cell).toEqual({ id: cell.id, keyId: cell.keyId, pub: cell.pub });
     expect(Object.keys(p.roster).sort()).toEqual(rosterOf(d, centre));
-    for (const [cand, e] of Object.entries(p.roster)) expect(e).toEqual({ form: d.cands[cand].form, extraMs: d.cands[cand].extraMs, pseud: d.cands[cand].pseud });
+    for (const [cand, e] of Object.entries(p.roster)) expect(e).toEqual({ form: d.cands[cand].form, extraMs: d.cands[cand].extraMs, pseud: d.cands[cand].pseud, ...(e.acc ? { acc: e.acc } : {}) });
   }
 });
 
@@ -71,4 +71,22 @@ test('provision --demo writes the DEMO ops into the directory; without it there 
   const a = provision({ out: join(tmp, 'a'), keys, cands: [], ops: OPS_DEMO });
   expect(a.ops).toEqual(OPS_DEMO);
   expect(provision({ out: join(tmp, 'b'), keys, cands: [] }).ops).toBeUndefined();
+});
+
+test('Stage 5: each policy carries a signed integrity section; the review key is written once; the demo scribe seat has 2 faces', async () => {
+  const d = provision({ out, keys, cands, relayHosts: { CEN042: '192.168.1.10:7070' } });
+  const rk = JSON.parse(readFileSync(join(out, FILES.reviewKey), 'utf8'));
+  const p = openPolicy(read<SignedPolicy>(FILES.policy('CEN042')), A, d);
+  expect(p.integrity!.reviewPub).toBe(rk.pub);
+  expect(p.integrity!.egress).toEqual(['192.168.1.10:7070']);
+  const second = Object.keys(p.roster).sort()[1];
+  expect(p.roster[second].acc).toEqual({ faces: 2, assistive: ['NVDA', 'VoiceOver'] });
+  // "written once and reused if present" — provision() refuses to re-run over an already-provisioned exam directory
+  // (existing invariant, pinned above), so exercise reuse against a fresh `out` that already has a review key on disk
+  // (e.g. left over from a crashed/retried provisioning run) rather than re-provisioning the same directory.
+  const out2 = join(tmp, 'retry');
+  mkdirSync(join(out2, 'control'), { recursive: true });
+  writeFileSync(join(out2, FILES.reviewKey), JSON.stringify({ priv: 'seed-priv', pub: 'seed-pub' }));
+  provision({ out: out2, keys, cands });
+  expect(JSON.parse(readFileSync(join(out2, FILES.reviewKey), 'utf8')).pub).toBe('seed-pub');
 });

@@ -8,14 +8,23 @@ import { hexToBytes, randomBytes, toHex } from '../packages/core/src/bytes.ts';
 import { DEV_EXAM, devForm, devRoster, type KeysFile } from '../packages/core/src/dev.ts';
 import { FILES, type CellEntry, type CellKeyFile, type Directory } from '../packages/core/src/directory.ts';
 import { cellKeyArray, cellKeyId, msg } from '../packages/core/src/enrol.ts';
+import { INTEGRITY_DEFAULT, type Accommodation } from '../packages/core/src/integrity.ts';
 import { pseudOf } from '../packages/core/src/log.ts';
-import { signer } from '../packages/core/src/node.ts';
+import { newKeyPair, signer } from '../packages/core/src/node.ts';
 import { OPS_DEMO, type Ops } from '../packages/core/src/ops.ts';
 import { signPolicy, type Policy, type RosterEntry } from '../packages/core/src/policy.ts';
 import { readCohort } from './cohort.ts';
 
 export interface CohortCand { cand: string; centre: string; form: 'F1' | 'F2'; pwd: 0 | 1 }
-export interface ProvisionOpts { out: string; keys: KeysFile; cands: CohortCand[]; demoCentre?: string; cellUrls?: string[]; durationMs?: number; now?: number; ops?: Ops }
+export interface ProvisionOpts {
+  out: string; keys: KeysFile; cands: CohortCand[]; demoCentre?: string; cellUrls?: string[]; durationMs?: number; now?: number; ops?: Ops;
+  /** centre → "host:port" the seats at that centre use for the relay; default 127.0.0.1:7070 for every centre */
+  relayHosts?: Record<string, string>;
+  /** candidate → accommodation; default (when omitted) marks the demo centre's second candidate (sorted) as a 2-face scribe seat with NVDA/VoiceOver */
+  acc?: Record<string, Accommodation>;
+  /** merged over INTEGRITY_DEFAULT; the computed egress and reviewPub always win */
+  integrity?: Partial<import('../packages/core/src/integrity.ts').IntegrityPolicy>;
+}
 
 /** Compensatory time: PwD candidates get 20 minutes per hour, so D_i = D + D/3. */
 export const extraFor = (pwd: 0 | 1, durationMs: number): number => (pwd ? Math.round(durationMs / 3) : 0);
@@ -59,10 +68,19 @@ export function provision(o: ProvisionOpts): Directory {
   const centres: Directory['centres'] = { [demo]: { cell: cells[0].id } };
   [...byCentre.keys()].filter((c) => c !== demo).sort().forEach((c, i) => { centres[c] = { cell: cells[i % cells.length].id }; });
 
+  // Addendum D: the review key is written once and reused across provisioning runs (e.g. a retry after a crash).
+  const rkPath = join(out, FILES.reviewKey);
+  if (!existsSync(rkPath)) { const k = newKeyPair(); write(FILES.reviewKey, JSON.stringify({ priv: toHex(k.priv), pub: toHex(k.pub) })); }
+  const reviewPub = (JSON.parse(readFileSync(rkPath, 'utf8')) as { pub: string }).pub;
+  const demoRoster = [...(byCentre.get(demo) ?? [])].map(([cand]) => cand).sort();
+  const acc: Record<string, Accommodation> = o.acc ?? (demoRoster[1] ? { [demoRoster[1]]: { faces: 2, assistive: ['NVDA', 'VoiceOver'] } } : {});
+
   const dir: Directory = { v: 1, exam: DEV_EXAM.exam, shift: DEV_EXAM.shift, durationMs, demoCentre: demo, issuedAt: now, cells, centres, cands, ...(o.ops ? { ops: o.ops } : {}) };
   for (const [centre, { cell: cellId }] of Object.entries(centres)) {
     const cell = cells.find((c) => c.id === cellId)!;
-    const policy: Policy = { v: 1, exam: dir.exam, shift: dir.shift, centre, cell: { id: cell.id, keyId: cell.keyId, pub: cell.pub }, durationMs, roster: Object.fromEntries(byCentre.get(centre) ?? []), issuedAt: now };
+    const roster = Object.fromEntries((byCentre.get(centre) ?? []).map(([cand, entry]) => [cand, acc[cand] ? { ...entry, acc: acc[cand] } : entry]));
+    const integrity = { ...INTEGRITY_DEFAULT, ...o.integrity, egress: [o.relayHosts?.[centre] ?? '127.0.0.1:7070'], reviewPub };
+    const policy: Policy = { v: 1, exam: dir.exam, shift: dir.shift, centre, cell: { id: cell.id, keyId: cell.keyId, pub: cell.pub }, durationMs, roster, issuedAt: now, integrity };
     write(FILES.policy(centre), JSON.stringify(signPolicy(policy, signA)));
   }
   write(FILES.pseudKey, toHex(pseudKey));
