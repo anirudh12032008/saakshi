@@ -24,14 +24,28 @@ function bunStack() {
   return { next, cmd, stop };
 }
 
+// When Playwright can't attach, run the exe the way it does and show why it exited (CI has no other window into it).
+function launchDiag(args: string[]): Promise<string> {
+  return new Promise((res) => {
+    const p = spawn(EXE, ['--inspect=0', '--remote-debugging-port=0', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    p.stdout!.on('data', (d) => { out += d; }); p.stderr!.on('data', (d) => { out += d; });
+    const t = setTimeout(() => { p.kill(); res(`launch diag: still running after 15 s\n${out}`); }, 15_000);
+    p.on('exit', (code, sig) => { clearTimeout(t); res(`launch diag: exit ${code} ${sig ?? ''}\n${out}`); });
+    p.on('error', (e) => { clearTimeout(t); res(`launch diag: spawn error ${e.message}`); });
+  });
+}
+
 test('enrol → unlock → answer offline → sync → submit → /verify green (e2e build, camera off)', async () => {
   const s = bunStack();
   const data = mkdtempSync(join(tmpdir(), 'saakshi-e2e-seat-'));             // a fresh journal every run
   let app: ElectronApplication | undefined;
   try {
     const { relayUrl } = await s.next() as { relayUrl: string };
-    app = await electron.launch({ executablePath: EXE, args: [`--user-data-dir=${data}`, '--test-mode', '--no-camera',
-      '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--relay', relayUrl, '--cand', 'C0001', '--seat', 'CEN042-S01'] });
+    const args = [`--user-data-dir=${data}`, '--test-mode', '--no-camera',
+      '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--relay', relayUrl, '--cand', 'C0001', '--seat', 'CEN042-S01'];
+    try { app = await electron.launch({ executablePath: EXE, args }); }
+    catch (e) { console.error(await launchDiag(args)); throw e; }
     const w = await app.firstWindow();
     w.setDefaultTimeout(30_000);
     await w.getByLabel('New PIN (6 digits)').fill('482913');
