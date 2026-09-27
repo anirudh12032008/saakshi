@@ -23,10 +23,12 @@ export type RunUv = (module: string, args: string[]) => Promise<{ code: number; 
 
 export function bunRunUv(o: { uv?: string; cwd: string; timeoutMs: number }): RunUv {
   return async (module, args) => {
-    const proc = Bun.spawn([o.uv ?? 'uv', 'run', 'python', '-m', module, ...args], { cwd: o.cwd, stdout: 'pipe', stderr: 'pipe' });
+    let proc: ReturnType<typeof Bun.spawn>;
+    try { proc = Bun.spawn([o.uv ?? 'uv', 'run', 'python', '-m', module, ...args], { cwd: o.cwd, stdout: 'pipe', stderr: 'pipe' }); }
+    catch (e) { return { code: 127, stdout: '', stderr: `cannot run uv: ${(e as Error).message}` }; }   // uv not installed
     const timer = setTimeout(() => proc.kill(), o.timeoutMs);
     try {
-      const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+      const [stdout, stderr] = await Promise.all([new Response(proc.stdout as ReadableStream).text(), new Response(proc.stderr as ReadableStream).text()]);
       return { code: await proc.exited, stdout, stderr };
     } finally { clearTimeout(timer); }
   };
@@ -113,6 +115,7 @@ export function analyticsRoutes(o: AnalyticsRoutesOpts): Routes {
     if (r.code !== 0) throw new Error(`scorecard failed: ${r.stderr.trim().split('\n').slice(-20).join('\n') || `exit ${r.code}`}`);
     return JSON.parse(readFileSync(outPath, 'utf8')) as { scorecard: ScoreRow[]; precision: unknown };
   })();
+  scorecardOnce.catch(() => {});   // served as a 503 on request; an unawaited rejection would otherwise kill control at start-up
 
   return {
     '/v1/analytics/run': { POST: handle(async (req) => {

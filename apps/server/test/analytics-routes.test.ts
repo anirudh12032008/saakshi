@@ -186,3 +186,10 @@ test('scorecard: 503 if uv failed', async () => {
   const res = await get(routes, '/v1/scorecard');
   expect(res.status).toBe(503);
 });
+
+test('bunRunUv: a missing uv binary is exit 127, not a throw (Windows CI has no uv)', async () => {
+  const { bunRunUv } = await import('../src/analytics-routes.ts');
+  const r = await bunRunUv({ uv: 'definitely-not-uv-xyz', cwd: '.', timeoutMs: 5000 })('m', []);
+  expect(r.code).toBe(127);
+  expect(r.stderr).toContain('cannot run uv');
+});
