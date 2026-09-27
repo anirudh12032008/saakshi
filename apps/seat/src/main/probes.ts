@@ -1,5 +1,8 @@
 import { join } from 'node:path';
-import { blocklistHits, parsePs, parseTasklistCsv, probe, run, type ProbeResult } from './probe-parse.ts';
+import { INTEGRITY_DEFAULT } from '@saakshi/core/integrity';
+import { matchRules, parsePs, parseTasklistCsv, probe, run, type ProbeResult } from './probe-parse.ts';
+
+const blocklistHits = (names: string[]): string[] => matchRules(names.map((name) => ({ name })), INTEGRITY_DEFAULT.blocklist).map((h) => h.name);
 
 export interface Selftest { app: 'saakshi-seat'; platform: string; arch: string; electron: string; ok: boolean; ms: number; probes: Record<string, ProbeResult> }
 
