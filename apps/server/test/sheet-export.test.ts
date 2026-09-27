@@ -33,14 +33,18 @@ async function sat(cand: string, entries: number, submit: boolean) {
   return s;
 }
 
+// Stage 4: every exported entry carries the relay's and cell's receive stamps; the seat's sheet has none.
+const noRx = <T extends { entries: { rx?: unknown }[] }>(s: T) => ({ ...s, entries: s.entries.map(({ rx: _, ...e }) => e) });
+
 test('the export is exactly the honest sheet plus the cell\'s countersigned receipt, and it verifies', async () => {
   const a = await sat('C0001', 21, true), b = await sat('C0002', 4, false);
   const exp = shiftExport(db, EX);
   expect(exp.sheets.map((s) => s.ctx.cand)).toEqual(['C0001', 'C0002']);
   const { receipt, ...rest } = exp.sheets[0];
-  expect(rest).toEqual(a.sheet());
+  expect(rest.entries.every((e) => e.rx?.length === 2)).toBe(true);
+  expect(noRx(rest)).toEqual(a.sheet());
   expect(receipt).toMatchObject({ cell: 'cell-1', seq: 22, h: a.hs[21] });
-  expect(exp.sheets[1]).toEqual(b.sheet());
+  expect(noRx(exp.sheets[1])).toEqual(b.sheet());
   const r = verifySheet(exp.sheets[0], forms, trust, verifier);
   expect(r.ok).toBe(true);
   expect(r.receipt!.code).toBe(receipt!.code);

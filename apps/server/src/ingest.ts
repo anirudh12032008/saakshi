@@ -9,6 +9,8 @@ import { receiptMessage, responsesOf } from '@saakshi/core/log';
 import { counts, entryHash, finalHash, genesisPrev, receiptCode, type Body, type Ctx, type Header, type State } from '@saakshi/core/protocol';
 import type { Forms } from '@saakshi/core/sheet';
 import type { Verify } from '@saakshi/core/sig';
+import type { StreamSnap } from '@saakshi/core/handover';
+import type { CellEvent, EventCode } from '@saakshi/core/ops';
 import {
   fromB64, streamKey, toB64,
   type NodeState, type Rejection, type RejectCode, type StreamStatus, type StreamView, type SyncReq, type SyncRes, type WireAck, type WireEntry,
@@ -44,6 +46,12 @@ export interface IngestOpts {
   acceptBinds?: (binds: WireBind[]) => (string | undefined)[];
   /** Stage 3, cell: the releases it holds; sent in the response when the relay has fewer (SyncReq.have). */
   releases?: () => ReleaseMsg[];
+  /** Addendum C.4: the fromSeq of a certified keyEpoch (undefined: no such epoch). EXAM: bindings.fromSeqOf. */
+  fromSeq?: (cand: string, keyEpoch: number) => number | undefined;
+  /** Addendum C.8: D_i + gap cap + slack for a candidate (undefined: no hard stop, e.g. DEV). */
+  deadlineMs?: (cand: string) => number | undefined;
+  /** cell: REBUILDING also ends this long after the last replay request, when some relay never replays (default 60 s). */
+  rebuildGraceMs?: number;
 }
 
 export interface Ingest {
@@ -57,11 +65,20 @@ export interface Ingest {
   setCellStatus(st: StreamStatus): boolean;
   /** relay: the cell is REBUILDING — forget its heads and acks. */
   resetCell(): void;
+  /** Evidence rows after `after` (≤ 500): rejections, ORPHANED, LATE, and the GAP / INTEGRITY / HANDOVER notes. */
+  events(after: number, limit?: number): CellEvent[];
+  /** Record an event that is not an entry (the cell's HANDOVER grant). */
+  note(code: EventCode, c: Ctx, seq: number, data: Record<string, string | number>): void;
+  /** What a cell knows about one stream (committed only). */
+  snapshot(c: Ctx): StreamSnap | undefined;
+  rebuild(): { done: number; expected: number };
+  /** relay: after a failed round, every cell head is unknown again (acks are kept). */
+  forgetCell(): void;
   close(): void;
 }
 
 /** bodies[seq-1] = the opened body (cell only); submitSeq = seq of the submit, 0 while the chain is open. */
-interface Stream { ctx: Ctx; hs: string[]; durable: number; epoch: number; ack?: WireAck; cellHead: number; senderHead: number; seenAt: number; bodies: Body[]; submitSeq: number; active: number; activeEpoch: number }
+interface Stream { ctx: Ctx; hs: string[]; durable: number; epoch: number; ack?: WireAck; cellHead: number; senderHead: number; seenAt: number; bodies: Body[]; submitSeq: number; active: number; activeEpoch: number; unlockRx: number }
 
 const ENV_MIN = 65 + 24 + 16 + 16;
 const SIG_HEX = /^[0-9a-f]{128}$/;
@@ -77,29 +94,38 @@ export function createIngest(o: IngestOpts): Ingest {
   const verifiers = new Map<string, Verify>();
   const getMeta = db.query('SELECT v FROM meta WHERE k = ?');
   const setMeta = db.query('INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v');
-  const addEvidence = db.query('INSERT INTO evidence (at, code, stream, seq, reason, line) VALUES (?, ?, ?, ?, ?, ?)');
-  const readAfter = db.query('SELECT line, env FROM entries WHERE exam = ? AND shift = ? AND attempt = ? AND cand = ? AND seq > ? ORDER BY seq LIMIT ?');
+  const addEvidence = db.query('INSERT INTO evidence (at, code, stream, seq, reason, line, env) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const readAfter = db.query('SELECT line, env, rx_wall FROM entries WHERE exam = ? AND shift = ? AND attempt = ? AND cand = ? AND seq > ? ORDER BY seq LIMIT ?');
   let closed = false;
 
   let state: NodeState = mode === 'cell' && (o.fresh || (getMeta.get('state') as { v: string } | null)?.v === 'REBUILDING') ? 'REBUILDING' : 'LIVE';
   if (state === 'REBUILDING') setMeta.run('state', 'REBUILDING');
-  let dones = 0;
+  let dones = 0, lastReplayAt = 0;
+  const expected = Math.max(1, o.rebuildRelays ?? 1), grace = o.rebuildGraceMs ?? 60_000;
+  /** REBUILDING ends when every relay this cell serves has replayed, or `grace` after the last replay request (a relay that is down). */
+  function settle(t: number): void {
+    if (state !== 'REBUILDING' || dones < 1 || (dones < expected && t - lastReplayAt <= grace)) return;
+    state = 'LIVE';
+    setMeta.run('state', 'LIVE');
+    o.onState?.(state);
+  }
 
   const get = (c: Ctx): Stream => {
     const k = streamKey(c);
     let s = streams.get(k);
-    if (!s) streams.set(k, (s = { ctx: ctxOf(c), hs: [], durable: 0, epoch: 0, cellHead: mode === 'cell' ? 0 : -1, senderHead: -1, seenAt: 0, bodies: [], submitSeq: 0, active: 0, activeEpoch: 0 }));
+    if (!s) streams.set(k, (s = { ctx: ctxOf(c), hs: [], durable: 0, epoch: 0, cellHead: mode === 'cell' ? 0 : -1, senderHead: -1, seenAt: 0, bodies: [], submitSeq: 0, active: 0, activeEpoch: 0, unlockRx: 0 }));
     return s;
   };
-  const view = (s: Stream): StreamView => ({ ...s.ctx, head: s.durable, cellHead: mode === 'cell' ? s.durable : s.cellHead, senderHead: s.senderHead, seenAt: s.seenAt });
+  const view = (s: Stream): StreamView => ({ ...s.ctx, head: s.durable, cellHead: mode === 'cell' ? s.durable : s.cellHead, senderHead: s.senderHead, seenAt: s.seenAt, ...(s.submitSeq ? { submitted: true as const } : {}) });
   const emit = (s: Stream) => o.onView?.(view(s));
 
   // ponytail: every h stays in memory (~100 B per entry); page from the DB if one node outgrows RAM.
-  for (const r of db.query('SELECT exam, shift, attempt, cand, seq, h, key_epoch FROM entries ORDER BY exam, shift, attempt, cand, seq').all() as (Ctx & { seq: number; h: string; key_epoch: number })[]) {
+  for (const r of db.query('SELECT exam, shift, attempt, cand, seq, h, key_epoch, rx_wall FROM entries ORDER BY exam, shift, attempt, cand, seq').all() as (Ctx & { seq: number; h: string; key_epoch: number; rx_wall: number })[]) {
     const s = get(r);
     s.hs.push(r.h);
     s.durable = r.seq;
     s.epoch = r.key_epoch;
+    if (r.seq === 1) s.unlockRx = r.rx_wall;
   }
   if (mode === 'cell') {
     // ponytail: replay state is rebuilt from the bodies table, so a post-startup DB edit only affects later submits; the audit catches edits regardless.
@@ -160,11 +186,13 @@ export function createIngest(o: IngestOpts): Ingest {
   };
 
   async function sync(req: SyncReq): Promise<SyncRes | 'REBUILDING'> {
-    if (state === 'REBUILDING' && !req.replay) return 'REBUILDING';
     const t = now();
+    if (req.replay) lastReplayAt = t;
+    settle(t);
+    if (state === 'REBUILDING' && !req.replay) return 'REBUILDING';
     const touched = new Map<Stream, boolean>();            // stream → a gap was seen (NEED)
     const rejected: Rejection[] = [];
-    const evidence: [RejectCode, string, number, string, string][] = [];
+    const evidence: [code: string, stream: string, seq: number, reason: string, line: string, env: Uint8Array | null][] = [];
     const rows: Row[] = [];
 
     for (const hl of req.streams) {
@@ -178,12 +206,17 @@ export function createIngest(o: IngestOpts): Ingest {
 
     // Stage 3: bindings first, so the entries below are checked against the keys they certify. A bad bind is evidence, not an error.
     if (req.binds?.length && o.acceptBinds) {
-      o.acceptBinds(req.binds).forEach((err, i) => { if (err) evidence.push(['BAD_SUBMISSION', '', 0, `bind: ${err}`, req.binds![i].cert]); });
+      o.acceptBinds(req.binds).forEach((err, i) => { if (err) evidence.push(['BAD_SUBMISSION', '', 0, `bind: ${err}`, req.binds![i].cert, null]); });
     }
 
     // Synchronous from here to commit.add: no other request interleaves with this validation.
     req.entries.forEach((e, index) => {
-      const reject = (code: RejectCode, reason: string, key = '', seq = 0) => { rejected.push({ index, code, reason }); evidence.push([code, key, seq, reason, e.line]); };
+      // C.7: the relay stamps its own clock; the cell keeps the relay's stamp unless it is from the future.
+      const rx = mode === 'relay' || e.rx === undefined || e.rx > t + 300_000 ? t : e.rx;
+      const envOf = (): Uint8Array | null => { try { return fromB64(e.env); } catch { return null; } };
+      const reject = (code: RejectCode, reason: string, key = '', seq = 0, env: Uint8Array | null = null) => {
+        rejected.push({ index, code, reason }); evidence.push([code, key, seq, reason, e.line, env]);
+      };
       const p = parseSignedLine(e.line);
       if (!p.ok) return reject('BAD_SUBMISSION', `${p.fault}: ${p.detail}`);
       const hd = p.header, key = streamKey(hd), s = get(hd);
@@ -194,6 +227,11 @@ export function createIngest(o: IngestOpts): Ingest {
       if (!v) return bad(`no seat key for ${hd.cand} at keyEpoch ${hd.keyEpoch}`);
       if (!v(p.m, p.sig)) return bad('signature does not verify');
       if (hd.seq < 1) return bad('seq must start at 1');
+      // Addendum C.4: a key epoch signs only its own range. The old seat's tail after a move is evidence, not tampering.
+      const from = o.fromSeq?.(hd.cand, hd.keyEpoch) ?? 0;
+      if (hd.seq <= from) return bad(`seq ${hd.seq} is not after keyEpoch ${hd.keyEpoch}'s fromSeq ${from}`);
+      const next = o.fromSeq?.(hd.cand, hd.keyEpoch + 1);
+      if (next !== undefined && hd.seq > next) return reject('ORPHANED', `keyEpoch ${hd.keyEpoch} was replaced at seq ${next}: the candidate moved to another seat`, key, hd.seq, envOf());
       if (s.submitSeq && hd.seq > s.submitSeq) return bad(`entry after submit (the chain closed at seq ${s.submitSeq})`);
       const head = s.hs.length;
       if (hd.seq > head + 1) { touched.set(s, true); return; }            // gap → NEED{cand, head}
@@ -202,6 +240,10 @@ export function createIngest(o: IngestOpts): Ingest {
       if (hd.prev !== (hd.seq === 1 ? genesisPrev(hd) : s.hs[hd.seq - 2])) return reject('FORK', `seq ${hd.seq}: prev does not match the stored chain`, key, hd.seq);
       // 3. fork or duplicate
       if (hd.seq <= head) return s.hs[hd.seq - 1] === h ? undefined : reject('FORK', `seq ${hd.seq} already holds a different signed entry`, key, hd.seq);
+      // Addendum C.8: the hard stop, from the unlock's rxWall. Kept as evidence: a human can admit it.
+      const dl = o.deadlineMs?.(hd.cand);
+      if (dl !== undefined && hd.seq > 1 && s.unlockRx > 0 && rx > s.unlockRx + dl)
+        return reject('LATE', `received ${Math.round((rx - s.unlockRx - dl) / 1000)} s after the hard stop`, key, hd.seq, envOf());
       // Addendum B.8: active time never runs backwards within a key epoch (plan §3.6).
       if (hd.keyEpoch === s.activeEpoch && hd.activeMs < s.active) return bad(`activeMs went backwards (${s.active} → ${hd.activeMs}) within keyEpoch ${hd.keyEpoch}`);
       let env: Uint8Array;
@@ -219,21 +261,21 @@ export function createIngest(o: IngestOpts): Ingest {
           receipt = r;
         }
         rec = { item: body.item, state: body.state, answer: body.answer, meta: JSON.stringify(body.meta), salt: opened.salt };
+        if (hd.kind === 'gap') evidence.push(['GAP', key, hd.seq, JSON.stringify({ cause: String(body.meta[0] ?? ''), pausedMs: typeof body.meta[1] === 'number' ? body.meta[1] : 0 }), e.line, null]);
+        if (hd.kind === 'integrity') evidence.push(['INTEGRITY', key, hd.seq, JSON.stringify({ code: String(body.meta[0] ?? '') }), e.line, null]);
       }
       s.hs.push(h);
+      if (hd.seq === 1) s.unlockRx = rx;
       s.active = hd.activeMs; s.activeEpoch = hd.keyEpoch;
       if (body) s.bodies[hd.seq - 1] = body;
       if (hd.kind === 'submit') s.submitSeq = hd.seq;
-      rows.push({ ...ctxOf(hd), seq: hd.seq, keyEpoch: hd.keyEpoch, h, line: e.line, env, body: rec, receipt });
+      rows.push({ ...ctxOf(hd), seq: hd.seq, keyEpoch: hd.keyEpoch, h, line: e.line, env, body: rec, receipt, rx, cellRx: mode === 'cell' ? t : 0 });
     });
 
     if (evidence.length) db.transaction(() => { for (const ev of evidence) addEvidence.run(t, ...ev); })();
     if (rows.length) await commit.add(rows);
-    if (req.replay && req.done && state === 'REBUILDING' && ++dones >= (o.rebuildRelays ?? 1)) {
-      state = 'LIVE';
-      setMeta.run('state', 'LIVE');
-      o.onState?.(state);
-    }
+    if (req.replay && req.done && state === 'REBUILDING') dones++;
+    settle(t);
     const rel = o.releases?.() ?? [];
     return {
       streams: [...touched].map(([s, need]) => ({ ...s.ctx, head: s.durable, headH: s.durable ? s.hs[s.durable - 1] : '', need, ack: ackOf(s) })),
@@ -242,13 +284,40 @@ export function createIngest(o: IngestOpts): Ingest {
     };
   }
 
+  const rxOf = db.query('SELECT rx_wall FROM entries WHERE exam = ? AND shift = ? AND attempt = ? AND cand = ? AND seq = ?');
+  const readEvents = db.query('SELECT id, at, code, stream, seq, reason FROM evidence WHERE id > ? ORDER BY id LIMIT ?');
+
   return {
     mode,
-    state: () => state,
+    state: () => { settle(now()); return state; },
+    rebuild: () => ({ done: dones, expected }),
+    events(after, limit = 500) {
+      return (readEvents.all(after, Math.min(limit, 500)) as { id: number; at: number; code: string; stream: string; seq: number; reason: string }[]).map((r) => {
+        let cand = '';
+        try { cand = r.stream ? String((JSON.parse(r.stream) as unknown[])[3]) : ''; } catch { /* unkeyed evidence */ }
+        let data: Record<string, string | number> | undefined;
+        if (r.reason.startsWith('{')) { try { data = JSON.parse(r.reason) as Record<string, string | number>; } catch { /* plain text */ } }
+        return { id: r.id, at: r.at, cell: cellId, code: r.code as EventCode, cand, centre: '', seq: r.seq, reason: r.reason, ...(data ? { data } : {}) };
+      });
+    },
+    note(code, c, seq, data) { addEvidence.run(now(), code, streamKey(c), seq, JSON.stringify(data), '', null); },
+    snapshot(c) {
+      const s = streams.get(streamKey(c));
+      if (!s) return undefined;
+      const row = s.durable ? (lineAt.get(c.exam, c.shift, c.attempt, c.cand, s.durable) as { line: string } | null) : null;
+      const p = row ? parseSignedLine(row.line) : undefined;
+      return {
+        head: s.durable, headH: s.durable ? s.hs[s.durable - 1] : genesisPrev(c), activeMs: p?.ok ? p.header.activeMs : 0,
+        pending: s.hs.length - s.durable, submitted: s.submitSeq > 0, bodies: s.bodies.slice(0, s.durable),
+        rxAt: (seq: number) => (rxOf.get(c.exam, c.shift, c.attempt, c.cand, seq) as { rx_wall: number } | null)?.rx_wall ?? 0,
+      };
+    },
+    forgetCell() { if (mode === 'relay') for (const s of streams.values()) if (s.cellHead !== -1) { s.cellHead = -1; emit(s); } },
     sync,
     views: () => [...streams.values()].map(view),
     entriesAfter: (c, after, limit) =>
-      (readAfter.all(c.exam, c.shift, c.attempt, c.cand, after, limit) as { line: string; env: Uint8Array }[]).map((r) => ({ line: r.line, env: toB64(r.env) })),
+      (readAfter.all(c.exam, c.shift, c.attempt, c.cand, after, limit) as { line: string; env: Uint8Array; rx_wall: number }[])
+        .map((r) => (r.rx_wall ? { line: r.line, env: toB64(r.env), rx: r.rx_wall } : { line: r.line, env: toB64(r.env) })),
     setCellStatus(st) {
       const s = streams.get(streamKey(st));
       if (!s || mode !== 'relay') return false;

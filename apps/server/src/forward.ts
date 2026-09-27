@@ -1,7 +1,8 @@
 import type { WireBind } from '@saakshi/core/enrol';
 import type { ReleaseMsg } from '@saakshi/core/paper';
 import type { Ctx } from '@saakshi/core/protocol';
-import { streamKey, type Hello, type StreamView, type SyncReq, type SyncRes } from '@saakshi/core/wire';
+import type { RoundSample } from '@saakshi/core/ops';
+import { LIMITS, streamKey, type Hello, type StreamView, type SyncReq, type SyncRes } from '@saakshi/core/wire';
 import type { Ingest } from './ingest.ts';
 
 export type CellSend = (req: SyncReq) => Promise<SyncRes | 'REBUILDING'>;
@@ -23,8 +24,10 @@ export interface ForwardOpts {
   batch?: number; heartbeatMs?: number;
   /** Stage 3: where releases from the cell go, and how many signed ones this relay already holds. */
   releases?: { count(): number; accept(r: ReleaseMsg): unknown };
-  /** Stage 3: the binding to replay for a stream while the cell is REBUILDING. */
-  bindFor?: (c: Ctx) => WireBind | undefined;
+  /** Every binding of the stream, oldest epoch first (Stage 4: a moved candidate has several). */
+  bindFor?: (c: Ctx) => WireBind[];
+  /** Stage 4: one sample per send, for the relay's link monitor (SYNC_LAG). */
+  onRound?: (r: RoundSample) => void;
 }
 
 /**
@@ -44,6 +47,7 @@ export class Forwarder {
   #loop: Promise<void> | undefined;
   #releases?: ForwardOpts['releases'];
   #bindFor?: ForwardOpts['bindFor'];
+  #onRound?: ForwardOpts['onRound'];
 
   constructor(relay: Ingest, send: CellSend, opts: ForwardOpts = {}) {
     this.#relay = relay;
@@ -52,6 +56,7 @@ export class Forwarder {
     this.#heartbeatMs = opts.heartbeatMs ?? 2000;
     this.#releases = opts.releases;
     this.#bindFor = opts.bindFor;
+    this.#onRound = opts.onRound;
   }
 
   get replaying(): boolean { return this.#replaying; }
@@ -61,19 +66,23 @@ export class Forwarder {
       const req: SyncReq = { entries: [], streams: [] };
       if (this.#replaying) req.replay = true;
       const before = new Map<string, number>();
+      const binds: WireBind[] = [];
+      let backlog = 0;
       // ponytail: first streams first, no fairness; add round-robin if one centre's backlog starves the rest.
       for (const v of this.#relay.views()) {
-        if (req.entries.length >= this.#batch || req.streams.length >= 5000) break;
+        backlog += Math.max(0, v.head - Math.max(0, v.cellHead));
+        if (req.entries.length >= this.#batch || req.streams.length >= 5000) continue;      // keep counting the backlog
         if (v.cellHead >= 0 && v.head <= v.cellHead) continue;
+        // A stream's bindings travel with its entries while the cell rebuilds, or when the cell does not know the stream
+        // (cellHead 0) — so a relay that missed a rebuild heals instead of being refused "no seat key".
+        const bs = this.#bindFor && v.cellHead >= 0 && (this.#replaying || v.cellHead === 0) ? this.#bindFor(v) : [];
+        if (binds.length + bs.length > LIMITS.entries) continue;
+        binds.push(...bs);
         req.streams.push(hello(v));
         before.set(streamKey(v), v.cellHead);
         if (v.cellHead >= 0) req.entries.push(...this.#relay.entriesAfter(v, v.cellHead, this.#batch - req.entries.length));
       }
-      // Stage 3: while the cell rebuilds, each stream's binding travels with its entries (the cell processes binds first).
-      if (this.#replaying && this.#bindFor) {
-        const binds = req.streams.flatMap((h): WireBind[] => { const b = this.#bindFor!(h); return b ? [b] : []; });
-        if (binds.length) req.binds = binds;
-      }
+      if (binds.length) req.binds = binds;
       let heartbeat = false;
       if (!req.streams.length) {
         if (this.#replaying) {
@@ -87,8 +96,16 @@ export class Forwarder {
         heartbeat = true;
       }
       if (this.#releases) req.have = this.#releases.count();
-      const res = await this.#send(req);
+      const t0 = Date.now();
+      let res: SyncRes | 'REBUILDING';
+      try { res = await this.#send(req); }
+      catch (e) {
+        this.#onRound?.({ at: Date.now(), ms: Date.now() - t0, ok: false, backlog, replaying: this.#replaying });
+        this.#relay.forgetCell();                   // learn the cell's heads again (a hello round) before sending entries
+        throw e;
+      }
       this.#lastContact = Date.now();
+      this.#onRound?.({ at: this.#lastContact, ms: this.#lastContact - t0, ok: true, backlog, replaying: this.#replaying || res === 'REBUILDING' });
       if (res === 'REBUILDING') {
         if (!this.#replaying) { this.#replaying = true; this.#relay.resetCell(); }
         return 'busy';

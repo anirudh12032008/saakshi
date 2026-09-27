@@ -149,13 +149,13 @@ test('Review Focus #5: after the cell loses its DB, the replay carries the binds
   const s = new SimSeat(keys, 'C0001', cell.pub, 1, seat);
   s.add(25);
   await seatPush(relay.n, s);
-  await drain(new Forwarder(relay.n, (req) => c1.n.sync(req), { bindFor: (x) => relay.b.get(x.cand, 1) }));
+  await drain(new Forwarder(relay.n, (req) => c1.n.sync(req), { bindFor: (x) => relay.b.forCand(x.cand) }));
   expect(c1.n.views()[0].head).toBe(25);
 
   const c2 = bound('cell2', 'cell', true);                                         // the disk died: a fresh DB that knows no binding
   expect([c2.n.state(), c2.b.seatKey('C0001', 1)]).toEqual(['REBUILDING', undefined]);
   const sent: SyncReq[] = [];
-  await drain(new Forwarder(relay.n, (req) => { sent.push(req); return c2.n.sync(req); }, { bindFor: (x) => relay.b.get(x.cand, 1) }));
+  await drain(new Forwarder(relay.n, (req) => { sent.push(req); return c2.n.sync(req); }, { bindFor: (x) => relay.b.forCand(x.cand) }));
   expect(c2.n.state()).toBe('LIVE');
   expect(sent.find((r) => r.entries.length)!.binds).toEqual([e.bind]);
   expect(c2.n.views()[0].head).toBe(25);

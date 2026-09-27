@@ -149,7 +149,7 @@ if (mode === 'control') {
     routes: modeRoutes,
   });
   const fwd = mode === 'relay'
-    ? new Forwarder(ingest, wan.wrap(httpCellSend(cellUrl)), bindings && releases ? { releases, bindFor: (c) => bindings.get(c.cand, 1) } : {})
+    ? new Forwarder(ingest, wan.wrap(httpCellSend(cellUrl)), bindings && releases ? { releases, bindFor: (c) => bindings.forCand(c.cand) } : {})
     : undefined;
   fwd?.start();
 

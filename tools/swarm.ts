@@ -105,7 +105,7 @@ export class Swarm {
     const bindings = new Bindings(db, { ...X, cell: { id: cellId, pub: cellPub } });
     const releases = new ReleaseStore(db, { ...X, manifest: o.manifest.manifest, authority: this.#authority, onNew: (r) => this.#unlock(id, r) });
     const ingest = createIngest({ mode: 'relay', db, fresh: false, seatKey: bindings.seatKey, acceptBinds: (b) => bindings.acceptAll(b), cell: { pub: cellPub } });
-    const fwd = new Forwarder(ingest, o.cell(cellId).send, { releases, bindFor: (c) => bindings.get(c.cand, 1) });
+    const fwd = new Forwarder(ingest, o.cell(cellId).send, { releases, bindFor: (c) => bindings.forCand(c.cand) });
     const sims = cands.map((cand): Sim => {
       const e = o.dir.cands[cand], ctx = { ...X, attempt: 1, cand }, seat = newKeyPair();
       return { ctx, form: e.form, seat, sign: signer(seat), steps: plan(ctx, e.form, o.forms[e.form], byCand.get(cand)!), next: 0, hs: [], t0: 0, bound: false, unlocked: false };
