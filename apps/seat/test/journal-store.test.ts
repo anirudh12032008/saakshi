@@ -39,7 +39,10 @@ test('appends survive a reopen byte-for-byte; hashAt follows the chain', () => {
 test('encrypted at rest: no header, context or answer text on disk; the session key is stored wrapped', () => {
   const { dir, path } = fresh(5);
   const text = readFileSync(path, 'latin1');
-  for (const s of ['DEMO-2026', '"answer"', 'signed', 'I01']) assert.equal(text.includes(s), false, s);
+  // Lines are base64(ciphertext): a short string like I01 can occur there by chance, so check the decoded bytes too.
+  const raw = text.split('\n').map((l) => Buffer.from(l, 'base64').toString('latin1')).join('');
+  for (const s of ['DEMO-2026', '"answer"', 'signed']) assert.equal(text.includes(s), false, s);
+  for (const s of ['DEMO-2026', '"answer"', 'signed', '"I01"']) assert.equal(raw.includes(s), false, s);
   const k = readFileSync(`${base(dir)}.key`, 'utf8');
   assert.equal(k[0], 'W');
   assert.equal(k.length, 65);
