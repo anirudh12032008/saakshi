@@ -268,3 +268,21 @@ The full matrix, filled in on both laptops (AnyDesk, TeamViewer, overlay-sim, se
 | Blocks before start / flags during the exam | Stage 5 (never auto-submits; move the candidate to another seat instead) | Stage 5 | — |
 
 No probe has yet been exercised against a real AnyDesk, TeamViewer or overlay. The Windows CI artifact ([`evidence/stage0-windows-probe.json`](evidence/stage0-windows-probe.json)) shows that the probes run in the packaged exe; it does not show that they detect those tools.
+
+## Stage 4 honest limits
+
+- **Moves:**
+  - A PIN move needs the exam server, so it waits for the WAN; the plan's "continue provisionally while restoring" is not built.
+  - A PIN guess needs an invigilator's approval each time, and after 3 wrong PINs control must verify the candidate.
+  - The relay cannot read the PIN or the restored answers, and cannot forge the grant.
+- **Spare relay after a move:** the new seat holds only the entries after `fromSeq`. A spare relay with an empty DB therefore cannot be refilled with the entries before the move from that seat. The cell has them; a relay that pulls a prefix from its cell is later work.
+- **rxWall is the relay's claim.** It is unsigned. A lying relay can move credited time and the hard stop within what the seat's signed `activeMs` allows. It cannot change an answer.
+- **The hard stop** rejects late entries but keeps them. A seat cut off from its own centre for longer than the gap cap plus the slack will have its late entries held for a human decision.
+- **Incidents and chaos:**
+  - Incidents live in control's memory and are rebuilt from live state and the cells' evidence; `incidents.json` is a record, not a source.
+  - The chaos routes are DEV-only, and the supervisor binds 127.0.0.1.
+  - The relay's degrade and purge routes are on the centre LAN. Purge needs an authority signature; degrade is DEV-only.
+- **The archive's WORM is simulated.** Production would use object lock or WORM media. Retention and DPDP deletion are not built.
+- **SEAT_SILENT and CENTRE_OUTAGE** are evaluated for the relays control can reach (the demo relay). The simulated centres report through their cells only.
+- **A spare relay's evidence event ids restart at 1.** Control's `/v1/events` cursor is per-relay and keyed by event id; when a dead relay is replaced by a spare, the spare's own event ids start over at 1, so a cursor left past that point on the old relay can miss the spare's first events until the next full poll. A cursor reset on relay replacement is later work.
+- **A provisional (not yet bound) seat that starts the exam keeps running even after an "already bound" refusal.** If a provisional seat (no WAN at check-in) lets its candidate start before the real binding lands, and the WAN then returns and refuses the seat as `ALREADY_BOUND`, the exam already under way on that seat is not itself halted — only the *binding* is refused. The started exam needs an operator to notice and intervene; nothing today force-stops it automatically.

@@ -1,0 +1,3 @@
+{"run":1,"scenario":"kill-cell","seats":8,"sent":800,"relayAcked":800,"cellAcked":800,"stored":800,"lost":0,"rpo":0,"rtoMs":1639,"ok":true,"at":"2026-09-27T14:06:59.929Z","host":"darwin-arm64"}
+{"run":2,"scenario":"wipe-cell","seats":8,"sent":800,"relayAcked":800,"cellAcked":800,"stored":800,"lost":0,"rpo":0,"rtoMs":1909,"ok":true,"at":"2026-09-27T14:07:03.659Z","host":"darwin-arm64"}
+{"run":3,"scenario":"spare-relay","seats":8,"sent":800,"relayAcked":800,"cellAcked":800,"stored":800,"lost":0,"rpo":0,"rtoMs":1308,"ok":true,"at":"2026-09-27T14:07:06.454Z","host":"darwin-arm64"}

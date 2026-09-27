@@ -1,0 +1,26 @@
+wrote 300 candidates x 100 items to /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-tqyNUG/g1
+✓ stack up: 3 cells, CEN042's relay, control (DEMO timers), supervisor on :61235
+✓ released by NTA + NIC; seat A answering at CEN042; swarm: 300 candidates
+  [relay] WAN DEGRADED (DEV chaos)
+✓ SYNC_LAG: "WAN failure likely: 51% of rounds failing (smoothed)" — 5 s after the link began to degrade, before it was cut
+  [relay] WAN DOWN (DEV chaos)
+✓ cut: RELAY_WAN_DOWN predicted 1 s earlier; banner at the seat; unacknowledged, it climbed to superintendent; acknowledged by SUP-42
+  [relay] WAN UP (DEV chaos)
+  [relay] WAN RESTORED from degraded (DEV chaos)
+  [cell-2] PLUG PULLED (SIGKILL); deleted /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-tqyNUG/data/cell-2.db, /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-tqyNUG/data/cell-2.db-wal, /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-tqyNUG/data/cell-2.db-shm
+✓ P1 "Data Centre 2 is down": 1 cell · 2 centres · 100 candidates · answers lost: not known yet
+✓ candidates keep answering: the swarm sent 570 more entries while Data Centre 2 was down
+✓ Data Centre 2 rebuilt from the relays: LIVE 12 s after the plug; the P1 closed with answers lost 0
+✓ sent = verified = stored = 6593 entries (verified: every chain, key certificate and body checked with only the authority key pinned); lost 0
+  [relay] HANDOVER-REQUEST {"cand":"C0001","seat":"CEN042-S02","key":"3bcb15094c58906c"}
+  [relay] HANDOVER-GRANTED {"cand":"C0001","seat":"CEN042-S02","keyEpoch":2,"fromSeq":15,"via":"pin","approvedBy":"INV-42-A","creditedMs":51907}
+✓ seat B resumed C0001: 13 answers restored, timer 0:19, +0:51 credited · approved by INV-42-A
+✓ seat A came back: its tail is ORPHANED evidence (not tampering) and it says "moved"; the time audit shows the move, approved
+✓ /verify, pinning only the authority key: 2 key epoch(s) for C0001: certified by cell-1, whose key the exam authority certified; receipt ZBRQ399ZKYAFCQTPG
+  [relay] PURGED {"exam":"DEMO-2026","shift":"S1","sthId":"28d5fbf30b0b92ca6fb7c6d89178cad9a16614354efba170fb80924795ff37f5","entries":19}
+✓ archived to 2 write-once stores (written 10 ms, verified 21 ms); relay purged 19 entries on a signed order
+  [cell-1] ROGUE UPDATE bodies SET answer = 'D' WHERE exam = 'DEMO-2026' AND shift = 'S1' AND attempt = 1 AND cand = 'C0001' AND seq = 3;
+✓ TAMPER (P0) for C0001 climbed to the regulator; the CERT-In 6-hour report draft is at certin/TAMPER-10.html
+✓ notice N-CELL_DOWN-1 approved and sent to the outbox (mock); the public page shows it, with no PII
+ACT3-NUMBERS {"syncLagAfterDegradeMs":5018,"predictedBeforeDownMs":1002,"cell2LiveMs":6159,"caughtUpMs":50401,"moveCreditedMs":51907,"archiveWriteMs":10,"archiveVerifyMs":21,"purged":19,"host":"darwin-arm64","candidates":301}
+PASS

@@ -1,6 +1,6 @@
 # Claims ledger
 
-This ledger lists every claim the pitch, the deck and the README make, the evidence behind each one, and its status. It reflects commit `cec0ebb`: Stages 0–3 and analytics A1–A4 are built; Stages 4–8 are not.
+This ledger lists every claim the pitch, the deck and the README make, the evidence behind each one, and its status. It reflects commit `1f7a07a`: Stages 0–4 and analytics A1–A4 are built; Stages 5–8 are not.
 
 ## Statuses
 
@@ -16,16 +16,18 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 
 | # | Claim | Evidence | Status |
 |---|---|---|---|
-| R1 | Killing the cell mid-stream loses nothing it acknowledged, and a wiped cell rebuilds from the relay with sent = stored, lost = 0 | `bun tools/chaos-kill.ts`: 1600 sent / 1600 stored / 0 lost, 3/3 runs (commit `0613963`); CI `server` job; `forward.test.ts` | **Proven** (one cell, one machine, 8 seats × 200 entries) |
+| R1 | Killing the cell mid-stream loses nothing it acknowledged, and a wiped cell rebuilds from the relay with sent = stored, lost = 0 | `bun tools/chaos-kill.ts`: 1600 sent / 1600 stored / 0 lost, 3/3 runs (commit `0613963`); CI `server` job; `forward.test.ts` | **Proven** (one cell, one machine, 8 seats × 200 entries). **Proven at swarm scale** for a wiped cell serving several relays: `act3.ts` steps 5–6 (sent = verified = stored = 6,593–6,602 entries across three runs, lost 0); `ingest-stage4.test.ts` "Review Focus #1" |
 | R2 | The seat keeps working offline; nothing is lost; the backlog drains when the link returns | `sync.test.ts` "offline: ✓ keeps growing, nothing is lost…"; `forward.test.ts` "cell down: the relay keeps acking" | **Proven** |
 | R3 | A seat crash or restart resumes with every answer, and the timer never runs backwards | `exam.test.ts` "resume…", "the receipt survives a restart"; `journal-store.test.ts` torn tail | **Proven** |
 | R4 | Relay and cell ack only after the commit is durable (group commit every 10 ms or 500 entries) | `store.test.ts` (commit visibility, 500-row flush, shared window); pragmas WAL + `synchronous=FULL` + `fullfsync` checked at boot | **Proven** for behaviour; throughput **Planned (Stage 7)** |
 | R5 | Power-loss durability | WAL, `synchronous=FULL`, `fullfsync` on the servers; seat fsync, which is not `F_FULLFSYNC` on macOS | **Built, not measured** (holds by design) |
-| R6 | A spare relay takes over | Seat side: `sync.test.ts` "a fresh (spare) relay gets the whole journal again" | Seat side **Proven**; operations **Planned (Stage 4)** |
-| R7 | Cells ×3 are independent failure domains, with a blast radius shown live | Three independent cells (`cell-1`, `cell-2`, `cell-3`) run together, each countersigning its own share of the cohort: `bun tools/act2.ts` | **Built**: three cells run in the Stage 3 demo; blast radius shown live is **Planned (Stage 4)** |
-| R8 | RPO and RTO are measured; 20 chaos runs are logged | — (the kill test prints restart times but is not an RTO benchmark) | **Planned (Stages 4, 7, 8)** |
-| R9 | Signed per-shift archive to 2 independent stores | Control writes one archive copy at seal (`control.ts`) | **Planned (Stage 4)** |
-| R10 | Resume on another seat (old-key signature, or PIN + invigilator); credited time approved | — | **Planned (Stage 4)** |
+| R6 | A spare relay takes over | Seat side: `sync.test.ts` "a fresh (spare) relay gets the whole journal again" | **Proven**: `chaos.ts` spare-relay runs (lost 0, RTO ~1.3–1.9 s, `docs/evidence/stage4-chaos.jsonl`), the control button "Replace Centre 42's relay with the spare". Limit: after a *move*, a spare relay cannot refill the entries before the move from the new seat (see threat model) |
+| R7 | Cells ×3 are independent failure domains, with a blast radius shown live | Three independent cells (`cell-1`, `cell-2`, `cell-3`) run together, each countersigning its own share of the cohort: `bun tools/act2.ts` | **Proven**: the P1 card with its blast radius (1 cell · N centres · ≈candidates), `incidents.test.ts`, `act3.ts` step 5 |
+| R8 | RPO and RTO are measured; 20 chaos runs are logged | `docs/evidence/stage4-chaos.jsonl` (3 runs shown here: kill-cell, wipe-cell, spare-relay; lost 0, RPO 0, RTO 1.3–1.9 s; `bun tools/chaos.ts --runs 20` runs the full 20-run exit check) | **Measured**: RTO per scenario (p50/max) and RPO = 0, `docs/evidence/stage4-chaos.jsonl` (8 seats × 100 entries, DEV mode, this Mac); swarm-scale rebuild times in `stage4-act3.txt` (`ACT3-NUMBERS`). **Not measured:** RPO/RTO at 20k over a real WAN; power loss |
+| R9 | Signed per-shift archive to 2 independent stores | Control writes one archive copy at seal (`control.ts`) | **Proven**: `archive.test.ts`, `ops-routes.test.ts`, `act3.ts` step 9 — two stores, verified against the signed STH, purge only on an authority-signed order after both verify (write 9–11 ms, verify 15–32 ms across three runs; relay entries purged 19–28). WORM is **simulated** (write-once, read-only files) |
+| R10 | Resume on another seat (old-key signature, or PIN + invigilator); credited time approved | — | **Proven**: `handover.test.ts`, `relay-handover.test.ts`, `move.test.ts`, `act3.ts` step 7 — PIN + invigilator (3 tries), or the old key's signed claim; answers restored sealed to the new seat; credit measured by the relay's clock (move credit 42.3–51.6 s across three runs) |
+| R11 | Time is credited by the relay's clock, capped at 30 min, two gaps → review, over the cap → re-test eligible; nothing is auto-penalised | `time-audit.test.ts`, `exam-stage4.test.ts` | **Proven** on synthetic chains |
+| R12 | The hard stop keeps late entries as evidence (LATE), never deletes them | `ingest-stage4.test.ts` | **Proven** |
 
 ## Trust: "prove it"
 
@@ -48,6 +50,7 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | T15 | An independent witness co-signs the register | — | **Planned (Stage 7, S6)** |
 | T16 | TLS with pinned certificates on seat → relay → cell | — | **Planned (Stage 7, S7)** |
 | T17 | Cell and control refuse to bind off loopback while their routes are unauthenticated | `main.test.ts` (commit `6e0c31e`) | **Proven** |
+| T9 (Stage 4 addendum) | For **enrolled** candidates, `/verify` pins only the authority key; the record carries the bind and cell certificates | Addendum C.1; `addendum-c.test.ts`, `verify-certs.test.ts`; `act3.ts` step 8: `/verify` for the moved candidate C0001 (2 key epochs) passes with only the authority key pinned | **Proven** |
 
 ## Prevention: custody, enrolment, integrity
 
@@ -64,7 +67,7 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | P9 | Hardened Electron: fuses, context isolation, sandbox, CSP, `app://` | `electron-builder.yml`, `apps/seat/src/main/index.ts`; `app-path.test.ts` | **Built, not measured**. Fused-build smoke test, `--inspect` refusal and single-instance lock **Planned (Stage 5)** |
 | P10 | Centre risk model: "at risk" precision 0.290 (2.1× base rate), "do not allot" precision 0.523 (3.8×) | `scorecard` CLI; `test_scorecard.py` (asserts ≥ 1.8× the base rate); commit `db2b95e` | **Proven on synthetic histories** |
 
-**Stage 3 honest limits** (detail in [`threat-model.md`](threat-model.md)): the `/custodian` page is served by control, so a compromised control could serve a page that captures a passphrase; enrolment is first-come, so a rogue relay could try to bind a candidate before they arrive (the real candidate is then refused with `ALREADY_BOUND`); while `DEV=1`, the relay's chaos routes (`/v1/dev/wan`, `/v1/dev/forge`) are reachable on the centre LAN; control zeroises `K_f` after every cell has the release, but this is best effort in a garbage-collected runtime; `/verify` still pins the fixture seat keys from `fixtures/trust-dev.json`, so an **enrolled** candidate's proof shows the keys row failing there until Addendum C (Stage 4) extends the proof with the bind and cell certificates.
+**Stage 3 honest limits** (detail in [`threat-model.md`](threat-model.md)): the `/custodian` page is served by control, so a compromised control could serve a page that captures a passphrase; enrolment is first-come, so a rogue relay could try to bind a candidate before they arrive (the real candidate is then refused with `ALREADY_BOUND`); while `DEV=1`, the relay's chaos routes (`/v1/dev/wan`, `/v1/dev/forge`) are reachable on the centre LAN; control zeroises `K_f` after every cell has the release, but this is best effort in a garbage-collected runtime; `/verify` used to pin the fixture seat keys from `fixtures/trust-dev.json`, so an **enrolled** candidate's proof showed the keys row failing there; **fixed in Stage 4** (Addendum C, see T9 above) — DEV-mode records still use the pinned fixture keys, labelled "pinned DEV keys".
 
 ## Detection and response: analytics
 
@@ -84,8 +87,8 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | D12 | The re-test allocator respects PwD access and language | `test_allocator_is_greedy_nearest_with_seats_pwd_and_language` | **Proven** (greedy, not optimal) |
 | D13 | Signed dispute tickets from a candidate's "raise objection" | `test_objection_ticket_hash_and_listing` | **Proven** for hashed tickets. Ticket signing and the "raise objection" button on `/verify` are **Planned** (no stage assigned yet; Stage 6 connects the analytics) |
 | D14 | The radar and the decision engine analyse what actually flowed through the cells | `test_radar_reads_cell_export_rows` (schema compatibility) | Format **Proven**; live wiring **Planned (Stage 6)** |
-| D15 | Incidents P0–P3 with blast radius, the escalation ladder, and the CERT-In template | Console marks a seat silent after 30 s (`console-view.test.ts`) | **Planned (Stage 4)** |
-| D16 | SYNC_LAG predicts WAN failure | — | **Planned (Stage 4)** |
+| D15 | Incidents P0–P3 with blast radius, the escalation ladder, and the CERT-In template | `incidents.test.ts` (P0–P3, blast radius, ladder, debounce, CERT-In at the regulator rung), `act3.ts` steps 4, 5, 10 (TAMPER reached the regulator rung and drafted a CERT-In 6-hour report; [`evidence/stage4-certin.html`](evidence/stage4-certin.html)) | **Proven**. The CERT-In file is a **draft template**, not filed |
+| D16 | SYNC_LAG predicts WAN failure | `link.test.ts`; `act3.ts` (`ACT3-NUMBERS.predictedBeforeDownMs`): SYNC_LAG raised 5.0–14.1 s after the degrade began, 1.0–1.9 s before the cut across three runs | **Proven on our chaos drill only**. Not validated on real WAN data |
 | D17 | Claude classifies invigilator reports, drafts notices and writes scorecard notes (templates by default, human-approved) | `scorecard.claude_note_hook` returns template text only | **Planned (Stage 6)** |
 
 ## Candidate experience and scale
@@ -95,7 +98,7 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | C1 | NTA-style exam UI: palette states, Save & Next, Mark for Review, Clear Response | `exam-state.test.ts` | **Proven** |
 | C2 | EN and HI with a bundled Devanagari font | `exam-state.test.ts` "EN and HI catalogues have the same keys … HI is Devanagari" | **Proven**. Tamil **Planned (Stage 6)** |
 | C3 | Accessible: keyboard-only use, ARIA, 200% zoom | Built in Stage 1 and checked by hand | **Built, not measured**. No WCAG 2.1 AA / GIGW 3.0 audit; Playwright e2e **Planned (Stage 5)** |
-| C4 | In-exam banner, public status page, notice outbox | — | **Planned (Stage 4, 6)** |
+| C4 | In-exam banner, public status page, notice outbox | `exam-state.test.ts`, `move.test.ts` (banner); `status-view.test.ts`, `ops-routes.test.ts`, `act3.ts` step 11 (public status page with no PII); mock outbox channels | **Proven on our chaos drill**. Claude-drafted notices and Tamil: **Planned (Stage 6)** |
 | C5 | 20k live candidates across 100 centres | `tools/swarm.ts`: 99 simulated centres replay the full G1 cohort (≈20k candidates) in one process, live (commit `5cd2f0a`); `bun tools/act2.ts` runs the same flow end to end on real cell/relay/control processes with a small cohort (300 candidates, 7 centres) | **Built**. Throughput: **~1.1k entries/s sustained on one core** (Apple M5, full G1 cohort at `--speed 20`, cells in-process; commit `5cd2f0a`), lower under heavy machine load; the cross-process HTTP number is **Planned (Stage 7)** |
 | C6 | Throughput, p50/p99, WAN bytes per candidate-hour, seat CPU on low-end hardware | — | **Planned (Stage 7)** |
 | C7 | A Rust cell ingest matches the TypeScript one on the same vectors | — | **Planned (optional Stage R)** |
