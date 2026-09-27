@@ -1,4 +1,4 @@
-# saakshi-analytics: G1 generator and thin radar (A1 / M11)
+# saakshi-analytics: G1 generator, thin radar (A1 / M11) and thin decision engine (A2 / M12)
 
 ## Generate a cohort
 
@@ -25,6 +25,7 @@ uv run python -m saakshi_analytics.radar OUT/cohort.jsonl --key OUT/key.json [--
 - It prints every flag with its reason, observed vs expected, and p-value.
 - With `--truth`, it adds precision, recall and FPR per signal, plus flag rates for the look-alike groups.
 - It also reads the cells' export rows (the cohort fields plus `seq/rxWall/h`); the extra fields are ignored.
+- With `--json flags.json`, it also writes the flags for the decision engine's `--flags`.
 - **Nothing is auto-penalised:** 1 signal → `watch`, 2 signals → `review`. The "escalate" rung needs device or camera evidence, which A1 doesn't have.
 
 ## Tests
@@ -95,3 +96,109 @@ Other seeds at 20k (11, 13):
 - **No `review` flags in G1.** No planted candidate trips both signals, and there is no device or camera evidence yet.
 - **Answer key.** The radar needs the answer key as a separate input (`--key`); it isn't part of the frozen row schema.
 - **Wall clock.** The 20k JSONL run uses about 18 s of CPU. On a heavily loaded machine the wall clock can be several minutes.
+
+## Decision engine (A2 / M12)
+
+```sh
+uv run python -m saakshi_analytics.radar OUT/cohort.jsonl --key OUT/key.json --json OUT/flags.json   # optional
+uv run python -m saakshi_analytics.decide --policy policy.illustrative.json \
+    --incident golden/cuet-2026.incident.json --cohort OUT/cohort.jsonl [--flags OUT/flags.json] [--json report.json]
+```
+
+It prints the report and, with `--json`, writes it. The output is deterministic (no timestamps, sorted lists) and no LLM is involved. The report is advisory until a human signs it off, and nobody is penalised by it.
+
+### Inputs
+
+- **Cohort** (`--cohort`): the G1 cohort or the cells' export JSONL (frozen schema v1). Only `cand`, `centre` and `shift` are read. A *room* is one centre-shift, `CENTRE/SHIFT`.
+- **Radar flags** (`--flags`, optional): the A1 radar output as written by `radar --json`, used unchanged.
+- **Incident** (`--incident`). Every field is optional, and unknown candidates, centres or centre-shifts are rejected.
+
+```jsonc
+{
+  "id": "CUET-2026 replay",
+  "disruptions": [{"centre": "CEN002", "shift": "S1", "fromMin": 40, "toMin": 160}],  // window on the exam clock
+  "gaps": {"C00012": [18], "C00354": [12, 10]},  // credited gaps (minutes) per candidate, from the M6 gap journal
+  "left": ["C00137"],                              // left the centre, or cannot resume
+  "breach": {                                      // omit when no breach is alleged
+    "perimeter": ["CEN005", "CEN008/S2"],          // a centre (all its shifts) or one centre-shift; or "unknown"
+    "systemic": false,                             // the committee's finding from outside evidence
+    "evidence": "FIR ..."
+  }
+}
+```
+
+### Policy (`policy.illustrative.json`)
+
+It is labelled **ILLUSTRATIVE**: every threshold is a committee parameter. The real file is signed (`signature` is null here) and published before the exam.
+
+| Key | Value | Meaning |
+|---|---|---|
+| `gapCapMin` | 30 | Credited gaps up to this total are compensated; beyond it, the candidate is re-tested (§3.6) |
+| `reviewGapCount` | 2 | Two or more gaps raise a review flag |
+| `tier1.systemicRoomShare` | 0.5 | (a) holds if the breach is evidenced (perimeter ∪ rooms with radar leak flags) in at least this share of centre-shifts |
+| `tier1.leakSignal` | `speed-accuracy` | The radar signal that marks leak beneficiaries |
+| `tier1.maxLeakFlagShareOutsidePerimeter` | 0.1 | (b) holds if at most this share of leak flags falls outside the declared perimeter |
+| `cost.reexamPerCandidateInr` | 1500 | Illustrative per-candidate re-exam cost for "₹ avoided". Not an NTA figure |
+
+### Rules
+
+1. **Tier 1, the NEET-UG 2024 Supreme Court test.**
+   - (a) *Systemic*: the committee declares it, **or** the perimeter is `"unknown"`, **or** the evidenced rooms reach `systemicRoomShare`.
+   - (b) *Separable*: a perimeter is declared **and** the radar's leak flags stay inside it (at most `maxLeakFlagShareOutsidePerimeter` outside). With no flags, it rests on the declared perimeter.
+   - Full re-conduct only when (a) holds and (b) does not. Otherwise only the perimeter's centre-shifts are re-conducted, and leak flags outside it are referred to the committee.
+2. **Per candidate** (not in a re-conducted room):
+   - Left, or cannot resume → re-test.
+   - Credited gap within the cap → compensate, with extra time equal to the gap.
+   - Beyond the cap → re-test. A candidate in a disrupted room with no journal entry is credited the whole window.
+   - Two or more gaps, or any radar flag → human review.
+3. **Spared and ₹ avoided.**
+   - Spared = the candidates in the counterfactual who are not re-examined.
+   - The counterfactual is a blanket re-exam of the disrupted rooms when there is no breach, and a full re-conduct of the cohort when there is one.
+   - ₹ avoided = spared × `reexamPerCandidateInr`. The report prints this assumption.
+4. **Evidence:** the sha256 of the policy, incident, cohort and flags files. The sign-off line stays `PENDING` until a human signs.
+
+### Golden cases (`golden/`, on the G1 small cohort: seed 7, 2k candidates, 10 centres × 3 shifts)
+
+| Case | Incident | Result |
+|---|---|---|
+| `cuet-2026` | 2-hour outage (40–160 min) at 3 centre-shifts (189 candidates). 21 left, 4 never resumed, 4 resumed after 45 min, 7 had two gaps, and the rest resumed on spare seats after 8–30 min. One unrelated 15-min seat gap elsewhere | Compensated 161 · Re-tested 29 · Re-conducted 0 centres · Spared 160 · ₹ avoided 2,40,000. 7 go to review |
+| `neet-2024-separable` | Leak with a declared perimeter: CEN005, CEN009, CEN010 and CEN008/S2 (the G1 leak and mid-exam leak); not declared systemic. Radar flags supplied | (a) no: 10/30 rooms. (b) yes: 0/29 leak flags outside. No full re-conduct; 10 centre-shifts (682 candidates) are re-conducted. Spared 1318 · ₹ avoided 19,77,000 |
+| `systemic` | Paper on a public channel (declared systemic); the FIR names only CEN005. Radar flags supplied | (a) yes. (b) no: 20/29 leak flags fall outside. **Full re-conduct**, all 10 centres. Spared 0 |
+
+Sample output (`cuet-2026`, lists trimmed):
+
+```
+SAAKSHI DECISION REPORT: CUET-2026 replay
+policy saakshi-decision-policy v1: ILLUSTRATIVE: every threshold here is a committee parameter, ...
+
+Compensated 161 · Re-tested 29 · Re-conducted 0 centres · Spared 160 · ₹ avoided 2,40,000
+
+Tier 1, the NEET-UG 2024 Supreme Court test (full re-conduct only if (a) systemic AND NOT (b) separable):
+  no breach alleged: tier 1 does not apply
+  => no full re-conduct
+Re-conduct: 0 centre-shifts, 0 candidates
+Compensate 161: extra time = credited gap, 8-30 min (total 3048 min); per-candidate list in --json
+Re-test 29:
+  C00137  left the centre or could not resume
+  C00454  never resumed (no gap-journal entry), so the whole window 120 min is beyond the 30-min cap
+  C00664  credited gap 45 min is beyond the 30-min cap
+  ...
+Human review 7 (nothing is auto-penalised):
+  C00354  2 gaps (review at >= 2)
+  ...
+Assumptions:
+  - ₹ avoided = spared × ₹1,500 per candidate re-exam, from policy.cost. Illustrative marginal cost ... Not an NTA figure.
+  - spared = candidates in the counterfactual who are not re-examined; counterfactual = a blanket re-exam of every candidate in the disrupted centre-shifts
+  - credited gaps come from the M6 gap journal; ...
+Evidence (sha256):
+  policy    7aa6c174...
+  incident  0b5ec76e...
+  cohort    4ce16872...
+Human sign-off: PENDING  name / role / date: ______________
+```
+
+### Decision-engine caveats
+
+- **Separability is a proxy.** It rests on the declared perimeter plus the radar's leak flags, whose recall is about 0.85. It says the known beneficiaries sit inside the perimeter; it cannot prove that none sit outside it.
+- **Leak branches are not built yet.** Re-scoring without leaked items, TOST comparability and the re-test allocator are S2 (A4). A separable breach here always re-conducts its perimeter.
+- **The ₹ figure is only as good as `cost.reexamPerCandidateInr`,** and the counterfactual is stated in the report.

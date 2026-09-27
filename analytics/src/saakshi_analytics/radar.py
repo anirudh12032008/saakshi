@@ -1,6 +1,6 @@
 """Thin radar (M11): signal 1 speed-accuracy, signal 2 same-room identical wrong answers.
 
-python -m saakshi_analytics.radar COHORT.jsonl --key key.json [--truth truth.json]
+python -m saakshi_analytics.radar COHORT.jsonl --key key.json [--truth truth.json] [--json flags.json]
 Flags are for human review only: each carries its reasons, observed vs expected and a p-value.
 """
 
@@ -207,9 +207,12 @@ def main(argv=None):
     ap.add_argument("cohort")
     ap.add_argument("--key", required=True)
     ap.add_argument("--truth")
+    ap.add_argument("--json", help="also write the flags as JSON (input to the decision engine's --flags)")
     args = ap.parse_args(argv)
     c = load(args.cohort, json.loads(open(args.key).read()))
     flags = run(c)
+    if args.json:
+        open(args.json, "w").write(json.dumps(flags, indent=1) + "\n")
     report(flags, evaluate(flags, json.loads(open(args.truth).read()), c) if args.truth else None)
 
 

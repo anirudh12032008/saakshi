@@ -1,0 +1,9 @@
+{
+  "id": "Systemic, not separable",
+  "note": "The paper circulated on a public channel before the exam. The FIR names one centre, but the radar finds leak beneficiaries at three more, so the perimeter cannot separate them.",
+  "breach": {
+    "perimeter": ["CEN005"],
+    "systemic": true,
+    "evidence": "Paper found on a public channel the night before (illustrative committee finding)"
+  }
+}

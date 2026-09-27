@@ -1,0 +1,17 @@
+{
+  "policy": "saakshi-decision-policy",
+  "version": 1,
+  "label": "ILLUSTRATIVE: every threshold here is a committee parameter, not a recommendation. The real file is signed and published before the exam.",
+  "signature": null,
+  "gapCapMin": 30,
+  "reviewGapCount": 2,
+  "tier1": {
+    "systemicRoomShare": 0.5,
+    "leakSignal": "speed-accuracy",
+    "maxLeakFlagShareOutsidePerimeter": 0.1
+  },
+  "cost": {
+    "reexamPerCandidateInr": 1500,
+    "note": "Illustrative marginal cost of re-examining one candidate (venue, invigilation, logistics). Not an NTA figure."
+  }
+}

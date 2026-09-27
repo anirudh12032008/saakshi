@@ -1,0 +1,9 @@
+{
+  "id": "NEET-2024 separable",
+  "note": "A leak localised to a known perimeter (police investigation names the centres; the mid-exam leak is at one centre-shift). Mirrors the NEET-UG 2024 Supreme Court finding: not systemic, beneficiaries separable.",
+  "breach": {
+    "perimeter": ["CEN005", "CEN009", "CEN010", "CEN008/S2"],
+    "systemic": false,
+    "evidence": "FIR and radar speed-accuracy flags (illustrative)"
+  }
+}
