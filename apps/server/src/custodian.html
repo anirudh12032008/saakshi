@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saakshi · Custodian</title>
+    <style>
+      :root { --s-1: .8rem; --s0: 1rem; --s1: 1.25rem; --s2: 1.563rem; --s3: 1.953rem; --ink: #202124; --muted: #5f6368; --blue: #1565c0;
+        font-family: system-ui, sans-serif; color: var(--ink); background: #fff; }
+      body { margin: 0 auto; padding: 1.5rem; max-width: 42rem; font-size: var(--s0); line-height: 1.5; }
+      h1 { font-size: var(--s3); margin: 0 0 .5rem; } h2 { font-size: var(--s1); margin: 1.5rem 0 .5rem; }
+      .fp { font: 700 var(--s2)/1.3 ui-monospace, Menlo, monospace; letter-spacing: .06em; margin: .25rem 0; }
+      form { display: grid; gap: 1rem; }
+      label { display: grid; gap: .25rem; font-weight: 600; }
+      input { font: inherit; padding: .5rem; min-height: 2.75rem; border: 1px solid var(--muted); border-radius: .375rem; }
+      button { font: inherit; font-weight: 700; padding: .625rem 1rem; min-height: 2.75rem; border-radius: .375rem; border: 1px solid var(--blue); background: var(--blue); color: #fff; cursor: pointer; justify-self: start; }
+      .hint { color: var(--muted); font-size: var(--s-1); font-weight: 400; }
+      #result { font-size: var(--s1); font-weight: 700; } #result.good { color: #1e6b25; }
+      #error { color: #b3261e; font-weight: 700; }
+      :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <h1>Custodian — release the paper</h1>
+    <p>Your share is decrypted <strong>on this computer</strong> and sent to control sealed to its release key; control never stores it. The paper opens only when two of the three custodians (NTA, NIC and the independent observer) have sent theirs.</p>
+    <h2>1. Check control's release key</h2>
+    <p class="fp" id="fp">…</p>
+    <p class="hint">Read these 16 characters to control by phone. Send your share only if they match.</p>
+    <h2>2. Send your share</h2>
+    <form id="form">
+      <label>Your share file <input id="file" type="file" accept=".json,application/json" required /></label>
+      <label>Your passphrase <span class="hint">17 characters; dashes and spaces are ignored</span>
+        <input id="pass" type="password" autocomplete="off" spellcheck="false" required /></label>
+      <button>Decrypt here and send to control</button>
+    </form>
+    <p id="error" role="alert"></p>
+    <h2>3. Status</h2>
+    <p id="result" role="status">…</p>
+    <script type="module" src="./custodian-page.ts"></script>
+  </body>
+</html>
