@@ -10,3 +10,4 @@ __pycache__/
 apps/seat/src/renderer/public/mediapipe/wasm/
 data/
 .pnpm-store/
+data-s2/
