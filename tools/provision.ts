@@ -15,7 +15,7 @@ import { OPS_DEMO, type Ops } from '../packages/core/src/ops.ts';
 import { signPolicy, type Policy, type RosterEntry } from '../packages/core/src/policy.ts';
 import { readCohort } from './cohort.ts';
 
-export interface CohortCand { cand: string; centre: string; form: 'F1' | 'F2'; pwd: 0 | 1 }
+export interface CohortCand { cand: string; centre: string; form: 'F1' | 'F2'; pwd: 0 | 1; lang?: string }
 export interface ProvisionOpts {
   out: string; keys: KeysFile; cands: CohortCand[]; demoCentre?: string; cellUrls?: string[]; durationMs?: number; now?: number; ops?: Ops;
   /** centre → "host:port" the seats at that centre use for the relay; default 127.0.0.1:7070 for every centre */
@@ -32,7 +32,7 @@ export const extraFor = (pwd: 0 | 1, durationMs: number): number => (pwd ? Math.
 /** One row per candidate (their first row in the cohort). */
 export async function cohortCands(path: string): Promise<CohortCand[]> {
   const seen = new Map<string, CohortCand>();
-  for await (const r of readCohort(path)) if (!seen.has(r.cand)) seen.set(r.cand, { cand: r.cand, centre: r.centre, form: r.form, pwd: r.pwd });
+  for await (const r of readCohort(path)) if (!seen.has(r.cand)) seen.set(r.cand, { cand: r.cand, centre: r.centre, form: r.form, pwd: r.pwd, lang: r.lang });
   return [...seen.values()];
 }
 
@@ -53,11 +53,11 @@ export function provision(o: ProvisionOpts): Directory {
   });
 
   const cands: Directory['cands'] = {};
-  for (const cand of devRoster(o.keys)) cands[cand] = { centre: demo, form: devForm(cand), extraMs: 0, pseud: pseudOf(pseudKey, cand) };
+  for (const cand of devRoster(o.keys)) cands[cand] = { centre: demo, form: devForm(cand), extraMs: 0, pseud: pseudOf(pseudKey, cand), lang: 'en', pwd: 0 };
   let skipped = 0;
   for (const c of o.cands) {
     if (c.centre === demo) { skipped++; continue; }                   // the demo centre is real; G1's rows there are not replayed
-    cands[c.cand] ??= { centre: c.centre, form: c.form, extraMs: extraFor(c.pwd, durationMs), pseud: pseudOf(pseudKey, c.cand) };
+    cands[c.cand] ??= { centre: c.centre, form: c.form, extraMs: extraFor(c.pwd, durationMs), pseud: pseudOf(pseudKey, c.cand), lang: c.lang ?? 'en', pwd: c.pwd };
   }
   const byCentre = new Map<string, [string, RosterEntry][]>();
   for (const [cand, c] of Object.entries(cands)) {
@@ -72,6 +72,11 @@ export function provision(o: ProvisionOpts): Directory {
   const rkPath = join(out, FILES.reviewKey);
   if (!existsSync(rkPath)) { const k = newKeyPair(); write(FILES.reviewKey, JSON.stringify({ priv: toHex(k.priv), pub: toHex(k.pub) })); }
   const reviewPub = (JSON.parse(readFileSync(rkPath, 'utf8')) as { pub: string }).pub;
+
+  // Addendum E: the decision key is written once for the control.
+  const dkPath = join(out, FILES.decisionKey);
+  if (!existsSync(dkPath)) { const k = newKeyPair(); write(FILES.decisionKey, JSON.stringify({ priv: toHex(k.priv), pub: toHex(k.pub) })); }
+
   const demoRoster = [...(byCentre.get(demo) ?? [])].map(([cand]) => cand).sort();
   const acc: Record<string, Accommodation> = o.acc ?? (demoRoster[1] ? { [demoRoster[1]]: { faces: 2, assistive: ['NVDA', 'VoiceOver'] } } : {});
 

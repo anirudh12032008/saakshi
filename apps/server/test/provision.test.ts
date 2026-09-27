@@ -18,9 +18,9 @@ beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'saakshi-prov-')); out = joi
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
 const cands: CohortCand[] = [
-  { cand: 'C00001', centre: 'CEN001', form: 'F1', pwd: 0 }, { cand: 'C00002', centre: 'CEN002', form: 'F2', pwd: 1 },
-  { cand: 'C00003', centre: 'CEN003', form: 'F1', pwd: 0 }, { cand: 'C00004', centre: 'CEN004', form: 'F2', pwd: 0 },
-  { cand: 'C00005', centre: 'CEN042', form: 'F1', pwd: 0 },                         // G1's own CEN042 row: the real centre replaces it
+  { cand: 'C00001', centre: 'CEN001', form: 'F1', pwd: 0, lang: 'en' }, { cand: 'C00002', centre: 'CEN002', form: 'F2', pwd: 1, lang: 'hi' },
+  { cand: 'C00003', centre: 'CEN003', form: 'F1', pwd: 0, lang: 'ta' }, { cand: 'C00004', centre: 'CEN004', form: 'F2', pwd: 0, lang: 'en' },
+  { cand: 'C00005', centre: 'CEN042', form: 'F1', pwd: 0, lang: 'en' },                         // G1's own CEN042 row: the real centre replaces it
 ];
 const read = <T>(rel: string) => JSON.parse(readFileSync(join(out, rel), 'utf8')) as T;
 
@@ -89,4 +89,18 @@ test('Stage 5: each policy carries a signed integrity section; the review key is
   writeFileSync(join(out2, FILES.reviewKey), JSON.stringify({ priv: 'seed-priv', pub: 'seed-pub' }));
   provision({ out: out2, keys, cands });
   expect(JSON.parse(readFileSync(join(out2, FILES.reviewKey), 'utf8')).pub).toBe('seed-pub');
+});
+
+test('provision writes lang and pwd per candidate and creates a decision key', () => {
+  const d = provision({ out, keys, cands });
+  expect(d.cands.C00001.lang).toBe('en');
+  expect(d.cands.C00001.pwd).toBe(0);
+  expect(d.cands.C00002.lang).toBe('hi');
+  expect(d.cands.C00002.pwd).toBe(1);
+  expect(d.cands.C00003.lang).toBe('ta');
+  expect(d.cands.C00003.pwd).toBe(0);
+  const decKey = read<{ priv: string; pub: string }>(FILES.decisionKey);
+  expect(decKey.priv).toMatch(/^[0-9a-f]{64}$/);
+  expect(decKey.pub).toMatch(/^[0-9a-f]{130}$/);
+  expect(existsSync(join(out, FILES.decisionKey))).toBe(true);
 });
