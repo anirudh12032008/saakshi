@@ -35,6 +35,13 @@ test('timer text clamps at zero and switches to h:mm:ss', () => {
   assert.deepEqual([-5, 0, 999, 61_000, 30 * 60_000, 3_600_000 + 1_000].map(fmtRemaining), ['00:00', '00:00', '00:01', '01:01', '30:00', '1:00:01']);
 });
 
+test('EN, HI and TA catalogues have the same keys; TA is Tamil script', () => {
+  const keys = (o: object) => Object.keys(o).sort();
+  assert.deepEqual(keys(T.ta), keys(T.en));
+  assert.match(T.ta.start, /[஀-௿]/);
+  assert.match(T.ta.preserved(1, 2, 3), /[஀-௿]/);
+});
+
 test('EN and HI catalogues have the same keys, no empty strings, and HI is Devanagari', () => {
   const flat = (o: object, p = ''): [string, string][] => Object.entries(o).flatMap(([k, x]) => (typeof x === 'string' ? [[p + k, x] as [string, string]] : flat(x, `${p}${k}.`)));
   const en = flat(T.en), hi = flat(T.hi);

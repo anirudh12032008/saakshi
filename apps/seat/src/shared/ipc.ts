@@ -5,7 +5,7 @@ import type { GateMethod } from '@saakshi/core/enrol';
 import type { CentreStatus } from '@saakshi/core/ops';
 import type { IntegrityFinding, ProvSummary, Verdict } from '@saakshi/core/integrity';
 
-export type Lang = 'en' | 'hi';
+export type Lang = 'en' | 'hi' | 'ta';
 /** The latest journaled state of one item; seq is the entry that set it (drives the tick). */
 export interface ItemState { state: State; answer: string; seq: number }
 /** local ✓ / relay ✓✓ / cell blue ✓✓. provisional: the cell has not ratified this seat's binding, so nothing leaves the seat. */

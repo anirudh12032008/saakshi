@@ -15,7 +15,12 @@ export function App() {
   const [boot, setBoot] = useState<ExamBoot | null>(null);
   const [paper, setPaper] = useState<Paper | null>(null);
   const [err, setErr] = useState('');
-  const [lang, setLang] = useState<Lang>(() => { try { return localStorage.getItem('lang') === 'hi' ? 'hi' : 'en'; } catch { return 'en'; } });
+  const [lang, setLang] = useState<Lang>(() => {
+    try {
+      const l = localStorage.getItem('lang');
+      return l === 'hi' || l === 'ta' ? l : 'en';
+    } catch { return 'en'; }
+  });
   useEffect(() => { window.saakshi.load().then(setBoot, (e) => setErr(String(e))); return window.saakshi.onBoot(setBoot); }, []);
   useEffect(() => { try { localStorage.setItem('lang', lang); } catch { /* per-viewer convenience only */ } document.documentElement.lang = lang; }, [lang]);
   const open = !!boot && (boot.phase === 'ready' || boot.phase === 'exam' || boot.phase === 'submitted');
@@ -162,7 +167,8 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
     );
   }
 
-  const q = bank.get(item)![lang];
+  const qItem = bank.get(item)!;
+  const q = lang === 'hi' ? qItem.hi : qItem.en; // the bank has no Tamil text yet; TA falls back to EN
   const tick = tickOf(items[item]?.seq ?? 0, sync);
   return (
     <div className="exam">
@@ -183,6 +189,7 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
           {t.question} {idx + 1}
           {tick !== 'none' && <span className={`tick ${tick}`} title={t.tick[tick]}><span aria-hidden="true">{GLYPH[tick]}</span><span className="sr-only">, {t.tick[tick]}</span></span>}
         </h2>
+        {lang === 'ta' && <p className="notice">{t.questionLangNote}</p>}
         <fieldset disabled={timeUp}>
           <legend className="q-text">{q.q}</legend>
           {q.o.map((o, i) => (

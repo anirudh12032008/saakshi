@@ -45,6 +45,7 @@ export function LangToggle({ lang, setLang, t }: { lang: Lang; setLang: (l: Lang
     <div className="lang" role="group" aria-label={t.lang}>
       <button aria-pressed={lang === 'en'} lang="en" onClick={() => setLang('en')}>English</button>
       <button aria-pressed={lang === 'hi'} lang="hi" onClick={() => setLang('hi')}>हिन्दी</button>
+      <button aria-pressed={lang === 'ta'} lang="ta" onClick={() => setLang('ta')}>தமிழ்</button>
     </div>
   );
 }

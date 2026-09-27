@@ -1,10 +1,12 @@
 @font-face { font-family: 'Noto Sans Devanagari'; src: url('/fonts/NotoSansDevanagari.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+@font-face { font-family: 'Noto Sans Tamil'; src: url('/fonts/NotoSansTamil.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
 :root {
   --ink: #202124; --muted: #5f6368; --line: #dadce0; --blue: #1565c0;
   --nv-bg: #e8eaed; --na: #c62828; --a: #2e7d32; --mr: #6a1b9a;
-  font-family: system-ui, 'Noto Sans Devanagari', sans-serif; color: var(--ink); background: #fff;
+  font-family: system-ui, 'Noto Sans Devanagari', 'Noto Sans Tamil', sans-serif; color: var(--ink); background: #fff;
 }
 :lang(hi) { font-family: 'Noto Sans Devanagari', system-ui, sans-serif; }
+:lang(ta) { font-family: 'Noto Sans Tamil', system-ui, sans-serif; }
 * { box-sizing: border-box; }
 body { margin: 0; line-height: 1.5; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
