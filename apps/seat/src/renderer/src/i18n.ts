@@ -1,5 +1,6 @@
 import type { State } from '@saakshi/core/protocol';
-import type { Lang } from '../../shared/ipc.ts';
+import type { BindState, GateMethod, Lang } from '../../shared/ipc.ts';
+import type { EnrolProblem } from './enrol-state.ts';
 import type { Tick } from './exam-state.ts';
 
 export interface Strings {
@@ -10,6 +11,10 @@ export interface Strings {
   receiptTitle: string; receiptCode: string; attempted: string; answered: string; marked: string;
   of: (n: number, total: number) => string; keepCode: string; print: string; submission: string; cameraTest: string;
   state: Record<State, string>; tick: Record<Tick, string>;
+  connecting: string; enrolTitle: string; enrolNote: string; pin: string; pinConfirm: string; gateCheck: string; operator: string; method: string;
+  methods: Record<GateMethod, string>; enrol: string; problems: Record<Exclude<EnrolProblem, ''>, string>;
+  lockedTitle: string; lockedNote: string; commitment: string; bind: Record<BindState, string>;
+  unlocked: string; viaCode: string; provisional: string; testBanner: string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -26,6 +31,27 @@ export const T: Record<Lang, Strings> = {
     print: 'Print slip', submission: 'Your submission', cameraTest: 'Camera off (test mode)',
     state: { NV: 'Not visited', NA: 'Not answered', A: 'Answered', MR: 'Marked for review', AMR: 'Answered and marked for review (will be evaluated)' },
     tick: { none: '', local: 'saved on this computer', relay: 'saved at the centre server', cell: 'saved at the exam server' },
+    connecting: 'Connecting to the centre server…',
+    enrolTitle: 'Check-in',
+    enrolNote: 'Set a 6-digit PIN. You need it only if you have to move to another computer. It is sent sealed to the exam server; the centre server cannot read it.',
+    pin: 'New PIN (6 digits)', pinConfirm: 'Type the PIN again', gateCheck: 'Gate check (filled in by the gate operator)',
+    operator: 'Gate operator ID', method: 'How the gate checked identity',
+    methods: { 'aadhaar-face': 'Aadhaar face authentication', 'aadhaar-fingerprint': 'Aadhaar fingerprint', 'id-document': 'Photo ID checked by hand' },
+    enrol: 'Check in',
+    problems: { pinDigits: 'The PIN must be exactly 6 digits.', pinMatch: 'The two PINs do not match.', operator: "Enter the gate operator's ID." },
+    lockedTitle: 'Paper locked until T0',
+    lockedNote: 'The paper on this computer is encrypted. It opens only with a key that matches the commitment published before the exam:',
+    commitment: 'Published commitment',
+    bind: {
+      none: 'Not checked in',
+      provisional: 'Seat provisional — the exam server will confirm it when the network returns. Your answers are safe on this computer.',
+      bound: 'Seat confirmed by the exam server',
+      refused: 'Check-in refused — please call the invigilator',
+    },
+    unlocked: 'Paper unlocked: the key matches the published commitment.',
+    viaCode: '(unlocked at this centre with the code phoned in by the superintendent)',
+    provisional: 'provisional',
+    testBanner: 'TEST MODE — not for real exams (journal key not in the OS keychain)',
   },
   hi: {
     title: 'साक्षी परीक्षा', candidate: 'अभ्यर्थी', form: 'प्रश्न-पत्र', start: 'परीक्षा शुरू करें',
@@ -40,5 +66,26 @@ export const T: Record<Lang, Strings> = {
     print: 'रसीद प्रिंट करें', submission: 'आपका जमा किया गया उत्तर-पत्र', cameraTest: 'कैमरा बंद (परीक्षण मोड)',
     state: { NV: 'नहीं देखा', NA: 'उत्तर नहीं दिया', A: 'उत्तर दिया', MR: 'समीक्षा हेतु चिह्नित', AMR: 'उत्तर दिया और समीक्षा हेतु चिह्नित (मूल्यांकन होगा)' },
     tick: { none: '', local: 'इस कंप्यूटर पर सहेजा गया', relay: 'केंद्र सर्वर पर सहेजा गया', cell: 'परीक्षा सर्वर पर सहेजा गया' },
+    connecting: 'केंद्र सर्वर से जुड़ रहे हैं…',
+    enrolTitle: 'चेक-इन',
+    enrolNote: '6 अंकों का पिन बनाएँ। इसकी ज़रूरत केवल तब होगी जब आपको दूसरे कंप्यूटर पर जाना पड़े। यह परीक्षा सर्वर को सीलबंद भेजा जाता है; केंद्र सर्वर इसे पढ़ नहीं सकता।',
+    pin: 'नया पिन (6 अंक)', pinConfirm: 'पिन दोबारा लिखें', gateCheck: 'गेट जाँच (गेट ऑपरेटर भरेंगे)',
+    operator: 'गेट ऑपरेटर आईडी', method: 'गेट पर पहचान कैसे जाँची गई',
+    methods: { 'aadhaar-face': 'आधार चेहरा प्रमाणीकरण', 'aadhaar-fingerprint': 'आधार फ़िंगरप्रिंट', 'id-document': 'फ़ोटो पहचान-पत्र हाथ से जाँचा गया' },
+    enrol: 'चेक-इन करें',
+    problems: { pinDigits: 'पिन ठीक 6 अंकों का होना चाहिए।', pinMatch: 'दोनों पिन मेल नहीं खाते।', operator: 'गेट ऑपरेटर की आईडी लिखें।' },
+    lockedTitle: 'T0 तक प्रश्न-पत्र बंद है',
+    lockedNote: 'इस कंप्यूटर पर प्रश्न-पत्र एन्क्रिप्टेड है। यह केवल उसी कुंजी से खुलेगा जो परीक्षा से पहले प्रकाशित प्रतिबद्धता से मेल खाती है:',
+    commitment: 'प्रकाशित प्रतिबद्धता',
+    bind: {
+      none: 'चेक-इन नहीं हुआ',
+      provisional: 'सीट अस्थायी है — नेटवर्क लौटने पर परीक्षा सर्वर इसकी पुष्टि करेगा। आपके उत्तर इस कंप्यूटर पर सुरक्षित हैं।',
+      bound: 'परीक्षा सर्वर ने सीट की पुष्टि की',
+      refused: 'चेक-इन अस्वीकार — कृपया निरीक्षक को बुलाएँ',
+    },
+    unlocked: 'प्रश्न-पत्र खुल गया: कुंजी प्रकाशित प्रतिबद्धता से मेल खाती है।',
+    viaCode: '(अधीक्षक द्वारा फ़ोन पर बताए गए कोड से इसी केंद्र पर खोला गया)',
+    provisional: 'अस्थायी',
+    testBanner: 'परीक्षण मोड — असली परीक्षा के लिए नहीं (जर्नल कुंजी OS कीचेन में नहीं है)',
   },
 };

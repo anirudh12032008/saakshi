@@ -1,31 +1,40 @@
-import { useEffect, useRef, useState } from 'react';
-import bankJson from '../../../../../fixtures/paper/bank.json';
-import formsJson from '../../../../../fixtures/paper/forms.json';
-import type { Action, ExamBoot, ItemState, Lang, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Action, ExamBoot, ItemState, Lang, Paper, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
 import { clearResponse, fmtRemaining, GLYPH, legendCounts, markAndNext, PALETTE_STATES, saveAndNext, tickOf, visitAction } from './exam-state.ts';
 import { FaceChip } from './FaceChip.tsx';
+import { Connecting, Enrol, LangToggle, Locked, TestBanner } from './Gate.tsx';
 import { T, type Strings } from './i18n.ts';
 import { Palette } from './Palette.tsx';
 import { Slip } from './Slip.tsx';
 
 declare global { interface Window { saakshi: SeatApi } }
-
-interface BankItem { id: string; subject: string; en: { q: string; o: string[] }; hi: { q: string; o: string[] } }
-const BANK = new Map((bankJson as { items: BankItem[] }).items.map((i) => [i.id, i]));
-const FORMS = formsJson as unknown as Record<'F1' | 'F2', string[]>;
 const LETTERS = ['A', 'B', 'C', 'D'] as const;
 
 export function App() {
   const [boot, setBoot] = useState<ExamBoot | null>(null);
+  const [paper, setPaper] = useState<Paper | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { window.saakshi.load().then(setBoot, (e) => setErr(String(e))); }, []);
-  if (err) return <p role="alert">{err}</p>;
-  return boot ? <Exam boot={boot} /> : <p>…</p>;
+  const [lang, setLang] = useState<Lang>(() => { try { return localStorage.getItem('lang') === 'hi' ? 'hi' : 'en'; } catch { return 'en'; } });
+  useEffect(() => { window.saakshi.load().then(setBoot, (e) => setErr(String(e))); return window.saakshi.onBoot(setBoot); }, []);
+  useEffect(() => { try { localStorage.setItem('lang', lang); } catch { /* per-viewer convenience only */ } document.documentElement.lang = lang; }, [lang]);
+  const open = !!boot && (boot.phase === 'ready' || boot.phase === 'exam' || boot.phase === 'submitted');
+  useEffect(() => { if (open && !paper) void window.saakshi.paper().then(setPaper); }, [open, paper]);
+  const t = T[lang];
+  const g = { t, lang, setLang };
+  let body;
+  if (err) body = <p role="alert">{err}</p>;
+  else if (!boot) body = <p>…</p>;
+  else if (boot.phase === 'connecting') body = <Connecting boot={boot} {...g} />;
+  else if (boot.phase === 'enrol') body = <Enrol boot={boot} {...g} />;
+  else if (boot.phase === 'locked') body = <Locked boot={boot} {...g} />;
+  else if (!paper) body = <p>…</p>;
+  else body = <Exam boot={boot} paper={paper} {...g} />;
+  return <>{boot?.testMode && <TestBanner t={t} />}{body}</>;
 }
 
-function Exam({ boot }: { boot: ExamBoot }) {
-  const order = FORMS[boot.form];
-  const [lang, setLang] = useState<Lang>(() => { try { return localStorage.getItem('lang') === 'hi' ? 'hi' : 'en'; } catch { return 'en'; } });
+function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper; t: Strings; lang: Lang; setLang: (l: Lang) => void }) {
+  const order = useMemo(() => paper.items.map((i) => i.id), [paper]);
+  const bank = useMemo(() => new Map(paper.items.map((i) => [i.id, i])), [paper]);
   const [started, setStarted] = useState(boot.started);
   const [items, setItems] = useState<Record<string, ItemState>>(boot.items);
   const itemsRef = useRef(items);
@@ -41,11 +50,9 @@ function Exam({ boot }: { boot: ExamBoot }) {
   const [now, setNow] = useState(performance.now());
   const shownAt = useRef(performance.now());
   const heading = useRef<HTMLHeadingElement>(null);
-  const t = T[lang];
 
   useEffect(() => window.saakshi.onSync(setSync), []);
   useEffect(() => { const id = setInterval(() => setNow(performance.now()), 250); return () => clearInterval(id); }, []);
-  useEffect(() => { try { localStorage.setItem('lang', lang); } catch { /* per-viewer convenience only */ } document.documentElement.lang = lang; }, [lang]);
   // Resume: the question on screen counts as visited (Addendum A.6).
   useEffect(() => { if (boot.started && !boot.receipt) void visit(order[0]); }, []);
 
@@ -53,7 +60,6 @@ function Exam({ boot }: { boot: ExamBoot }) {
   const timeUp = started && remaining <= 0;
   const item = order[idx];
 
-  /** Journal the first display of an item as visited (clear, NA). Never overwrites a state set meanwhile. */
   async function visit(id: string) {
     const a = visitAction(id, itemsRef.current[id]);
     if (!a) return;
@@ -100,6 +106,7 @@ function Exam({ boot }: { boot: ExamBoot }) {
         <h1>{t.title}</h1>
         <p>{t.candidate}: {boot.cand} · {boot.seatId} · {t.form} {boot.form}</p>
         <LangToggle lang={lang} setLang={setLang} t={t} />
+        <p className="badge bound">{t.unlocked} {boot.release?.via === 'code' ? t.viaCode : ''}</p>
         <p>{t.startNote}</p>
         <button className="primary" onClick={async () => {
           const r = await window.saakshi.start();
@@ -110,7 +117,7 @@ function Exam({ boot }: { boot: ExamBoot }) {
           shownAt.current = performance.now();
           void visit(order[0]);
         }}>{t.start}</button>
-        <p role="status">{notice}</p>
+        <p role="status">{notice || boot.notice}</p>
       </main>
     );
   }
@@ -134,7 +141,7 @@ function Exam({ boot }: { boot: ExamBoot }) {
     );
   }
 
-  const q = BANK.get(item)![lang];
+  const q = bank.get(item)![lang];
   const tick = tickOf(items[item]?.seq ?? 0, sync);
   return (
     <div className="exam">
@@ -174,21 +181,13 @@ function Exam({ boot }: { boot: ExamBoot }) {
   );
 }
 
-function LangToggle({ lang, setLang, t }: { lang: Lang; setLang: (l: Lang) => void; t: Strings }) {
-  return (
-    <div className="lang" role="group" aria-label={t.lang}>
-      <button aria-pressed={lang === 'en'} lang="en" onClick={() => setLang('en')}>English</button>
-      <button aria-pressed={lang === 'hi'} lang="hi" onClick={() => setLang('hi')}>हिन्दी</button>
-    </div>
-  );
-}
-
 function SyncStatus({ v, t }: { v: SyncView; t: Strings }) {
   return (
     <div className="sync">
       <span><span aria-hidden="true">✓</span> {v.local}<span className="sr-only"> {t.tick.local}</span></span>
       <span><span aria-hidden="true">✓✓</span> {v.relay}<span className="sr-only"> {t.tick.relay}</span></span>
       <span className="cell"><span aria-hidden="true">✓✓</span> {v.cell}<span className="sr-only"> {t.tick.cell}</span></span>
+      {v.provisional && <span className="badge provisional">{t.provisional}</span>}
       <span role="status" className={v.online ? 'online' : 'offline'}>{v.online ? t.online : t.offline}</span>
     </div>
   );
