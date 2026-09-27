@@ -2,13 +2,18 @@
 // and tools/act2.ts drive it directly; index.ts only wires it to IPC.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hexToBytes } from '@saakshi/core/bytes';
-import { verifier } from '@saakshi/core/node';
+import { hexToBytes, toHex } from '@saakshi/core/bytes';
+import type { Canon } from '@saakshi/core/canon';
+import { msg } from '@saakshi/core/enrol';
+import { faceArray, integrityOf, readinessArray } from '@saakshi/core/integrity';
+import { signer, verifier } from '@saakshi/core/node';
 import type { CentreStatus } from '@saakshi/core/ops';
 import type { ReleaseMsg } from '@saakshi/core/paper';
 import { kcf, type Ctx } from '@saakshi/core/protocol';
-import type { Action, ActResult, EnrolInput, EnrolResult, ExamBoot, Paper, Phase, SubmitResult, SyncView } from '../shared/ipc.ts';
+import type { Action, ActResult, EnrolInput, EnrolResult, ExamBoot, FaceSample, GateView, Paper, Phase, SubmitResult, SyncView } from '../shared/ipc.ts';
 import { ExamSession, type PauseCause } from './exam.ts';
+import { Gate } from './gate.ts';
+import type { ProbeSnapshot } from './integrity.ts';
 import { httpPost, SeatIdentity } from './identity.ts';
 import { writeDurable, type Wrapper } from './journal-store.ts';
 import { loadPackage, type SeatPackage } from './pkg.ts';
@@ -20,6 +25,8 @@ export interface SeatOpts {
   camera: boolean; testMode: boolean;
   fetch?: typeof fetch; clock?: () => number; now?: () => number; retryMs?: number;
   onBoot?: (b: ExamBoot) => void; onSync?: (v: SyncView) => void;
+  /** Stage 5: the integrity gate. Without it the seat behaves as in Stage 4 (act2/act3, older tests). */
+  integrity?: { collect: () => Promise<ProbeSnapshot> };
 }
 interface Unlocked { form: string; key: string; via: 'push' | 'code' }
 
@@ -38,6 +45,8 @@ export class Seat {
   #timer?: ReturnType<typeof setInterval>;
   #busy = false;
   #closed = false;
+  #gate?: Gate;
+  #polMs = 0;
 
   constructor(o: SeatOpts) {
     this.#o = o;
@@ -63,6 +72,7 @@ export class Seat {
       release: this.#unlocked && { via: this.#unlocked.via },
       moveable: this.#id?.moveable ?? false, moveKey: this.#id?.state === 'moving' ? this.#id.moveKey : undefined,
       credited: this.#id?.credit, status: this.#status, paused: e?.paused ?? false,
+      gate: this.#gate?.view(), faces: me?.acc?.faces ?? 1,
     };
   }
 
@@ -89,6 +99,10 @@ export class Seat {
 
   start(): ActResult {
     if (!this.#exam || !this.#unlocked) return { ok: false, error: 'The paper is locked until T0.' };
+    if (!this.#exam.started && this.#gate?.blocked()) {        // only before start: a started exam is never refused for integrity
+      const names = [...new Set(this.#gate.view().findings.filter((f) => f.level === 'block').flatMap((f) => f.names))].join(', ');
+      return { ok: false, error: `This seat cannot start: ${names}. Close them and press Re-check.` };
+    }
     const r = this.#exam.start([this.#unlocked.form, kcf(hexToBytes(this.#unlocked.key)), this.#unlocked.via]);
     this.#sync?.kick();
     this.#emit();
@@ -110,6 +124,16 @@ export class Seat {
     this.#emit();
     return r;
   }
+
+  /** Stage 5: run the gate now (the Re-check button). Without a gate: the empty view. */
+  async recheck(): Promise<GateView> {
+    if (!this.#gate) return { verdict: 'green', findings: [], checkedAt: 0 };
+    const v = await this.#gate.check();
+    this.#emit();
+    return v;
+  }
+  faceSample(s: FaceSample): void { this.#gate?.faceSample(s); }
+  blur(ms: number): void { this.#gate?.blur(ms); }
 
   paper(): Paper | null { return this.#paper ?? null; }
 
@@ -139,6 +163,12 @@ export class Seat {
       else if (this.#id?.state === 'provisional') { await this.#id.retry(); if (this.#id.state !== 'provisional') this.#emit(); }
       else if (this.#id?.state === 'moving') { await this.#id.poll(); if (this.#id.state !== 'moving') { this.#openExam(); this.#emit(); } }
       if (this.#pkg) await this.#pollStatus();
+      if (this.#gate && this.#id?.key) {                          // from the locked phase on, every probeMs (checkedAt 0: right after enrolment)
+        const g = this.#gate, was = g.view().verdict;
+        if ((this.#o.now ?? Date.now)() - g.view().checkedAt >= this.#polMs) await g.check();
+        await g.retry();
+        if (g.view().verdict !== was) this.#emit();
+      }
       this.#exam?.tick();
     } finally { this.#busy = false; }
   }
@@ -153,6 +183,15 @@ export class Seat {
       cell: { id: p.cell.id, pub: hexToBytes(p.cell.pub) }, post: httpPost(this.#o.relayUrl, 5000, this.#o.fetch), now: this.#o.now });
     const saved = `${this.#base}.release`;
     if (existsSync(saved)) this.#unlock(JSON.parse(this.#o.wrap.decryptString(readFileSync(saved))) as Unlocked);
+    if (this.#o.integrity) {
+      const { pol, defaulted } = integrityOf(p.integrity), acc = p.roster[this.#o.ctx.cand]?.acc ?? {};
+      this.#polMs = pol.probeMs;
+      this.#gate = new Gate({ pol, acc, defaulted, testMode: this.#o.testMode, ctx: this.#o.ctx, seatId: this.#o.seatId, now: this.#o.now,
+        collect: this.#o.integrity.collect, key: () => (this.#id?.key ? { keyEpoch: this.#id.keyEpoch } : undefined),
+        journal: (f) => { const s = this.#exam?.note(f); if (s !== undefined) this.#sync?.kick(); return s; },
+        report: (r) => this.#signedPost('/v1/readiness', { r, sig: this.#sign(readinessArray(r)) }),
+        face: (f) => this.#signedPost('/v1/faces', { f, sig: this.#sign(faceArray(f)) }) });
+    }
     this.#watch = new ReleaseWatcher({ relayUrl: this.#o.relayUrl, fetch: this.#o.fetch, retryMs: this.#o.retryMs, onRelease: (r) => this.#onRelease(r) });
     this.#watch.start();
     this.#emit();
@@ -210,6 +249,11 @@ export class Seat {
     if (this.#exam.resumed) this.#exam.restartGap();                     // the app restarted mid-exam: journal the gap (plan §2)
     this.#sync = new SeatSync(this.#exam, httpSend(this.#o.relayUrl, 5000, this.#o.fetch), verifier(cellPub), (v) => this.#o.onSync?.(v), { bind: () => id.bind });
     this.#sync.start(1000);
+  }
+
+  #sign(a: Canon[]): string { return toHex(signer(this.#id!.key!)(msg(a))); }
+  async #signedPost(path: string, body: unknown): Promise<boolean> {
+    return (await httpPost(this.#o.relayUrl, 5000, this.#o.fetch)(path, body)).status === 200;
   }
 
   #emit(): void { this.#o.onBoot?.(this.boot()); }

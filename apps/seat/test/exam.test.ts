@@ -190,3 +190,18 @@ test('Stage 3 timer: remaining = D_i − activeMs, and activeMs never runs backw
   assert.equal(s.remainingMs(), D - 10_000);
   s.close(); rmSync(dir, { recursive: true, force: true });
 });
+
+test('Stage 5: act carries pointer provenance in the second meta slot; note() before start is undefined', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+  const s = session(dir, () => 0);
+  assert.equal(s.note({ code: 'blur', level: 'review', detail: 'x', names: [] }), undefined);
+  s.start();
+  const seq = (s.act({ ...act('answer', 'I01', 'A', 'D'), prov: { moves: 3, pathPx: 10, clicks: 1, keys: 0, untrusted: 0, lastMoveMs: 40 } }) as { seq: number }).seq;
+  const [e] = s.entriesAfter(seq - 1, 1);
+  const p = parseSignedLine(e.line);
+  if (!p.ok) throw new Error(p.detail);
+  assert.deepEqual(openBody(cell.priv, { ...s.ctx, seq }, fromB64(e.env), p.header.bodyCommit).body.meta, [1234, ['prov', 3, 10, 1, 0, 0, 40]]);
+  assert.equal(s.note({ code: 'blur', level: 'review', detail: 'x', names: [] }), seq + 1);
+  s.close();
+  rmSync(dir, { recursive: true, force: true });
+});

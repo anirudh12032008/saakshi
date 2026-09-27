@@ -1,5 +1,6 @@
 import { randomBytes } from '@saakshi/core/bytes';
 import type { Canon } from '@saakshi/core/canon';
+import { findingMeta, provArray, type IntegrityFinding } from '@saakshi/core/integrity';
 import { signedLine } from '@saakshi/core/journal';
 import { responsesOf } from '@saakshi/core/log';
 import { sealBody, signer, verifier, type KeyPair } from '@saakshi/core/node';
@@ -102,8 +103,14 @@ export class ExamSession implements SyncSource {
   act(a: Action): ActResult {
     const error = this.#check(a);
     if (error) return { ok: false, error };
-    const seq = this.#append(a.kind, { item: a.item, state: a.state, answer: a.answer, meta: [Math.max(0, Math.round(a.dwellMs)), []] });
+    const seq = this.#append(a.kind, { item: a.item, state: a.state, answer: a.answer, meta: [Math.max(0, Math.round(a.dwellMs)), provArray(a.prov)] });
     return { ok: true, seq, activeMs: this.activeMs() };
+  }
+
+  /** Stage 5: journal an integrity finding (Addendum D.2); undefined before start or after submit. */
+  note(f: IntegrityFinding): number | undefined {
+    if (!this.started || this.submitted) return undefined;
+    return this.#append('integrity', { ...EMPTY, meta: findingMeta(f) });
   }
 
   /** Close the chain (Addendum A.5) over the restored answers and this seat's own. Works offline; idempotent; allowed after time is up. */
