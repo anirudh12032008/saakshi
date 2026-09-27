@@ -1,12 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, session, systemPreferences } from 'electron';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import { cellKey, DEV_EXAM, devForm, devSeat, type KeysFile } from '@saakshi/core/dev';
+import { cellKey, DEV_EXAM, devForm, devPseud, devSeat, type KeysFile } from '@saakshi/core/dev';
 import { verifier } from '@saakshi/core/node';
 import keysJson from '../../../../fixtures/keys.json';
 import formsJson from '../../../../fixtures/paper/forms.json';
-import type { Action, ActResult, ExamBoot } from '../shared/ipc.ts';
+import type { Action, ExamBoot, SubmitResult } from '../shared/ipc.ts';
 import { resolveAppPath } from './app-path.ts';
+import { cameraEnabled } from './camera.ts';
 import { ExamSession } from './exam.ts';
 import { runSelftest } from './probes.ts';
 import { httpSend, SeatSync } from './sync.ts';
@@ -45,22 +46,25 @@ function start(): void {
   const cell = cellKey(keys, 'cell-1');
   const form = devForm(cand);
   const durationMs = forms.durationMin * 60_000;
+  const camera = cameraEnabled(process.argv, process.env);
   let exam: ExamSession | undefined;
   let sync: SeatSync | undefined;
   let win: BrowserWindow | undefined;
 
-  const guard = (fn: () => ActResult): ActResult => { try { return fn(); } catch (e) { return { ok: false, error: (e as Error).message }; } };
+  const guard = <T>(fn: () => T): T | { ok: false; error: string } => { try { return fn(); } catch (e) { return { ok: false, error: (e as Error).message }; } };
   ipcMain.handle('exam:load', (): ExamBoot => ({
     cand, seatId: seat!.seatId, form, durationMs, activeMs: exam!.activeMs(), started: exam!.started, items: exam!.items(), sync: sync!.view(),
+    receipt: exam!.receipt(), camera,
   }));
   ipcMain.handle('exam:start', () => guard(() => { const r = exam!.start(); sync!.kick(); return r; }));
+  ipcMain.handle('exam:submit', (): SubmitResult => guard(() => { const r = exam!.submit(); sync!.kick(); return r; }));
   ipcMain.handle('exam:act', (_e, a: Action) => guard(() => { const r = exam!.act(a); if (r.ok) sync!.kick(); return r; }));
 
   app.whenReady().then(async () => {
     if (!seat) { dialog.showErrorBox('Saakshi', `No DEV seat key for candidate ${cand}`); app.exit(1); return; }
     if (!safeStorage.isEncryptionAvailable()) { dialog.showErrorBox('Saakshi', 'OS key storage (safeStorage) is unavailable, so the journal cannot be encrypted.'); app.exit(1); return; }
     try {
-      exam = new ExamSession({ dir: join(app.getPath('userData'), 'journal'), ctx: { ...DEV_EXAM, cand }, keyEpoch: 1, seat, cellPub: cell.pub, wrap: safeStorage, durationMs, items: forms[form] });
+      exam = new ExamSession({ dir: join(app.getPath('userData'), 'journal'), ctx: { ...DEV_EXAM, cand }, keyEpoch: 1, seat, cellPub: cell.pub, wrap: safeStorage, durationMs, items: forms[form], form, pseud: devPseud(cand) });
     } catch (e) { dialog.showErrorBox('Saakshi — journal problem, please call the invigilator', (e as Error).message); app.exit(1); return; }
     sync = new SeatSync(exam, httpSend(relayUrl), verifier(cell.pub), (v) => win?.webContents.send('sync', v));
     sync.start(1000);
@@ -73,9 +77,10 @@ function start(): void {
         return new Response(await readFile(p), { headers: { 'content-type': MIME[extname(p)] ?? 'application/octet-stream', 'content-security-policy': CSP } });
       } catch { return new Response('not found', { status: 404 }); }
     });
-    session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'media'));
-    session.defaultSession.setPermissionCheckHandler((_wc, perm) => perm === 'media');
-    if (process.platform === 'darwin') await systemPreferences.askForMediaAccess('camera');
+    // Camera off (test mode): no permission and no macOS prompt.
+    session.defaultSession.setPermissionRequestHandler((_wc, perm, cb) => cb(camera && perm === 'media'));
+    session.defaultSession.setPermissionCheckHandler((_wc, perm) => camera && perm === 'media');
+    if (camera && process.platform === 'darwin') await systemPreferences.askForMediaAccess('camera');
 
     win = new BrowserWindow({
       width: 1200, height: 800,

@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cellKey, DEV_EXAM, devSeat, type KeysFile } from '@saakshi/core/dev';
+import { cellKey, DEV_EXAM, devPseud, devSeat, type KeysFile } from '@saakshi/core/dev';
 import { parseSignedLine } from '@saakshi/core/journal';
 import { openBody } from '@saakshi/core/node';
+import { counts, finalHash, receiptCode, type Response } from '@saakshi/core/protocol';
 import { fromB64 } from '@saakshi/core/wire';
 import { ExamSession, IDLE_MS } from '../src/main/exam.ts';
 import type { Wrapper } from '../src/main/journal-store.ts';
@@ -15,7 +16,7 @@ const cell = cellKey(keys, 'cell-1');
 const wrap: Wrapper = { encryptString: (s) => Buffer.from('W' + s), decryptString: (b) => b.toString().slice(1) };
 const D = 30 * 60_000;
 function session(dir: string, clock: () => number): ExamSession {
-  return new ExamSession({ dir, ctx: { ...DEV_EXAM, cand: 'C0001' }, keyEpoch: 1, seat: devSeat(keys, 'C0001')!, cellPub: cell.pub, wrap, durationMs: D, items: ['I01', 'I02', 'I03'], clock });
+  return new ExamSession({ dir, ctx: { ...DEV_EXAM, cand: 'C0001' }, keyEpoch: 1, seat: devSeat(keys, 'C0001')!, cellPub: cell.pub, wrap, durationMs: D, items: ['I01', 'I02', 'I03'], form: 'F1', pseud: devPseud('C0001'), clock });
 }
 const act = (kind: 'answer' | 'mark' | 'clear', item: string, state: 'A' | 'MR' | 'AMR' | 'NA', answer: string) => ({ kind, item, state, answer, dwellMs: 1234 });
 
@@ -91,6 +92,71 @@ test('an idle entry is journaled after 60 s without one, and not before', () => 
   assert.equal(s.head(), 2);
   assert.equal(s.journal.headers[1].kind, 'idle');
   assert.equal(s.journal.headers[1].activeMs, IDLE_MS);
+  s.close();
+  rmSync(dir, { recursive: true });
+});
+
+test('submit closes the journal with [form, finalHash] and returns the receipt the cell will compute', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+  let t = 0;
+  const s = session(dir, () => t);
+  s.start();
+  t = 1_000; s.act(act('clear', 'I02', 'NA', ''));        // first visit (Addendum A.6)
+  t = 2_000; s.act(act('answer', 'I01', 'A', 'B'));
+  t = 3_000; s.act(act('mark', 'I03', 'MR', ''));
+  const r = s.submit();
+  if (!r.ok) throw new Error(r.error);
+  const responses: Response[] = [['I01', 'A', 'B'], ['I02', 'NA', ''], ['I03', 'MR', '']];
+  const fh = finalHash(s.ctx, 'F1', responses);
+  const B = { exam: 'DEMO-2026', shift: 'S1', attempt: 1, pseud: devPseud('C0001'), seq: 5, h: s.hashAt(5), finalHash: fh, ...counts(responses) };
+  assert.deepEqual(r.receipt, { exam: 'DEMO-2026', shift: 'S1', cand: 'C0001', form: 'F1', code: receiptCode(B), seq: 5, h: s.hashAt(5), finalHash: fh, attempted: 3, answered: 1, marked: 1, total: 3 });
+  const [e] = s.entriesAfter(4, 1);
+  const p = parseSignedLine(e.line);
+  if (!p.ok) throw new Error(p.detail);
+  assert.equal(p.header.kind, 'submit');
+  assert.deepEqual(openBody(cell.priv, { ...s.ctx, seq: 5 }, fromB64(e.env), p.header.bodyCommit).body, { item: '', state: '', answer: '', meta: ['F1', fh] });
+  s.close();
+  rmSync(dir, { recursive: true });
+});
+
+test('submitting twice returns the same receipt and appends nothing; nothing else is journaled after submit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+  let t = 0;
+  const s = session(dir, () => t);
+  s.start();
+  s.act(act('answer', 'I01', 'A', 'C'));
+  const a = s.submit(), b = s.submit();
+  assert.deepEqual(a, b);
+  assert.equal(s.head(), 3);
+  assert.deepEqual(s.act(act('answer', 'I02', 'A', 'D')), { ok: false, error: 'exam submitted' });
+  t = 10 * 60_000; s.tick();
+  assert.equal(s.head(), 3);
+  s.close();
+  rmSync(dir, { recursive: true });
+});
+
+test('the receipt survives a restart', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+  const a = session(dir, () => 0);
+  a.start();
+  a.act(act('answer', 'I03', 'A', 'A'));
+  const r = a.submit();
+  a.close();
+  const b = session(dir, () => 0);
+  assert.equal(b.submitted, true);
+  assert.deepEqual(b.receipt(), r.ok ? r.receipt : null);
+  b.close();
+  rmSync(dir, { recursive: true });
+});
+
+test('submit is refused before start and allowed after time is up', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+  let t = 0;
+  const s = session(dir, () => t);
+  assert.deepEqual(s.submit(), { ok: false, error: 'exam not started' });
+  s.start();
+  t = D + 5_000;
+  assert.equal(s.submit().ok, true);
   s.close();
   rmSync(dir, { recursive: true });
 });
