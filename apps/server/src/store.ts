@@ -2,7 +2,11 @@ import { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
 import type { Ctx } from '@saakshi/core/protocol';
 
-export interface Row extends Ctx { seq: number; keyEpoch: number; h: string; line: string; env: Uint8Array }
+/** The cell's opened copy of a body — "the record". meta is JSON.stringify(body.meta). */
+export interface BodyRow { item: string; state: string; answer: string; meta: string; salt: Uint8Array }
+/** The cell's countersigned receipt B (protocol Addendum A.1/A.5). */
+export interface ReceiptRow { seq: number; h: string; finalHash: string; pseud: string; attempted: number; answered: number; marked: number; code: string; cell: string; sig: string }
+export interface Row extends Ctx { seq: number; keyEpoch: number; h: string; line: string; env: Uint8Array; body?: BodyRow; receipt?: ReceiptRow }
 
 /** Open (or create) a node DB. `fresh` = the file did not exist, which puts a cell into REBUILDING. */
 export function openDb(path: string): { db: Database; fresh: boolean } {
@@ -16,6 +20,15 @@ export function openDb(path: string): { db: Database; fresh: boolean } {
     exam TEXT NOT NULL, shift TEXT NOT NULL, attempt INTEGER NOT NULL, cand TEXT NOT NULL, seq INTEGER NOT NULL,
     key_epoch INTEGER NOT NULL, h TEXT NOT NULL, line TEXT NOT NULL, env BLOB NOT NULL,
     PRIMARY KEY (exam, shift, attempt, cand, seq)) WITHOUT ROWID`);
+  db.run(`CREATE TABLE IF NOT EXISTS bodies (
+    exam TEXT NOT NULL, shift TEXT NOT NULL, attempt INTEGER NOT NULL, cand TEXT NOT NULL, seq INTEGER NOT NULL,
+    item TEXT NOT NULL, state TEXT NOT NULL, answer TEXT NOT NULL, meta TEXT NOT NULL, salt BLOB NOT NULL,
+    PRIMARY KEY (exam, shift, attempt, cand, seq)) WITHOUT ROWID`);
+  db.run(`CREATE TABLE IF NOT EXISTS receipts (
+    exam TEXT NOT NULL, shift TEXT NOT NULL, attempt INTEGER NOT NULL, cand TEXT NOT NULL,
+    seq INTEGER NOT NULL, h TEXT NOT NULL, final_hash TEXT NOT NULL, pseud TEXT NOT NULL,
+    attempted INTEGER NOT NULL, answered INTEGER NOT NULL, marked INTEGER NOT NULL, code TEXT NOT NULL, cell TEXT NOT NULL, sig TEXT NOT NULL,
+    PRIMARY KEY (exam, shift, attempt, cand)) WITHOUT ROWID`);
   db.run(`CREATE TABLE IF NOT EXISTS evidence (id INTEGER PRIMARY KEY, at INTEGER NOT NULL, code TEXT NOT NULL,
     stream TEXT NOT NULL, seq INTEGER NOT NULL, reason TEXT NOT NULL, line TEXT NOT NULL)`);
   db.run('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)');
@@ -43,8 +56,17 @@ export class GroupCommit {
 
   constructor(db: Database, onCommit: (rows: Row[]) => void, opts: { ms?: number; max?: number; onFatal?: (e: unknown) => void } = {}) {
     const ins = db.query('INSERT INTO entries (exam, shift, attempt, cand, seq, key_epoch, h, line, env) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const insBody = db.query('INSERT INTO bodies (exam, shift, attempt, cand, seq, item, state, answer, meta, salt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const insReceipt = db.query(`INSERT OR REPLACE INTO receipts (exam, shift, attempt, cand, seq, h, final_hash, pseud, attempted, answered, marked, code, cell, sig)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     this.#insert = db.transaction((rows: Row[]) => {
-      for (const r of rows) ins.run(r.exam, r.shift, r.attempt, r.cand, r.seq, r.keyEpoch, r.h, r.line, r.env);
+      for (const r of rows) {
+        ins.run(r.exam, r.shift, r.attempt, r.cand, r.seq, r.keyEpoch, r.h, r.line, r.env);
+        const b = r.body;
+        if (b) insBody.run(r.exam, r.shift, r.attempt, r.cand, r.seq, b.item, b.state, b.answer, b.meta, b.salt);
+        const x = r.receipt;
+        if (x) insReceipt.run(r.exam, r.shift, r.attempt, r.cand, x.seq, x.h, x.finalHash, x.pseud, x.attempted, x.answered, x.marked, x.code, x.cell, x.sig);
+      }
     });
     this.#onCommit = onCommit;
     this.#ms = opts.ms ?? 10;

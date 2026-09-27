@@ -3,13 +3,15 @@ import { ackMessage } from '@saakshi/core/ack';
 import { hexToBytes, toHex } from '@saakshi/core/bytes';
 import { parseSignedLine } from '@saakshi/core/journal';
 import { openBody, signer, verifier } from '@saakshi/core/node';
-import { entryHash, genesisPrev, type Ctx } from '@saakshi/core/protocol';
+import { receiptMessage, responsesOf } from '@saakshi/core/log';
+import { counts, entryHash, finalHash, genesisPrev, receiptCode, type Body, type Ctx, type Header, type State } from '@saakshi/core/protocol';
+import type { Forms } from '@saakshi/core/sheet';
 import type { Verify } from '@saakshi/core/sig';
 import {
   fromB64, streamKey, toB64,
   type NodeState, type Rejection, type RejectCode, type StreamStatus, type StreamView, type SyncReq, type SyncRes, type WireAck, type WireEntry,
 } from '@saakshi/core/wire';
-import { GroupCommit, type Row } from './store.ts';
+import { GroupCommit, type ReceiptRow, type Row } from './store.ts';
 
 export type Mode = 'cell' | 'relay';
 
@@ -28,6 +30,14 @@ export interface IngestOpts {
   onState?: (s: NodeState) => void;
   now?: () => number;
   commit?: { ms?: number; max?: number };
+  /** cell: the form item lists (forms.json without durationMin). Without them every submit is rejected. */
+  forms?: Forms;
+  /** cell: the form the roster assigns to a candidate (DEV: devForm). */
+  formOf?: (cand: string) => string | undefined;
+  /** cell: the candidate's pseudonym for receipts (DEV: devPseud). */
+  pseud?: (cand: string) => string;
+  /** cell: the id stamped on countersigned receipts. Default 'cell-1'. */
+  cellId?: string;
 }
 
 export interface Ingest {
@@ -44,7 +54,8 @@ export interface Ingest {
   close(): void;
 }
 
-interface Stream { ctx: Ctx; hs: string[]; durable: number; epoch: number; ack?: WireAck; cellHead: number; senderHead: number; seenAt: number }
+/** bodies[seq-1] = the opened body (cell only); submitSeq = seq of the submit, 0 while the chain is open. */
+interface Stream { ctx: Ctx; hs: string[]; durable: number; epoch: number; ack?: WireAck; cellHead: number; senderHead: number; seenAt: number; bodies: Body[]; submitSeq: number }
 
 const ENV_MIN = 65 + 24 + 16 + 16;
 const SIG_HEX = /^[0-9a-f]{128}$/;
@@ -71,7 +82,7 @@ export function createIngest(o: IngestOpts): Ingest {
   const get = (c: Ctx): Stream => {
     const k = streamKey(c);
     let s = streams.get(k);
-    if (!s) streams.set(k, (s = { ctx: ctxOf(c), hs: [], durable: 0, epoch: 0, cellHead: mode === 'cell' ? 0 : -1, senderHead: -1, seenAt: 0 }));
+    if (!s) streams.set(k, (s = { ctx: ctxOf(c), hs: [], durable: 0, epoch: 0, cellHead: mode === 'cell' ? 0 : -1, senderHead: -1, seenAt: 0, bodies: [], submitSeq: 0 }));
     return s;
   };
   const view = (s: Stream): StreamView => ({ ...s.ctx, head: s.durable, cellHead: mode === 'cell' ? s.durable : s.cellHead, senderHead: s.senderHead, seenAt: s.seenAt });
@@ -83,6 +94,35 @@ export function createIngest(o: IngestOpts): Ingest {
     s.hs.push(r.h);
     s.durable = r.seq;
     s.epoch = r.key_epoch;
+  }
+  if (mode === 'cell') {
+    // ponytail: replay state is rebuilt from the bodies table, so a post-startup DB edit only affects later submits; the audit catches edits regardless.
+    for (const r of db.query('SELECT exam, shift, attempt, cand, seq, item, state, answer, meta FROM bodies ORDER BY exam, shift, attempt, cand, seq').all() as (Ctx & { seq: number; item: string; state: string; answer: string; meta: string })[])
+      get(r).bodies[r.seq - 1] = { item: r.item, state: r.state as State | '', answer: r.answer, meta: JSON.parse(r.meta) };
+  }
+  const lineAt = db.query('SELECT line FROM entries WHERE exam = ? AND shift = ? AND attempt = ? AND cand = ? AND seq = ?');
+  for (const s of streams.values()) {
+    const row = s.durable ? (lineAt.get(s.ctx.exam, s.ctx.shift, s.ctx.attempt, s.ctx.cand, s.durable) as { line: string } | null) : null;
+    const p = row ? parseSignedLine(row.line) : undefined;
+    if (p?.ok && p.header.kind === 'submit') s.submitSeq = s.durable;
+  }
+  const cellId = o.cellId ?? 'cell-1';
+
+  /** Protocol Addendum A.5: replay the committed bodies; the submit's finalHash must match. Returns the countersigned receipt, or why not. */
+  function checkSubmit(s: Stream, hd: Header, h: string, body: Body): ReceiptRow | string {
+    const [form, fh] = body.meta;
+    if (body.item || body.state || body.answer || body.meta.length !== 2 || typeof form !== 'string' || typeof fh !== 'string')
+      return 'submit body must be ["body","","","",[form, finalHash]]';
+    const want = o.formOf?.(hd.cand);
+    const items = o.forms?.[form];
+    if (!items || form !== want) return `submit names form ${form}; the roster says ${want ?? 'nothing'}`;
+    if (!o.pseud) return 'this cell has no pseudonym key';
+    for (let i = 0; i < hd.seq - 1; i++) if (!s.bodies[i]) return `cannot replay: no body for seq ${i + 1}`;
+    let responses;
+    try { responses = responsesOf(items, s.bodies.slice(0, hd.seq - 1)); } catch (e) { return `submit: ${(e as Error).message}`; }
+    if (finalHash(hd, form, responses) !== fh) return 'submit: finalHash does not match the replayed chain';
+    const B = { exam: hd.exam, shift: hd.shift, attempt: hd.attempt, pseud: o.pseud(hd.cand), seq: hd.seq, h, finalHash: fh, ...counts(responses) };
+    return { seq: B.seq, h, finalHash: fh, pseud: B.pseud, attempted: B.attempted, answered: B.answered, marked: B.marked, code: receiptCode(B), cell: cellId, sig: toHex(cellSign!(receiptMessage(B))) };
   }
 
   const commit = new GroupCommit(db, (rows) => {
@@ -143,6 +183,7 @@ export function createIngest(o: IngestOpts): Ingest {
       if (!v) return bad(`no seat key for ${hd.cand} at keyEpoch ${hd.keyEpoch}`);
       if (!v(p.m, p.sig)) return bad('signature does not verify');
       if (hd.seq < 1) return bad('seq must start at 1');
+      if (s.submitSeq && hd.seq > s.submitSeq) return bad(`entry after submit (the chain closed at seq ${s.submitSeq})`);
       const head = s.hs.length;
       if (hd.seq > head + 1) { touched.set(s, true); return; }            // gap → NEED{cand, head}
       // 2. prev against the stored chain
@@ -153,11 +194,23 @@ export function createIngest(o: IngestOpts): Ingest {
       let env: Uint8Array;
       try { env = fromB64(e.env); } catch { return bad('envelope is not base64'); }
       if (env.length < ENV_MIN) return bad('envelope too short');
+      let body: Body | undefined, rec: Row['body'], receipt: ReceiptRow | undefined;
       if (mode === 'cell') {
-        try { openBody(o.cell.priv!, { ...hd }, env, hd.bodyCommit); } catch (err) { return bad(`body: ${(err as Error).message}`); }
+        let opened: { salt: Uint8Array; body: Body };
+        try { opened = openBody(o.cell.priv!, { ...hd }, env, hd.bodyCommit); } catch (err) { return bad(`body: ${(err as Error).message}`); }
+        body = opened.body;
+        if (body.item && o.forms && !o.forms[o.formOf?.(hd.cand) ?? '']?.includes(body.item)) return bad(`item ${body.item} is not in ${hd.cand}'s form`);
+        if (hd.kind === 'submit') {
+          const r = checkSubmit(s, hd, h, body);
+          if (typeof r === 'string') return bad(r);
+          receipt = r;
+        }
+        rec = { item: body.item, state: body.state, answer: body.answer, meta: JSON.stringify(body.meta), salt: opened.salt };
       }
       s.hs.push(h);
-      rows.push({ ...ctxOf(hd), seq: hd.seq, keyEpoch: hd.keyEpoch, h, line: e.line, env });
+      if (body) s.bodies[hd.seq - 1] = body;
+      if (hd.kind === 'submit') s.submitSeq = hd.seq;
+      rows.push({ ...ctxOf(hd), seq: hd.seq, keyEpoch: hd.keyEpoch, h, line: e.line, env, body: rec, receipt });
     });
 
     if (evidence.length) db.transaction(() => { for (const ev of evidence) addEvidence.run(t, ...ev); })();
