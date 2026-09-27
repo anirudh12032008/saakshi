@@ -41,3 +41,8 @@ test('a relay head that differs from the cell\'s count names the candidate and t
   expect(r.headMismatches).toEqual(['C0001: relay 8 · cell 6']);
   expect(r.green).toBe(false);
 });
+
+test('an empty shift (nothing checked in, submitted or sealed) is not green', () => {
+  const r = reconcile({ ...base, relay: { mode: 'relay', state: 'LIVE', streams: [] }, cell: { cell: 'cell-1', exam: 'DEMO-2026', shift: 'S1', sheets: [] } });
+  expect([r.checkedIn, r.submitted, r.leaves, r.headsEqual, r.green]).toEqual([0, 0, 0, true, false]);
+});

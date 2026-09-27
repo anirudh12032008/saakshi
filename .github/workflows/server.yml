@@ -2,9 +2,9 @@ name: server
 on:
   push:
     branches: [main]
-    paths: ['apps/server/**', 'apps/seat/src/main/sync.ts', 'apps/seat/src/shared/**', 'packages/**', 'tools/**', 'fixtures/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/server.yml']
+    paths: ['apps/server/**', 'apps/seat/src/main/sync.ts', 'apps/seat/src/main/**', 'apps/seat/src/shared/**', 'packages/**', 'tools/**', 'fixtures/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/server.yml']
   pull_request:
-    paths: ['apps/server/**', 'apps/seat/src/main/sync.ts', 'apps/seat/src/shared/**', 'packages/**', 'tools/**', 'fixtures/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/server.yml']
+    paths: ['apps/server/**', 'apps/seat/src/main/sync.ts', 'apps/seat/src/main/**', 'apps/seat/src/shared/**', 'packages/**', 'tools/**', 'fixtures/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/server.yml']
   workflow_dispatch:
 concurrency:
   group: server-${{ github.ref }}
@@ -23,7 +23,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: 1.3.14 }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @saakshi/server typecheck
+      - run: pnpm --filter @saakshi/core --filter @saakshi/server typecheck
+      - run: pnpm --filter @saakshi/core test
       - run: bun test --timeout 60000 apps/server
       - name: Kill test (SIGKILL + wipe the cell mid-stream)
         run: bun tools/chaos-kill.ts
+      - name: Act 4 end to end (submit → seal → rogue insider → audit → verify → evidence)
+        run: bun tools/act4.ts

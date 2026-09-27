@@ -26,7 +26,8 @@ export function reconcile(i: ReconIn): ReconRow {
     headsEqual: headMismatches.length === 0,
     headMismatches,
   };
-  const green = row.headsEqual && row.submitted === row.receipts && row.receipts === row.leaves
+  // Nothing submitted yet is not green: an empty shift has nothing to reconcile.
+  const green = row.submitted > 0 && row.headsEqual && row.submitted === row.receipts && row.receipts === row.leaves
     && row.unlocked <= row.checkedIn && row.checkedIn <= row.registered;
   return { ...row, green };
 }
