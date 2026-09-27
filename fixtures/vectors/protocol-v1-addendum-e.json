@@ -1,0 +1,198 @@
+{
+  "note": "DEV ONLY: decisionKey is the fixture authority key from fixtures/keys.json. P-256 signatures are randomised: verify, do not compare bytes.",
+  "decisionKey": {
+    "pub": "04ddfd23a034b80069356d8ee8b2d1a36fbd1a47e5b1e896d1342a11f33225a60ebe016aefd4b7a4128587b3e0c088d655505dac3952625adb1982d9213fd0c592"
+  },
+  "decision": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "reportHash": "7a3b04faf42f11e084a1030e657670e6911a13b4964ba165abfb066dfd075b11",
+      "by": "R. Iyer (committee chair)",
+      "at": 1790000000000
+    },
+    "text": "[\"decision\",\"DEMO-2026\",\"S1\",\"7a3b04faf42f11e084a1030e657670e6911a13b4964ba165abfb066dfd075b11\",\"R. Iyer (committee chair)\",1790000000000]",
+    "sig": "f920162045eea8a6abff39ca5d400280e2f735c5659fbd3bae1f5dff617eafc4790bd75fc31ba0bb32b0797234770e506fd391b5df9688040c79f5f6e6a60a3e"
+  },
+  "export": {
+    "sheet": {
+      "ctx": {
+        "exam": "DEMO-2026",
+        "shift": "S1",
+        "attempt": 1,
+        "cand": "C0001"
+      },
+      "form": "F1",
+      "pseud": "7777777777777777777777777777777777777777777777777777777777777777",
+      "keys": [],
+      "entries": [
+        {
+          "line": "[\"signed\",[\"entry\",1,\"DEMO-2026\",\"S1\",1,\"C0001\",1,1,\"5d69bc2c61786a76aca971f7b9dce3b2d12f9e592b92cc102720078d6564fd8a\",\"unlock\",0,0,\"8fcb43e5a0af7ae87ca3ca9ea54150c1d14b6e03abaccbcca7ea311e3cb3c97f\"],\"6253f3c68c758ef266d53ec3cab44ea1e80f20a59af1f4e066fd92e2400c72315d8cd625c988b25419ebf1e76e4f3f01009b5ff141de40be691c5f65cbbc7c70\"]",
+          "salt": "01010101010101010101010101010101",
+          "body": [
+            "body",
+            "",
+            "",
+            "",
+            []
+          ],
+          "rx": [
+            1790000000000,
+            1790000000005
+          ]
+        },
+        {
+          "line": "[\"signed\",[\"entry\",1,\"DEMO-2026\",\"S1\",1,\"C0001\",1,2,\"385c4a096d66609b85f1c4ce3d01207dec0a8d27ccca9cbebff839fffff51f65\",\"answer\",30000,30000,\"d49969aece01b3d8317bbc3fc62bac276df16bce829fe57dd2e0739be121513a\"],\"a02aac6e1197a1e059e5e5b0836461927599b44003888f4dd96a938487c67019664e797279d851d71d3caeaa2c8edd6455061b7db2391cfa81a230f6433bd2d3\"]",
+          "salt": "02020202020202020202020202020202",
+          "body": [
+            "body",
+            "I01",
+            "A",
+            "B",
+            [
+              30000,
+              []
+            ]
+          ],
+          "rx": [
+            1790000030000,
+            1790000030005
+          ]
+        },
+        {
+          "line": "[\"signed\",[\"entry\",1,\"DEMO-2026\",\"S1\",1,\"C0001\",1,3,\"0f98d217387aa3d9ee673bfb328cff9f070b321a07c0fd7b46ac6965094e3216\",\"answer\",45000,45000,\"062ea2020186342db53dfc42b8cfb8ead01330c4dcc1d31ccf80d21af3ce87a1\"],\"2abb15d5f8a52e7e2335904170d4bed72837750fc65a78a83d9205adbcb3218b61b6b847731c00ff4f10e96cf83b230988d82ee7284488b15e01119e8ddef318\"]",
+          "salt": "03030303030303030303030303030303",
+          "body": [
+            "body",
+            "I01",
+            "A",
+            "C",
+            [
+              5000,
+              []
+            ]
+          ],
+          "rx": [
+            1790000045000,
+            1790000045005
+          ]
+        },
+        {
+          "line": "[\"signed\",[\"entry\",1,\"DEMO-2026\",\"S1\",1,\"C0001\",1,4,\"2fe65f795e547756bf615a002192f45b244efc68b4d91f6d29ed91d5b10da88e\",\"answer\",60000,60000,\"0e63346cab55ec4faca57f23896335e8d0ef926288ad0a936cfd6b14d72ba594\"],\"269acfa1bd9ff34386a5c1f8a5f5302b77eb6625a673d51268be17b1c00f6f192c857a8e8afdbfb1fce75f9c9d33f983786c49161f2fe8438139b7c6858ca3c3\"]",
+          "salt": "04040404040404040404040404040404",
+          "body": [
+            "body",
+            "I02",
+            "MR",
+            "",
+            [
+              15000,
+              []
+            ]
+          ],
+          "rx": [
+            1790000060000,
+            1790000060005
+          ]
+        },
+        {
+          "line": "[\"signed\",[\"entry\",1,\"DEMO-2026\",\"S1\",1,\"C0001\",1,5,\"452749d90ffd2b12a1fb74986ac33b0bf5ce4a9202719531167987746e0a3e19\",\"answer\",75000,75000,\"3dbb80373fa7a873c1a794b908d759bf3d68c26d3172143b55cb3c8cf3abfd23\"],\"551d96b48d15aad4e8206a7b8349c7745df87c28778ce330e266edc8e979956a40c4129a81a8d580007b74acf2946c8c96d829b73b86c252ea5acb0307b93ddd\"]",
+          "salt": "05050505050505050505050505050505",
+          "body": [
+            "missing"
+          ],
+          "rx": [
+            1790000075000,
+            1790000075005
+          ]
+        }
+      ]
+    },
+    "form": [
+      "I01",
+      "I02",
+      "I03",
+      "I04"
+    ],
+    "dir": {
+      "centre": "CEN042",
+      "form": "F1",
+      "lang": "en",
+      "pwd": 0
+    },
+    "rows": [
+      {
+        "cand": "C0001",
+        "centre": "CEN042",
+        "shift": "S1",
+        "form": "F1",
+        "lang": "en",
+        "pwd": 0,
+        "item": "I01",
+        "state": "A",
+        "answer": "C",
+        "dwellMs": 35000,
+        "visits": 2,
+        "changes": 1,
+        "tFirstMs": 30000,
+        "seq": 3,
+        "rxWall": 1790000045000,
+        "h": "2fe65f795e547756bf615a002192f45b244efc68b4d91f6d29ed91d5b10da88e"
+      },
+      {
+        "cand": "C0001",
+        "centre": "CEN042",
+        "shift": "S1",
+        "form": "F1",
+        "lang": "en",
+        "pwd": 0,
+        "item": "I02",
+        "state": "MR",
+        "answer": "",
+        "dwellMs": 15000,
+        "visits": 1,
+        "changes": 0,
+        "tFirstMs": -1,
+        "seq": 4,
+        "rxWall": 1790000060000,
+        "h": "452749d90ffd2b12a1fb74986ac33b0bf5ce4a9202719531167987746e0a3e19"
+      },
+      {
+        "cand": "C0001",
+        "centre": "CEN042",
+        "shift": "S1",
+        "form": "F1",
+        "lang": "en",
+        "pwd": 0,
+        "item": "I03",
+        "state": "NV",
+        "answer": "",
+        "dwellMs": 0,
+        "visits": 0,
+        "changes": 0,
+        "tFirstMs": -1,
+        "seq": 0,
+        "rxWall": 0,
+        "h": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "cand": "C0001",
+        "centre": "CEN042",
+        "shift": "S1",
+        "form": "F1",
+        "lang": "en",
+        "pwd": 0,
+        "item": "I04",
+        "state": "NV",
+        "answer": "",
+        "dwellMs": 0,
+        "visits": 0,
+        "changes": 0,
+        "tFirstMs": -1,
+        "seq": 0,
+        "rxWall": 0,
+        "h": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  }
+}

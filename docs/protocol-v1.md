@@ -539,3 +539,16 @@ This addendum is additive only. No byte defined in §1–§16 changes, so `V` st
 | D.3 | Readiness report `["readiness",exam,shift,attempt,cand,seatId,keyEpoch,at,verdict,findingsHash]`, signed (A.1 style) by the seat key of `keyEpoch`; `findingsHash = hex(SHA-256(UTF-8(canon(["findings",[meta…]]))))` over the D.2 metas in report order | The board cannot be forged by the LAN |
 | D.4 | Face flag `["face",exam,shift,attempt,cand,seatId,at,code,faces,expected,thumbHash]`, signed by the seat key; `code ∈ {face-none, face-extra}`; thumb = a B.4 box to `reviewPub`, `info = ["saakshi-face",1,exam,shift,attempt,cand,at]`, `pt` a JPEG ≤ 160×120; `thumbHash = hex(SHA-256(box))`, or `""` with no box | Plan §3.5 "one thumbnail, encrypted to control" |
 | D.5 | Provenance (not checked): the second meta slot of `answer` / `mark` / `clear` bodies (already `[]`) may be `["prov",moves,pathPx,clicks,keys,untrusted,lastMoveMs]` (non-negative integers) | S5 pointer-path provenance, inside the sealed body |
+
+
+## 18. Addendum E (Stage 6, 2026-09-27)
+
+This addendum is additive only. No byte defined in §1–§17 changes, so `V` stays 1.
+
+- Vectors: `fixtures/vectors/protocol-v1-addendum-e.json`, produced by `tools/gen-vectors-addendum-e.ts`, checked by `packages/core/test/addendum-e.test.ts`.
+- Code: `analytics.ts` (`ExportRow`, `SignedDecision`, `decisionArray`, `headlineOf`).
+
+| # | Addendum | Why |
+|---|---|---|
+| E.1 | **Export rows.** For each sheet in a cell's `ShiftExport` (dedupe by `cand`, keeping the sheet with the most entries; ties → the highest `attempt`) and each item of the candidate's form (directory `form` → `forms.json` order), one row with the frozen `fixtures/schemas/v1.json` cohort fields plus the export fields. From the directory: `centre`, `form`, `lang` (default `"en"`), `pwd` (default 0); `shift` = the export's shift. From the entries whose body `item` is this item (in `seq` order): `state`/`answer` = the last one's (none → `"NV"`, `""`); `dwellMs` = Σ `meta[0]` (non-negative integers; anything else counts 0); `visits` = their count; `changes` = the number of consecutive pairs whose `answer` differs; `tFirstMs` = `activeMs` of the first whose `answer ≠ ""` (none → −1); `seq`, `rxWall` (the relay's `rx[0]`, 0 if absent) and `h` (hex `entryHash`) of the last one (none → 0, 0, 64 zeros). Bodies recorded as `missing`/`unreadable` count as no entry. Rows are sorted by `cand`, then form position | The radar and the engine analyse the system's own record |
+| E.2 | **Decision sign-off** `["decision",exam,shift,reportHash,by,at]`, signed (A.1 style: `msg(array)`) by control's decision key; `reportHash` = hex SHA-256 of the report file's bytes; `by` 1–64 characters | A named human approved exactly this report |

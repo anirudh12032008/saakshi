@@ -72,14 +72,14 @@ export interface TimeRow {
 }
 
 export interface Notice {
-  id: string; incident: string; kind: IncidentKind; centres: string[]; audience: number; en: string; hi: string;
+  id: string; incident: string; kind: IncidentKind; centres: string[]; audience: number; en: string; hi: string; ta?: string;
   channels: ('sms' | 'email' | 'digilocker')[]; draftedAt: number; approvedBy?: string; approvedAt?: number;
 }
 export interface PublicStatus {
-  exam: string; shift: string; at: number; summary: { en: string; hi: string };
-  centres: { centre: string; tone: TileTone; en: string; hi: string }[];
-  incidents: { kind: IncidentKind; severity: Severity; since: number; centres: string[]; answersLost: number | null; en: string; hi: string }[];
-  notices: { at: number; en: string; hi: string }[];
+  exam: string; shift: string; at: number; summary: { en: string; hi: string; ta?: string };
+  centres: { centre: string; tone: TileTone; en: string; hi: string; ta?: string }[];
+  incidents: { kind: IncidentKind; severity: Severity; since: number; centres: string[]; answersLost: number | null; en: string; hi: string; ta?: string }[];
+  notices: { at: number; en: string; hi: string; ta?: string }[];
 }
 
 export interface StoreReport { store: string; path: string; sha256: string; ok: boolean; detail: string }

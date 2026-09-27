@@ -2,10 +2,8 @@
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 
-export interface CohortRow {
-  cand: string; centre: string; shift: string; form: 'F1' | 'F2'; lang: string; pwd: 0 | 1; item: string;
-  state: 'NV' | 'NA' | 'A' | 'MR' | 'AMR'; answer: string; dwellMs: number; visits: number; changes: number; tFirstMs: number;
-}
+import type { CohortRow } from '../packages/core/src/analytics.ts';
+export type { CohortRow } from '../packages/core/src/analytics.ts';
 
 export async function* readCohort(path: string): AsyncGenerator<CohortRow> {
   for await (const line of createInterface({ input: createReadStream(path), crlfDelay: Infinity })) if (line.trim()) yield JSON.parse(line) as CohortRow;

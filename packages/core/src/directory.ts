@@ -10,7 +10,7 @@ export interface CellEntry { id: string; url: string; keyId: string; pub: string
 export interface CellKeyFile { id: string; keyId: string; priv: string; pub: string }
 export interface Directory {
   v: 1; exam: string; shift: string; durationMs: number; demoCentre: string; issuedAt: number;
-  cells: CellEntry[]; centres: Record<string, { cell: string }>; cands: Record<string, RosterEntry & { centre: string }>;
+  cells: CellEntry[]; centres: Record<string, { cell: string }>; cands: Record<string, RosterEntry & { centre: string; lang?: string; pwd?: 0 | 1 }>;
   /** Stage 4: operating parameters (tools/provision.ts --demo writes OPS_DEMO). */
   ops?: Ops;
 }
@@ -21,6 +21,8 @@ export const FILES = {
   pseudKey: 'control/pseud.key',
   /** Stage 5 (Addendum D.4): control's review key; face thumbnails are sealed to its public half. */
   reviewKey: 'control/review.key.json',
+  /** Stage 6 (Addendum E.2): control's decision key; signs the committee's sign-off. */
+  decisionKey: 'control/decision.key.json',
   manifest: 'package/manifest.json',
   paper: (form: string) => `package/paper-${form}.bin`,
   wraps: 'package/wraps.json',
