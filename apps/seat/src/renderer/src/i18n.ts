@@ -27,7 +27,7 @@ export interface Strings {
   questionLangNote: string;
 }
 
-// TA strings reviewed by: ______
+// TA strings: not yet reviewed by a Tamil reader (see docs/claims-ledger.md, Stage 6 limits).
 
 export const T: Record<Lang, Strings> = {
   en: {

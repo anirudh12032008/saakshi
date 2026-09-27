@@ -1,0 +1,59 @@
+Stage 6 exit check — automated proxy for "run acts 1-5 by hand"
+=================================================================
+Run at: 2026-09-27/28, this Mac, DEV mode. Note: the machine was under heavy,
+unrelated load from the user's own long-running jobs during this run (load
+average ~90-170 at points), so every act ran several times slower than the
+155-202s (act5) / previously-measured times quoted in the plan and the
+claims ledger. All acts still PASSed and every checked number matched the
+plan's pre-supplied facts exactly.
+
+What was actually verified by this agent (automated, not by hand with the
+seat app):
+  Act 0 (hook)     : swarm.ts / act2.ts wiring — covered by act2 below.
+  Act 1 (before)   : bun tools/act1.ts -> PASS. Blocked by name (AnyDesk,
+                     overlay-sim); CEN042 amber; 1 integrity entry for 3
+                     probes; INTEGRITY_CRITICAL; face-extra flag raised on
+                     synthetic samples and cleared by a reviewer; submitted
+                     and verified. See docs/evidence/stage5-act1.txt for an
+                     earlier capture; this run repeated it.
+  Act 2 (T0)       : bun tools/act2.ts -> PASS. 2 of 3 custodians release;
+                     CEN001 and CEN042 codes revealed and logged; 6585
+                     entries committed; 300 candidates submitted.
+  Act 3 (during)   : bun tools/act3.ts -> PASS. TAMPER (P0) climbed to the
+                     regulator rung, CERT-In draft written; notice approved
+                     to the outbox and shown on the public page with no PII.
+                     ACT3-NUMBERS: syncLagAfterDegradeMs 12302,
+                     predictedBeforeDownMs 1274, moveCreditedMs 54053,
+                     purged 21, candidates 301.
+  Act 4 (after)    : bun tools/act4.ts -> PASS. Audit recovered a tampered
+                     record from the archive; /verify passed on chain, keys,
+                     finalHash, receipt, slip, STH and inclusion proof; a
+                     9-file evidence pack's manifest verified.
+  Act 5 (decide)   : bun tools/act5.ts -> PASS. See docs/evidence/stage6-act5.txt
+                     for the full transcript. Headline, flags, history,
+                     scorecard, report/notice and sign-off all matched the
+                     plan's pinned numbers exactly.
+  Regression       : bun tools/chaos.ts --runs 3 -> PASS, lost 0 on all three
+                     scenarios (kill-cell, wipe-cell, spare-relay).
+
+What this does NOT cover, and still needs a human with the real seat app:
+  - The actual manual walkthrough of acts 1-5 in order on one
+    `bun tools/stack.ts --paper ... --cohort ...` run with the seat app in
+    --test-mode, watching the UI (palette states, banner, notices, the
+    Tamil toggle) render on screen rather than being asserted by a script.
+  - Live face-presence detection with a real camera and a real human face
+    (Stage 7 by hand). This agent did not touch the camera or run the seat
+    app in a camera-holding mode, per instruction; no camera-holding process
+    was left running (checked with `ps` after each run; nothing left).
+  - Visual/UX review of the Tamil (TA) strings by a Tamil reader — the
+    strings render and the pipeline is correct, but no one who reads Tamil
+    has checked they read naturally. See claims-ledger.md's M9 limit and
+    apps/seat/src/renderer/src/i18n.ts / apps/server/src/llm.ts.
+  - `SAAKSHI_LLM=claude` (the opt-in Claude provider) was not exercised here
+    or in CI, by design (cost/availability); only the template provider path
+    is exercised by act5.ts.
+
+Process hygiene: no seat app, camera-holding process, or leftover stack
+process (cell/relay/control/swarm) was left running after this exit check;
+each was allowed to exit on its own or was pkilled by PID/pattern after its
+script's PASS/FAIL was recorded.

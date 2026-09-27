@@ -1,6 +1,6 @@
 # Saakshi threat model
 
-This document is honest about the limits. It reflects the code at commit `cec0ebb`: Stages 0–3 and analytics A1–A4 are built; Stages 4–8 are not.
+This document is honest about the limits. It reflects Stage 6 ("Decide fairly"): Stages 0–6 are built and M1–M12 are frozen (see [`claims-ledger.md`](claims-ledger.md)); Stages 7–8 are not.
 
 **Status tags** used throughout:
 
@@ -265,7 +265,7 @@ The full matrix, filled in on both laptops (AnyDesk, TeamViewer, overlay-sim, se
 | Remote session | `screensharingd` present, self-test | `SM_REMOTESESSION`, self-test in CI | `probes.ts`, `probes-win.ts` |
 | VM | `kern.hv_vmm_present` (one signal of the score) | Score ≥ 2 blocks, 1 is review; CI's own `windows-latest` runner scores 2 (model, bios) ([`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json)) | `probes.ts`, `integrity.ts` |
 | Egress allowlist | Review only (never blocks); flags connections outside `Policy.integrity.egress` | Same, review only; CI's runner shows Azure infra IPs flagged | `gate.ts` |
-| Pointer provenance | Recorded in the sealed `answer`/`mark`/`clear` body (D.5); **not checked, not yet analysed** (Stage 6) | Same | `act1.ts`, protocol Addendum D.5 |
+| Pointer provenance | `untrusted > 0` (from the sealed `answer`/`mark`/`clear` body, D.5) feeds the radar's `escalate` input; **it is not a signal on its own** and never creates or raises a flag by itself (Stage 6) | Same | `act1.ts`, protocol Addendum D.5, `cohort-export.ts` |
 | Face presence | Live count on the device in the packaged app (MediaPipe on CPU; [evidence](evidence/stage0-seat-faces-1.png)); flags and the review queue scripted in `act1.ts` with synthetic samples (no camera); live with the camera is Stage 7 by hand | Stage 7 (laptop) | `FaceChip.tsx`, `face.ts` |
 | Assistive tech allowlist (NVDA, VoiceOver), scribe seat expects 2 faces | NVDA/VoiceOver allowed as an `info` finding, scribe accommodation (2 faces) scripted in `act1.ts` | Same | `integrity.ts` |
 | Blocks before start / flags during the exam | **Built**: `block` refuses `start()`; during the exam nothing blocks — new findings are journaled and critical codes raise `INTEGRITY_CRITICAL` (candidate never auto-submitted, never locked out) | Same | `gate.ts`, cell events |
@@ -289,3 +289,9 @@ No probe has yet been exercised against a *real* AnyDesk, TeamViewer or overlay 
 - **SEAT_SILENT and CENTRE_OUTAGE** are evaluated for the relays control can reach (the demo relay). The simulated centres report through their cells only.
 - **A spare relay's evidence event ids restart at 1.** Control's `/v1/events` cursor is per-relay and keyed by event id; when a dead relay is replaced by a spare, the spare's own event ids start over at 1, so a cursor left past that point on the old relay can miss the spare's first events until the next full poll. A cursor reset on relay replacement is later work.
 - **A provisional (not yet bound) seat that starts the exam keeps running even after an "already bound" refusal.** If a provisional seat (no WAN at check-in) lets its candidate start before the real binding lands, and the WAN then returns and refuses the seat as `ALREADY_BOUND`, the exam already under way on that seat is not itself halted — only the *binding* is refused. The started exam needs an operator to notice and intervene; nothing today force-stops it automatically.
+
+## Stage 6 additions
+
+- **LLM (Claude) risks.** The invigilator's free-text report is untrusted input to a model call: a report could attempt prompt injection against the classifier or the notice drafter. The `Provider` interface mitigates but does not eliminate this — `claudeProvider` sees only aggregated, pseudonymous facts (no raw candidate PII), every reply is schema-checked before use, and a human approves every notice and every classification's consequence before it reaches the public status page or the seat banner. A rejected or malformed reply falls back to the template provider. Cost and availability: Claude is opt-in (`SAAKSHI_LLM=claude`) and cached by input hash; an outage or a disabled key silently falls back to templates, never blocking the report pipeline. Templates are the default in CI and in the demo.
+- **The sign-off key (E.2).** `control/decision.key.json` is a **DEV key held in plaintext on control's disk**. It signs `["decision", exam, shift, reportHash, by, at]`, so a sign-off record shows *who* approved *which* exact report bytes — it does not make the report's contents correct, and it does not protect against a compromised control host reading or replacing the key. **Roadmap:** an HSM- or KMS-backed key, so the private key never touches application disk.
+- **The export refuses, it does not partially run.** Control's analytics run (`analytics-routes.ts`) requires `/v1/shift` to answer from **every** cell in the directory, none `REBUILDING`; if one cell is unreachable or rebuilding, the run returns 409 rather than silently analysing a shrunk cohort. This is a deliberate refuse-not-degrade choice: a partial radar run could look complete while missing a whole centre's rows.

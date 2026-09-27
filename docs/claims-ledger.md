@@ -1,6 +1,6 @@
 # Claims ledger
 
-This ledger lists every claim the pitch, the deck and the README make, the evidence behind each one, and its status. It reflects commit `1f7a07a`: Stages 0–4 and analytics A1–A4 are built; Stages 5–8 are not.
+This ledger lists every claim the pitch, the deck and the README make, the evidence behind each one, and its status. It reflects Stage 6 ("Decide fairly"): Stages 0–6 are built and M1–M12 are frozen (see the MoSCoW freeze table below); Stages 7–8 are not.
 
 ## Statuses
 
@@ -90,22 +90,47 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | D11 | TOST comparability flags a group that was harmed after the disruption | `test_comparability_catches_a_group_that_was_hurt_after_the_disruption` | **Proven** on a doctored synthetic room |
 | D12 | The re-test allocator respects PwD access and language | `test_allocator_is_greedy_nearest_with_seats_pwd_and_language` | **Proven** (greedy, not optimal) |
 | D13 | Signed dispute tickets from a candidate's "raise objection" | `test_objection_ticket_hash_and_listing` | **Proven** for hashed tickets. Ticket signing and the "raise objection" button on `/verify` are **Planned** (no stage assigned yet; Stage 6 connects the analytics) |
-| D14 | The radar and the decision engine analyse what actually flowed through the cells | `test_radar_reads_cell_export_rows` (schema compatibility) | Format **Proven**; live wiring **Planned (Stage 6)** |
+| D14 | The radar and the decision engine analyse what actually flowed through the cells | `test_radar_reads_cell_export_rows` (schema compatibility); `bun tools/act5.ts` compares the export with the replayed cohort row by row and decides on it, in CI ([`evidence/stage6-act5.txt`](evidence/stage6-act5.txt)) | **Proven** |
 | D15 | Incidents P0–P3 with blast radius, the escalation ladder, and the CERT-In template | `incidents.test.ts` (P0–P3, blast radius, ladder, debounce, CERT-In at the regulator rung), `act3.ts` steps 4, 5, 10 (TAMPER reached the regulator rung and drafted a CERT-In 6-hour report; [`evidence/stage4-certin.html`](evidence/stage4-certin.html)) | **Proven**. The CERT-In file is a **draft template**, not filed |
 | D16 | SYNC_LAG predicts WAN failure | `link.test.ts`; `act3.ts` (`ACT3-NUMBERS.predictedBeforeDownMs`): SYNC_LAG raised 5.0–14.1 s after the degrade began, 1.0–1.9 s before the cut across three runs | **Proven on our chaos drill only**. Not validated on real WAN data |
-| D17 | Claude classifies invigilator reports, drafts notices and writes scorecard notes (templates by default, human-approved) | `scorecard.claude_note_hook` returns template text only | **Planned (Stage 6)** |
+| D17 | Claude classifies invigilator reports, drafts notices and writes scorecard notes (templates by default, human-approved) | `apps/server/src/llm.ts` (`Provider`: `templateProvider` default, `claudeProvider` opt-in via `SAAKSHI_LLM=claude`, disk-cached, PII-redacted, schema-checked); `bun tools/act5.ts` (templates path, in CI) | **Built**: templates by default, Claude opt-in; PII redaction and schema checks are tested. Limits: Claude's HI/TA are machine drafts (not native-reviewed); no field evaluation of classification accuracy; `SAAKSHI_LLM=claude` is not exercised in CI, by design (cost/availability) |
+| D18 | The decision report's sign-off is a signed statement over the report's hash (Addendum E.2) | `control/decision.key.json` signs `["decision", exam, shift, reportHash, by, at]` where `reportHash` = SHA-256 of the exact `run.json` bytes; `bun tools/act5.ts` (signed sign-off) | **Proven**. It records that a named human approved *this* report; **it does not make the report correct**. The key is a DEV key on control's disk (see threat model; roadmap: HSM) |
+| D19 | Device/camera evidence (Stage 5 records) lifts a 2-signal flag to `escalate`; it never creates or raises a flag by itself | `test_escalation_ladder`; a 1-signal flag with evidence stays `watch` | **Proven on synthetic data**. Built from Stage 5 records only: a critical `integrity` entry, a provenance summary with `untrusted > 0`, or a human-**confirmed** face flag |
+| D20 | Act 5 headline, 2k twin (seed 7) | "Compensated 0 · Re-tested 193 · Re-conducted 3 centres · Spared 1,190 · ₹ avoided 17,85,000"; 2,000 candidates, 203,031 entries, export matches the replayed cohort on 200,000 checked fields; 53 flags (CEN005/CEN008/CEN009/CEN010), no honest candidate flagged; history annotates 53, corroborates 4 | **Proven**, [`evidence/stage6-act5.txt`](evidence/stage6-act5.txt). The incident and the ₹1,500/candidate policy value are **illustrative**, not tuned to hit a target number — "Compensated 0" is explained, not hidden: with no measured gaps the outage window exceeds the 30-minute compensation cap, so every affected candidate is re-tested |
 
 ## Candidate experience and scale
 
 | # | Claim | Evidence | Status |
 |---|---|---|---|
 | C1 | NTA-style exam UI: palette states, Save & Next, Mark for Review, Clear Response | `exam-state.test.ts` | **Proven** |
-| C2 | EN and HI with a bundled Devanagari font | `exam-state.test.ts` "EN and HI catalogues have the same keys … HI is Devanagari" | **Proven**. Tamil **Planned (Stage 6)** |
+| C2 | EN and HI with a bundled Devanagari font | `exam-state.test.ts` "EN and HI catalogues have the same keys … HI is Devanagari" | **Proven** |
+| C2 (Stage 6 addendum) | Tamil for the seat catalogue, banner, notices and status page, with a bundled Noto Sans Tamil font | `bun tools/act5.ts` (notice approved EN/HI/TA on `/status`); `apps/seat/src/renderer/src/i18n.ts` | **Proven for UI, banner, notices and status page. Tamil question text is not built** — the item bank has no Tamil, so TA mode shows EN question text with a note (`questionLangNote`) |
 | C3 | Accessible: keyboard-only use, ARIA, 200% zoom | Built in Stage 1 and checked by hand; Playwright e2e now runs against the packaged Windows e2e build in CI (`--test-mode --no-camera --use-fake-device-for-media-stream`), green | **Playwright e2e passing; the WCAG audit is still not done** |
 | C4 | In-exam banner, public status page, notice outbox | `exam-state.test.ts`, `move.test.ts` (banner); `status-view.test.ts`, `ops-routes.test.ts`, `act3.ts` step 11 (public status page with no PII); mock outbox channels | **Proven on our chaos drill**. Claude-drafted notices and Tamil: **Planned (Stage 6)** |
 | C5 | 20k live candidates across 100 centres | `tools/swarm.ts`: 99 simulated centres replay the full G1 cohort (≈20k candidates) in one process, live (commit `5cd2f0a`); `bun tools/act2.ts` runs the same flow end to end on real cell/relay/control processes with a small cohort (300 candidates, 7 centres) | **Built**. Throughput: **~1.1k entries/s sustained on one core** (Apple M5, full G1 cohort at `--speed 20`, cells in-process; commit `5cd2f0a`), lower under heavy machine load; the cross-process HTTP number is **Planned (Stage 7)** |
 | C6 | Throughput, p50/p99, WAN bytes per candidate-hour, seat CPU on low-end hardware | — | **Planned (Stage 7)** |
 | C7 | A Rust cell ingest matches the TypeScript one on the same vectors | — | **Planned (optional Stage R)** |
+
+## MoSCoW freeze: M1–M12 (Stage 6, 2026-09-27)
+
+Every Must-have (M1–M12) is frozen as of this commit. "Frozen" means the feature is built and its evidence command passes; "Frozen with limits" means it is built and passes but a named limit remains (see the row's evidence and the claims above for detail).
+
+| # | Feature | Evidence command | Status |
+|---|---|---|---|
+| M1 | Seat journal: signed header + encrypted body, tick states, NEED/gap resync | `packages/core/test/journal.test.ts`; `apps/seat/test/sync.test.ts` | **Frozen (Stage 6, 2026-09-27)** |
+| M2 | Untrusted centre relay: store-and-forward, spare relay takeover | `bun tools/chaos.ts --runs 3` (lost 0, `docs/evidence/stage6-demo.txt`) | **Frozen (Stage 6, 2026-09-27)** |
+| M3 | Cells ×3: verify, group commit, countersign, REBUILDING, 2-store archive | `bun tools/act2.ts`, `bun tools/act3.ts` | **Frozen (Stage 6, 2026-09-27)** |
+| M4 | Integrity gate and in-exam monitor, signed policy, face presence, hardened Electron | `bun tools/act1.ts`; [`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json) | **Frozen with limits (Stage 6, 2026-09-27)** — name matching only; live camera check is manual (P8) |
+| M5 | Split-custody paper release: Shamir 2-of-3, `kc_f`, offline codes | `bun tools/act2.ts` | **Frozen (Stage 6, 2026-09-27)** |
+| M6 | Active-time timer, gap caps, resume on another seat | `apps/seat/test/exam.test.ts`; `bun tools/act3.ts` step 7 | **Frozen (Stage 6, 2026-09-27)** |
+| M7 | Receipts, Merkle log, `/verify`, audit, reconciliation report, evidence pack | `bun tools/act4.ts` | **Frozen (Stage 6, 2026-09-27)** |
+| M8 | Control room: readiness, tiles, incidents P0–P3, escalation ladder, review queue | `bun tools/act2.ts`, `bun tools/act3.ts` | **Frozen (Stage 6, 2026-09-27)** |
+| M9 | Candidate comms: banner, status page, notice outbox, EN/HI/TA catalogue | `bun tools/act5.ts` ([`evidence/stage6-act5.txt`](evidence/stage6-act5.txt)) | **Frozen with limits (Stage 6, 2026-09-27)** — TA strings not yet reviewed by a Tamil reader |
+| M10 | Swarm, chaos scripts, reset script | `bun tools/chaos.ts --runs 3` | **Frozen (Stage 6, 2026-09-27)** |
+| M11 | Thin radar: speed-accuracy and same-room similarity | `uv run pytest -q` ([`evidence/stage6-pytest.txt`](evidence/stage6-pytest.txt)) | **Frozen (Stage 6, 2026-09-27)** |
+| M12 | Thin decision engine: tier-1 test, per-candidate compensate/re-test, CUET golden | `uv run pytest -q`; `bun tools/act5.ts` | **Frozen (Stage 6, 2026-09-27)** |
+
+**Frozen with limits, summary:** M4 (name-matching detection only, camera check is manual), M9 (Tamil review pending). Everything else above froze clean. See [`threat-model.md`](threat-model.md) for the detection matrix's other honest limits (Stage 4/5), which are unchanged by Stage 6 and not reopened here.
 
 ## Claims we deliberately don't make
 

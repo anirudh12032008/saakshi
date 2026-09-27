@@ -1,0 +1,16 @@
+wrote 2000 candidates x 100 items to /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act5-sYjChL/g1
+gen-paper-g1: wrote /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act5-sYjChL/paper/{bank,forms,key}.json (100 items)
+✓ G1 twin (2k, seed 7) and its 100-item paper
+✓ stack up (3 cells, CEN042's relay, control on templates, the swarm: 2000 candidates); released by NTA + NIC
+✓ 2000 candidates submitted on G1's clock (203031 entries, 333 s)
+✓ export rows equal swarmCohort rows on radar fields: 200000 rows, every one equal
+✓ "Compensated 0 · Re-tested 193 · Re-conducted 3 centres · Spared 1,190 · ₹ avoided 17,85,000" (= pinned); 53 flags; leak centres CEN005, CEN010, CEN009, CEN008 flagged; no honest candidate flagged (30.1 s)
+✓ history: 53 flags annotated, 4 corroborated; the flag set and the headline unchanged
+✓ scorecard: 100 centres; CEN042 → add observer (risk 0.36)
+✓ report R-8ba067eeb0: CENTRE_OUTAGE, 14 seats, linked to RELAY_WAN_DOWN-4 (RELAY_WAN_DOWN); nothing acked or resolved by it
+Bundled page in 16ms: ../../../../../../../Users/anirudh/probtester/apps/server/src/status.html
+✓ notice N-RELAY_WAN_DOWN-4 redrafted, approved; the public page shows it in EN, HI and TA (Tamil script); the TA toggle is on /status
+✓ signed off by "Act 5 script" over report bbec38651406…; the signature verifies with the decision key
+ACT5-NUMBERS {"twin":"2k","headline":"Compensated 0 · Re-tested 193 · Re-conducted 3 centres · Spared 1,190 · ₹ avoided 17,85,000","flags":53,"annotated":53,"corroborated":4,"rows":200000,"runSeconds":30.143,"totalSeconds":437,"host":"darwin-arm64"}
+PASS
+EXIT:0

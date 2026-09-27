@@ -38,6 +38,21 @@ uv run python -m saakshi_analytics.evaluate --n 2000 --centres 10 --json eval.js
 - `uv run pytest -q` runs everything, including the one full 20k test (`-m full`: calibrate on honest G1, evaluate on G2).
 - `uv run pytest -q -m "not full"` runs only the fast suite (2k candidates).
 
+## Stage 6: the live pipeline
+
+```sh
+bun tools/act5.ts          # 2k twin (seed 7), CI-sized
+bun tools/act5.ts --full   # 20k engine run
+```
+
+Control fetches `/v1/shift` from every cell in the directory (refusing 409 unless all answer and none is `REBUILDING`), turns the export into cohort rows (Addendum E.1), and runs one pipeline: radar → history annotation → decision engine → scorecard → one `AnalyticsRun` JSON, signed off over the exact `run.json` bytes (Addendum E.2). **One demo shift**: every comparison against "the generator's cohort" uses the generator cohort with `shift` rewritten to the directory shift and the demo centre's rows removed, so the swarm's simulated centres and the one real demo centre are compared on the same footing.
+
+Act 5 headline (2k, seed 7): "Compensated 0 · Re-tested 193 · Re-conducted 3 centres · Spared 1,190 · ₹ avoided 17,85,000" — export rows match the replayed cohort row by row on every radar field (200,000 rows checked); 53 flags, CEN005/CEN008/CEN009/CEN010 flagged, no honest candidate flagged; history annotates 53 flags and corroborates 4; scorecard: "CEN042 → add observer" (risk 0.36); an invigilator's report "lab 2 power gone, 14 seats" classifies as `CENTRE_OUTAGE` (14 seats) and links to the open `RELAY_WAN_DOWN` incident at CEN042; the notice is approved and appears on `/status` in EN, HI and TA. See [`../docs/evidence/stage6-act5.txt`](../docs/evidence/stage6-act5.txt) for the exact run and [`../docs/evidence/stage6-act5-full.txt`](../docs/evidence/stage6-act5-full.txt) for the 20k live run, which is **pending**: the export matched on 1,981,100 rows, but the pipeline refused the script's CEN042 disruption because CEN042 is not in the 20k swarm cohort. The 20k engine golden (pytest `-m full`) passes.
+
+**"Compensated 0" is not a bug.** With no measured gaps in the disruption window, every affected candidate is credited the full 120-minute window — over the 30-minute compensation cap — so each one is re-tested rather than compensated. The report prints this reasoning; the numbers are not tuned to avoid a zero.
+
+`drill.mock.json` is the T−1 mock-drill telemetry behind the scorecard; CEN042's row there is what makes CEN042 the readiness board's top risk ("add observer") in the Act 5 run above.
+
 ## Signals
 
 | # | What | Test | Threshold |

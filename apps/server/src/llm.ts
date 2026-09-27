@@ -1,6 +1,6 @@
 // The LLM Provider (Stage 6). Templates are the default; Claude is opt-in (SAAKSHI_LLM=claude), cached, sees only
 // redacted, pseudonymous facts, and every answer is schema-checked. Claude drafts; a human approves. Claude never decides.
-// Tamil sentences: to be reviewed by a Tamil reader before the demo (Task 16 records who).
+// Tamil sentences: not yet reviewed by a Tamil reader (see docs/claims-ledger.md, Stage 6 limits).
 import Anthropic from '@anthropic-ai/sdk';
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';

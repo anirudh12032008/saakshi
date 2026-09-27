@@ -1,6 +1,6 @@
 # Traceability: the challenge's 12 focus areas → features → code → tests
 
-This document traces each of the 12 focus areas of the Challenge 6 brief to the features that address it, the code that implements them and the tests that cover them. It reflects commit `cec0ebb`: Stages 0–3 and analytics A1–A4 are built; Stages 4–8 are not.
+This document traces each of the 12 focus areas of the Challenge 6 brief to the features that address it, the code that implements them and the tests that cover them. It reflects Stage 6 ("Decide fairly"): Stages 0–6 are built and M1–M12 are frozen (see [`claims-ledger.md`](claims-ledger.md)'s MoSCoW freeze table); Stages 7–8 are not.
 
 **Sources:**
 - The feature IDs (M = Must, S = Should) and the stage numbers are defined in [`plan.md`](plan.md) §1 and §5.
@@ -20,16 +20,16 @@ This document traces each of the 12 focus areas of the Challenge 6 brief to the 
 |---|---|---|---|---|
 | 1 | Real-time monitoring | M8, M2, M4 | **Partly built** | In-exam monitor (Stage 5) |
 | 2 | Early failure prediction | M8 readiness, S4 predicted risk, SYNC_LAG | **Partly built** | SYNC_LAG (Stage 4); readiness board (Stages 5–6) |
-| 3 | Incident detection, classification, escalation | M8 rules and ladder, S3 classification | **Planned** | Stage 4 (rules, ladder); Stage 6 (Claude) |
+| 3 | Incident detection, classification, escalation | M8 rules and ladder, S3 classification | **Built** | — |
 | 4 | Backup and DR | M2, M3 | **Partly built** | Spare relay, 2-store archive, RPO/RTO (Stage 4) |
 | 5 | Tamper-evident storage | M1, M5, M7, S6 | **Built (without S6)** | Witness (Stage 7) |
 | 6 | Suspicious patterns | M4, M11, S1, S5 | **Partly built** | Integrity gate and monitor, pointer provenance (Stage 5) |
 | 7 | Reconciliation and validation | M1 NEED protocol, M7 reconciliation report | **Built** | — |
-| 8 | Candidate communication | M9, S3 notices | **Planned** (tick states and slip built) | Banner, status page (Stage 4); notices, Tamil (Stage 6) |
-| 9 | Re-schedule / re-conduct decision | M12, S2 | **Built** (synthetic data) | Live cell export (Stage 6) |
+| 8 | Candidate communication | M9, S3 notices | **Built** | Tamil question text (the bank has none) |
+| 9 | Re-schedule / re-conduct decision | M12, S2 | **Built**, live on the cells' export | — |
 | 10 | Fairness when disrupted | M6, M12 | **Partly built** | Gap journal, caps, handover (Stage 4) |
 | 11 | Audit trail and evidence reports | M7 evidence pack, S6 | **Built** (without S6) | Witness (Stage 7) |
-| 12 | AI analytics for systemic risk | S1, S3, S4 | **Partly built** | Claude provider (Stage 6) |
+| 12 | AI analytics for systemic risk | S1, S3, S4 | **Built** | Field accuracy (no field data) |
 
 ## Detail
 
@@ -59,11 +59,10 @@ Paths are relative to the repo root.
 
 ### 3. Incident detection, classification, escalation: M8 rules and ladder, S3 classification
 
-**Groundwork only:** the console marks a seat silent after 30 s, which is the basis of `SEAT_SILENT`.
-
-**Planned:**
-- Rules P0–P3, blast radius, the escalation ladder and the CERT-In template: **Stage 4**.
-- Claude classification of invigilator reports: **Stage 6**.
+**Built:**
+- **What:** rules P0–P3, blast radius, the escalation ladder and the CERT-In template (Stage 4); an invigilator's free-text report is classified (template or opt-in Claude), linked to the matching open incident (e.g. `CENTRE_OUTAGE` at CEN042), and drafts a notice for human approval (Stage 6).
+- **Code:** `apps/server/src/incidents.ts`, `report-routes.ts`, `llm.ts`.
+- **Tests:** `incidents.test.ts`; `bun tools/act3.ts` (TAMPER to the regulator rung, CERT-In draft); `bun tools/act5.ts` (report "lab 2 power gone, 14 seats" → `CENTRE_OUTAGE`, 14 seats, linked to the open `RELAY_WAN_DOWN` incident at CEN042).
 
 ### 4. Backup and DR: M2, M3
 
@@ -114,9 +113,12 @@ Paths are relative to the repo root.
 - **Code:** `apps/seat/src/renderer/src/App.tsx`, `Slip.tsx`, `i18n.ts`, `exam-state.ts`.
 - **Tests:** `apps/seat/test/exam-state.test.ts`.
 
-**Planned:**
-- In-exam banner and public status page: **Stage 4**.
-- Claude-drafted notices and Tamil: **Stage 6**.
+**Also built (Stage 6):**
+- **What:** an approved notice reaches the public status page and the seat banner in EN/HI/TA; templates by default, Claude drafts opt-in and human-approved.
+- **Code:** `apps/server/src/llm.ts`, `report-routes.ts`; `apps/seat/src/renderer/src/i18n.ts` (TA catalogue).
+- **Tests:** `bun tools/act5.ts` (notice approved EN/HI/TA on `/status`).
+
+**Planned:** Tamil question text — the bank has no Tamil items, so TA mode shows EN question text with a note.
 
 ### 9. Re-schedule / re-conduct decision: M12, S2
 
@@ -132,7 +134,7 @@ Paths are relative to the repo root.
 - **Code:** `analytics/src/saakshi_analytics/decide.py`; `analytics/policy.illustrative.json`; `analytics/golden/`.
 - **Tests:** `analytics/tests/test_decide.py`, `test_a4.py`.
 
-**Planned:** reading the cells' export live, **Stage 6**. Only the row format is tested so far, in `test_radar_reads_cell_export_rows`.
+**Also built (Stage 6):** the radar and decision engine read what actually flowed through the cells. Control fetches `/v1/shift` from every cell in the directory (refuses 409 on a partial or `REBUILDING` cell), turns it into cohort rows (Addendum E.1), and runs radar → history → decide → scorecard as one pipeline (`pipeline.py`, `analytics-routes.ts`). Evidence: `test_radar_reads_cell_export_rows` (schema); `bun tools/act5.ts` (export rows match the replayed cohort row by row on every radar field; headline in [`evidence/stage6-act5.txt`](evidence/stage6-act5.txt)).
 
 ### 10. Fairness when disrupted: M6, M12
 
@@ -168,7 +170,9 @@ Paths are relative to the repo root.
 - **Code:** `analytics/src/saakshi_analytics/radar.py`, `evaluate.py`, `scorecard.py`.
 - **Tests:** `analytics/tests/test_a3.py`, `test_scorecard.py`.
 
-**Planned:** the S3 Claude provider, **Stage 6**.
+**Also built (Stage 6):** the S3 `Provider` interface — `templateProvider` (default) and `claudeProvider` (opt-in, `SAAKSHI_LLM=claude`, disk-cached, PII-guarded) — classifies invigilator reports, drafts notices and writes scorecard notes; every reply is schema-checked and human-approved. Code: `apps/server/src/llm.ts`. Tests: `bun tools/act5.ts`; `SAAKSHI_LLM=claude` is not exercised in CI by design (cost/availability; templates are the tested default).
+
+**Planned:** field evaluation of classification accuracy (no field data).
 
 ## Demo acts
 
@@ -181,4 +185,4 @@ The live demo runs in five acts, numbered 0–5 in [`plan.md`](plan.md) §6.
 | 2 T0 | 2, 5, 8 | **Yes:** `bun tools/act2.ts` (custody release by 2 of 3 custodians, simulated centres go green, Centre 42 unlocked by the phoned code with its link cut) |
 | 3 During | 1, 3, 4, 7, 10 | Partly. Ticks, `kill -9` of the cell and rebuild, and three cells running together, run today; blast radius, escalation and handover are Stage 4 |
 | 4 After | 5, 7, 11 | **Yes:** `bun tools/act4.ts`, or `/control` by hand |
-| 5 Decide | 9, 10, 12 | Partly. Radar, decision engine and scorecard run as CLIs on synthetic cohorts; live export, Claude notices and Tamil are Stage 6 |
+| 5 Decide | 9, 10, 12 | **Yes:** `bun tools/act5.ts` — the cells' export drives the radar, history corroborates a queued flag, the decision engine's headline, "CEN042 → add observer" on the scorecard, an approved notice in EN/HI/TA, and a signed sign-off, all in CI |
