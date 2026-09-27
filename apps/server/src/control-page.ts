@@ -18,7 +18,8 @@ async function recon(): Promise<void> {
     $('recon-row').replaceChildren(...[{ value: `${r.centre} · ${r.shift}`, ok: true }, ...reconCells(r)].map((c) => {
       const td = document.createElement('td'); td.textContent = c.value; td.className = c.ok ? 'ok' : 'bad'; return td;
     }));
-    say('recon-status', r.green ? 'Green: every count and every head agrees.' : 'Not green: see the red cells.', r.green ? 'ok' : 'bad');
+    if (r.submitted === 0) say('recon-status', 'Nothing submitted yet.');
+    else say('recon-status', r.green ? 'Green: every count and every head agrees.' : 'Not green: see the red cells.', r.green ? 'ok' : 'bad');
   } catch (e) { say('recon-status', `Cannot reconcile: ${(e as Error).message}`, 'bad'); }
 }
 
