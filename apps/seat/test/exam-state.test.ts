@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ItemState, SyncView } from '../src/shared/ipc.ts';
-import { clearResponse, displayState, fmtRemaining, legendCounts, markAndNext, saveAndNext, tickOf } from '../src/renderer/src/exam-state.ts';
+import { clearResponse, displayState, fmtRemaining, legendCounts, markAndNext, saveAndNext, slipCode, tickOf, visitAction } from '../src/renderer/src/exam-state.ts';
 import { T } from '../src/renderer/src/i18n.ts';
 
 const v: SyncView = { local: 10, relay: 7, cell: 4, online: true, error: '' };
@@ -41,4 +41,21 @@ test('EN and HI catalogues have the same keys, no empty strings, and HI is Devan
   assert.deepEqual(hi.map(([k]) => k), en.map(([k]) => k));
   for (const [k, s] of [...en, ...hi]) if (k !== 'tick.none') assert.ok(s.length > 0, k);
   for (const k of ['saveNext', 'markNext', 'clear', 'timeUp']) assert.match(hi.find(([x]) => x === k)![1], /[ऀ-ॿ]/, k);
+});
+
+test('the first display of an item with no journaled state is journaled as visited (clear, NA)', () => {
+  assert.deepEqual(visitAction('I04', undefined), { kind: 'clear', item: 'I04', state: 'NA', answer: '', dwellMs: 0 });
+  assert.equal(visitAction('I04', { state: 'NA', answer: '', seq: 3 }), null);
+  assert.equal(visitAction('I04', A('B')), null);
+});
+
+test('the slip code is grouped in fours for copying by hand', () => {
+  assert.equal(slipCode('N5JY1E59BR0FGNVQW'), 'N5JY-1E59-BR0F-GNVQ-W');
+});
+
+test('every new string exists in both languages; the Hindi count puts the total first', () => {
+  for (const k of Object.keys(T.en) as (keyof typeof T.en)[]) assert.ok(T.hi[k], `hi lacks ${k}`);
+  assert.equal(T.en.of(5, 20), '5 of 20');
+  assert.equal(T.hi.of(5, 20), '20 में से 5');
+  assert.equal(T.en.cameraTest, 'Camera off (test mode)');
 });

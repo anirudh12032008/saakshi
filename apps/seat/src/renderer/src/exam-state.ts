@@ -38,3 +38,14 @@ export function fmtRemaining(ms: number): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return h ? `${h}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
 }
+
+/**
+ * Protocol Addendum A.6: the first display of an item with no journaled state is journaled as visited
+ * (clear, NA), so NA survives a resume and counts as attempted on the receipt.
+ */
+export function visitAction(item: string, cur: ItemState | undefined): Action | null {
+  return cur ? null : { kind: 'clear', item, state: 'NA', answer: '', dwellMs: 0 };
+}
+
+/** N5JY1E59BR0FGNVQW → N5JY-1E59-BR0F-GNVQ-W (decoding ignores the dashes). */
+export const slipCode = (code: string): string => code.replace(/(.{4})(?=.)/g, '$1-');

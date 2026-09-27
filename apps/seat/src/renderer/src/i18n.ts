@@ -6,6 +6,9 @@ export interface Strings {
   title: string; candidate: string; form: string; start: string; startNote: string; question: string;
   timeLeft: string; timeUp: string; lang: string; palette: string; saveNext: string; markNext: string; clear: string;
   saved: string; online: string; offline: string; faces: string; cameraOff: string;
+  exam: string; submit: string; confirmTitle: string; confirmNote: string; submitNow: string; back: string;
+  receiptTitle: string; receiptCode: string; attempted: string; answered: string; marked: string;
+  of: (n: number, total: number) => string; keepCode: string; print: string; submission: string; cameraTest: string;
   state: Record<State, string>; tick: Record<Tick, string>;
 }
 
@@ -16,6 +19,11 @@ export const T: Record<Lang, Strings> = {
     question: 'Question', timeLeft: 'Time left', timeUp: 'Time is up. Please wait for the invigilator.', lang: 'Language',
     palette: 'Question palette', saveNext: 'Save & Next', markNext: 'Mark for Review & Next', clear: 'Clear Response',
     saved: 'Saved', online: 'Connected', offline: 'Offline — your answers are safe on this computer', faces: 'Faces', cameraOff: 'Camera unavailable',
+    exam: 'Exam', submit: 'Submit', confirmTitle: 'Submit your exam?', confirmNote: 'You cannot change any answer after submitting.',
+    submitNow: 'Submit now', back: 'Back to the questions', receiptTitle: 'Submission receipt', receiptCode: 'Receipt code',
+    attempted: 'Attempted', answered: 'Answered', marked: 'Marked for review', of: (n, total) => `${n} of ${total}`,
+    keepCode: 'Copy this code onto your admit card. With it you can check later that your answers were recorded exactly as you submitted them.',
+    print: 'Print slip', submission: 'Your submission', cameraTest: 'Camera off (test mode)',
     state: { NV: 'Not visited', NA: 'Not answered', A: 'Answered', MR: 'Marked for review', AMR: 'Answered and marked for review (will be evaluated)' },
     tick: { none: '', local: 'saved on this computer', relay: 'saved at the centre server', cell: 'saved at the exam server' },
   },
@@ -25,6 +33,11 @@ export const T: Record<Lang, Strings> = {
     question: 'प्रश्न', timeLeft: 'शेष समय', timeUp: 'समय समाप्त। कृपया निरीक्षक की प्रतीक्षा करें।', lang: 'भाषा',
     palette: 'प्रश्न पैलेट', saveNext: 'सहेजें और आगे बढ़ें', markNext: 'समीक्षा हेतु चिह्नित करें और आगे बढ़ें', clear: 'उत्तर मिटाएँ',
     saved: 'सहेजा गया', online: 'जुड़ा हुआ', offline: 'ऑफ़लाइन — आपके उत्तर इस कंप्यूटर पर सुरक्षित हैं', faces: 'चेहरे', cameraOff: 'कैमरा उपलब्ध नहीं',
+    exam: 'परीक्षा', submit: 'जमा करें', confirmTitle: 'क्या आप परीक्षा जमा करना चाहते हैं?', confirmNote: 'जमा करने के बाद कोई भी उत्तर बदला नहीं जा सकता।',
+    submitNow: 'अभी जमा करें', back: 'प्रश्नों पर लौटें', receiptTitle: 'जमा करने की रसीद', receiptCode: 'रसीद कोड',
+    attempted: 'प्रयास किए', answered: 'उत्तर दिए', marked: 'समीक्षा हेतु चिह्नित', of: (n, total) => `${total} में से ${n}`,
+    keepCode: 'यह कोड अपने प्रवेश-पत्र पर लिख लें। इससे आप बाद में जाँच सकते हैं कि आपके उत्तर ठीक वैसे ही दर्ज हुए जैसे आपने जमा किए थे।',
+    print: 'रसीद प्रिंट करें', submission: 'आपका जमा किया गया उत्तर-पत्र', cameraTest: 'कैमरा बंद (परीक्षण मोड)',
     state: { NV: 'नहीं देखा', NA: 'उत्तर नहीं दिया', A: 'उत्तर दिया', MR: 'समीक्षा हेतु चिह्नित', AMR: 'उत्तर दिया और समीक्षा हेतु चिह्नित (मूल्यांकन होगा)' },
     tick: { none: '', local: 'इस कंप्यूटर पर सहेजा गया', relay: 'केंद्र सर्वर पर सहेजा गया', cell: 'परीक्षा सर्वर पर सहेजा गया' },
   },

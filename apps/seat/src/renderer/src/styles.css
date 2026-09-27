@@ -57,3 +57,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .legend .mini { display: inline-grid; place-items: center; min-width: 2rem; min-height: 2rem; margin-right: .5rem; }
 .start { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
 @media (forced-colors: active) { .pal { border: 2px solid CanvasText; } .pal.AMR::after { background: CanvasText; } }
+
+button.submit { margin-left: auto; border-color: var(--ink); font-weight: 700; }
+.slip { max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+.slip-meta { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0 0 1rem; }
+.slip-meta dt { color: var(--muted); }
+.slip-meta dd { margin: 0; }
+.code-label { margin: 0; color: var(--muted); }
+.slip .code { font: 700 2rem/1.3 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .06em; margin: .25rem 0 1rem; overflow-wrap: anywhere; }
+.slip-counts { border-collapse: collapse; margin-bottom: 1rem; }
+.slip-counts th { text-align: left; font-weight: 400; padding: .25rem 1.5rem .25rem 0; }
+.slip-counts td { font-variant-numeric: tabular-nums; font-weight: 700; }
+@media print { .no-print { display: none; } .slip { margin: 0; max-width: none; } :root { color: #000; background: #fff; } }

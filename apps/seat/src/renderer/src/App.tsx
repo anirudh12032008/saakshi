@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import bankJson from '../../../../../fixtures/paper/bank.json';
 import formsJson from '../../../../../fixtures/paper/forms.json';
-import type { Action, ExamBoot, ItemState, Lang, SeatApi, SyncView } from '../../shared/ipc.ts';
-import { clearResponse, fmtRemaining, GLYPH, markAndNext, saveAndNext, tickOf } from './exam-state.ts';
+import type { Action, ExamBoot, ItemState, Lang, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
+import { clearResponse, fmtRemaining, GLYPH, legendCounts, markAndNext, PALETTE_STATES, saveAndNext, tickOf, visitAction } from './exam-state.ts';
 import { FaceChip } from './FaceChip.tsx';
 import { T, type Strings } from './i18n.ts';
 import { Palette } from './Palette.tsx';
+import { Slip } from './Slip.tsx';
 
 declare global { interface Window { saakshi: SeatApi } }
 
@@ -27,11 +28,15 @@ function Exam({ boot }: { boot: ExamBoot }) {
   const [lang, setLang] = useState<Lang>(() => { try { return localStorage.getItem('lang') === 'hi' ? 'hi' : 'en'; } catch { return 'en'; } });
   const [started, setStarted] = useState(boot.started);
   const [items, setItems] = useState<Record<string, ItemState>>(boot.items);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const [visited, setVisited] = useState<Set<string>>(() => new Set([...Object.keys(boot.items), ...(boot.started ? [order[0]] : [])]));
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState(boot.items[order[0]]?.answer ?? '');
   const [sync, setSync] = useState<SyncView>(boot.sync);
   const [notice, setNotice] = useState('');
+  const [receipt, setReceipt] = useState<Receipt | undefined>(boot.receipt);
+  const [confirming, setConfirming] = useState(false);
   const [clock, setClock] = useState({ base: boot.activeMs, at: performance.now() });
   const [now, setNow] = useState(performance.now());
   const shownAt = useRef(performance.now());
@@ -41,33 +46,53 @@ function Exam({ boot }: { boot: ExamBoot }) {
   useEffect(() => window.saakshi.onSync(setSync), []);
   useEffect(() => { const id = setInterval(() => setNow(performance.now()), 250); return () => clearInterval(id); }, []);
   useEffect(() => { try { localStorage.setItem('lang', lang); } catch { /* per-viewer convenience only */ } document.documentElement.lang = lang; }, [lang]);
+  // Resume: the question on screen counts as visited (Addendum A.6).
+  useEffect(() => { if (boot.started && !boot.receipt) void visit(order[0]); }, []);
 
   const remaining = boot.durationMs - (started ? clock.base + (now - clock.at) : 0);
   const timeUp = started && remaining <= 0;
   const item = order[idx];
 
-  function go(i: number, its: Record<string, ItemState> = items) {
+  /** Journal the first display of an item as visited (clear, NA). Never overwrites a state set meanwhile. */
+  async function visit(id: string) {
+    const a = visitAction(id, itemsRef.current[id]);
+    if (!a) return;
+    const r = await window.saakshi.act(a);
+    if (r.ok) setItems((p) => (p[id] ? p : { ...p, [id]: { state: 'NA', answer: '', seq: r.seq } }));
+  }
+
+  function go(i: number, its: Record<string, ItemState> = itemsRef.current) {
     const n = (i + order.length) % order.length, next = order[n];
     setIdx(n);
     setVisited((v) => new Set(v).add(next));
     setSelected(its[next]?.answer ?? '');
     shownAt.current = performance.now();
     requestAnimationFrame(() => heading.current?.focus());
+    void visit(next);
   }
 
   async function commit(a: Action | null, advance: boolean) {
-    let its = items;
+    let its = itemsRef.current;
     if (a) {
       const r = await window.saakshi.act(a);
       if (!r.ok) { setNotice(r.error); return; }
-      its = { ...items, [a.item]: { state: a.state, answer: a.answer, seq: r.seq } };
-      setItems(its);
+      const st: ItemState = { state: a.state, answer: a.answer, seq: r.seq };
+      its = { ...itemsRef.current, [a.item]: st };
+      setItems((p) => ({ ...p, [a.item]: st }));
       setClock({ base: r.activeMs, at: performance.now() });
       setNotice(`${t.saved} ✓`);
     }
     if (advance) go(idx + 1, its); else setSelected(its[item]?.answer ?? '');
   }
   const dwell = () => performance.now() - shownAt.current;
+
+  async function submit() {
+    const r = await window.saakshi.submit();
+    if (r.ok) setReceipt(r.receipt);
+    else { setConfirming(false); setNotice(r.error); }
+  }
+
+  if (receipt) return <Slip r={receipt} sync={sync} t={t} />;
 
   if (!started) {
     return (
@@ -83,8 +108,28 @@ function Exam({ boot }: { boot: ExamBoot }) {
           setClock({ base: r.activeMs, at: performance.now() });
           setVisited((v) => new Set(v).add(order[0]));
           shownAt.current = performance.now();
+          void visit(order[0]);
         }}>{t.start}</button>
         <p role="status">{notice}</p>
+      </main>
+    );
+  }
+
+  if (confirming) {
+    const c = legendCounts(order, items, new Set());
+    return (
+      <main className="start" aria-labelledby="confirm-h">
+        <h1 id="confirm-h">{t.confirmTitle}</h1>
+        <ul className="legend">
+          {PALETTE_STATES.map((s) => (
+            <li key={s}><span className={`pal ${s} mini`} aria-hidden="true">{c[s]}</span>{t.state[s]}<span className="sr-only">: {c[s]}</span></li>
+          ))}
+        </ul>
+        <p>{t.confirmNote}</p>
+        <div className="actions">
+          <button className="primary" onClick={submit}>{t.submitNow}</button>
+          <button onClick={() => setConfirming(false)}>{t.back}</button>
+        </div>
       </main>
     );
   }
@@ -100,7 +145,8 @@ function Exam({ boot }: { boot: ExamBoot }) {
         </div>
         <LangToggle lang={lang} setLang={setLang} t={t} />
         <SyncStatus v={sync} t={t} />
-        <FaceChip label={t.faces} unavailable={t.cameraOff} />
+        <FaceChip label={t.faces} unavailable={t.cameraOff} off={!boot.camera} offLabel={t.cameraTest} />
+        <button className="submit" onClick={() => setConfirming(true)}>{t.submit}</button>
       </header>
       <main className="question" aria-labelledby="qh">
         <h2 id="qh" ref={heading} tabIndex={-1}>
