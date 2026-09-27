@@ -46,3 +46,9 @@ test('an empty shift (nothing checked in, submitted or sealed) is not green', ()
   const r = reconcile({ ...base, relay: { mode: 'relay', state: 'LIVE', streams: [] }, cell: { cell: 'cell-1', exam: 'DEMO-2026', shift: 'S1', sheets: [] } });
   expect([r.checkedIn, r.submitted, r.leaves, r.headsEqual, r.green]).toEqual([0, 0, 0, true, false]);
 });
+
+test('Stage 3: with bindings, "checked in" counts the bound candidates on the roster', () => {
+  const { exp, relay } = shift();
+  const r = reconcile({ ...base, relay, cell: exp, rec: seal(undefined, exp, o).rec, bound: ['C0001', 'C0003', 'X9'] });
+  expect([r.checkedIn, r.green]).toEqual([2, true]);
+});

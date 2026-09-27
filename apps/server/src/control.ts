@@ -18,6 +18,8 @@ export interface ControlOpts {
   formOf: (cand: string) => string | undefined; pseud: (cand: string) => string;
   roster: string[]; centre: string; exam: string; shift: string;
   cellUrl: string; relayUrl: string; now?: () => number;
+  /** Stage 3: the demo cell's enrolled seat keys (`${cand}/${keyEpoch}` → pub), each already checked against that cell's certificate. */
+  seatKeys?: () => Promise<Record<string, string>>;
 }
 
 class HttpError extends Error {
@@ -50,6 +52,11 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
   }
   const cellExport = () => upstream<ShiftExport>(`${o.cellUrl}/v1/shift?exam=${encodeURIComponent(o.exam)}&shift=${encodeURIComponent(o.shift)}`);
   const relayHeads = () => upstream<HeadsRes>(`${o.relayUrl}/v1/heads`);
+  const seats = async (): Promise<Record<string, string> | undefined> => {
+    if (!o.seatKeys) return undefined;
+    try { return await o.seatKeys(); } catch (e) { throw new HttpError(502, `the cell's bindings are unavailable: ${(e as Error).message}`); }
+  };
+  const trustNow = async (): Promise<Trust> => { const s = await seats(); return s ? { ...o.trust, seats: { ...o.trust.seats, ...s } } : o.trust; };
   const handle = (fn: (req: Request) => Promise<Response>) => async (req: Request): Promise<Response> => {
     try { return await fn(req); } catch (e) { return json({ error: (e as Error).message }, e instanceof HttpError ? e.status : 500); }
   };
@@ -61,7 +68,7 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
   async function findings(): Promise<Finding[]> {
     const rec = readRec();
     const [cell, relay] = await Promise.all([cellExport(), relayHeads()]);
-    return audit({ cell, relay, archive: readArchive(rec), rec, trust: o.trust, forms: o.forms });
+    return audit({ cell, relay, archive: readArchive(rec), rec, trust: await trustNow(), forms: o.forms });
   }
   async function proof(cand: string): Promise<Proof> {
     const rec = readRec();
@@ -75,13 +82,14 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
     '/control': page,
     '/verify': { GET: handle(async () => new Response(await verifyHtml(), { headers: { 'content-type': 'text/html; charset=utf-8' } })) },
     '/v1/recon': { GET: handle(async () => {
-      const [cell, relay] = await Promise.all([cellExport(), relayHeads()]);
-      return json(reconcile({ centre: o.centre, exam: o.exam, shift: o.shift, roster: o.roster, relay, cell, rec: readRec() }));
+      const [cell, relay, s] = await Promise.all([cellExport(), relayHeads(), seats()]);
+      const bound = s && Object.keys(s).filter((k) => k.endsWith('/1')).map((k) => k.slice(0, -2));
+      return json(reconcile({ centre: o.centre, exam: o.exam, shift: o.shift, roster: o.roster, relay, cell, rec: readRec(), bound }));
     }) },
     '/v1/seal': { POST: handle(async () => {
       const exp = await cellExport();
       const before = readRec();
-      const r = seal(before, exp, { authority: o.authority, trust: o.trust, pseud: o.pseud, now });
+      const r = seal(before, exp, { authority: o.authority, trust: await trustNow(), pseud: o.pseud, now });
       const signed = r.rec.sths.at(-1)!;
       if (r.rec !== before) {
         writeFileSync(recPath, JSON.stringify(r.rec, null, 2));
@@ -109,12 +117,19 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
       custody('rogue-simulated', { cand, item: items[q - 1], note: 'DEV chaos button: an insider edit, simulated on purpose' });
       return json({ ...out, q });
     }) },
+    '/v1/chaos/wan': { POST: handle(async (req) => {
+      const b = (await req.json().catch(() => ({}))) as { up?: unknown };
+      if (typeof b.up !== 'boolean') throw new HttpError(400, 'need {up: boolean}');
+      const out = await upstream<{ up: boolean }>(`${o.relayUrl}/v1/dev/wan`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ up: b.up }) });
+      custody('chaos-wan', { centre: o.centre, up: b.up, note: "DEV chaos: the demo centre's WAN link" });
+      return json(out);
+    }) },
     '/v1/proof': { GET: handle(async (req) => json(await proof(candOf(req)))) },
     '/v1/evidence': { GET: handle(async (req) => {
       const cand = candOf(req);
       const p = await proof(cand);
       const mine = (await findings()).filter((f) => f.cand === cand);
-      const pack = await buildPack({ proof: p, findings: mine, custody: custodyLines(), verifyHtml: await verifyHtml(), forms: o.forms, trust: o.trust, now: now() });
+      const pack = await buildPack({ proof: p, findings: mine, custody: custodyLines(), verifyHtml: await verifyHtml(), forms: o.forms, trust: await trustNow(), now: now() });
       const out = join(o.dir, 'evidence', pack.name);
       mkdirSync(out, { recursive: true });
       for (const [f, c] of Object.entries(pack.files)) writeFileSync(join(out, f), c);

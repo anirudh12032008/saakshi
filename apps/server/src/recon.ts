@@ -3,7 +3,7 @@ import { parseSignedLine } from '@saakshi/core/journal';
 import type { ReconRow, ShiftExport, SthRecord } from '@saakshi/core/sheet';
 import type { HeadsRes } from '@saakshi/core/wire';
 
-export interface ReconIn { centre: string; exam: string; shift: string; roster: string[]; relay: HeadsRes; cell: ShiftExport; rec?: SthRecord }
+export interface ReconIn { centre: string; exam: string; shift: string; roster: string[]; relay: HeadsRes; cell: ShiftExport; rec?: SthRecord; bound?: string[] }
 
 export function reconcile(i: ReconIn): ReconRow {
   const relay = i.relay.streams.filter((v) => v.exam === i.exam && v.shift === i.shift);
@@ -18,7 +18,8 @@ export function reconcile(i: ReconIn): ReconRow {
   const row = {
     centre: i.centre, exam: i.exam, shift: i.shift,
     registered: i.roster.length,
-    checkedIn: relay.filter((v) => v.senderHead >= 0 && i.roster.includes(v.cand)).length,  // DEV: the relay heard the seat (enrolment is Stage 3)
+    // Stage 3: checked in = bound (a cell-signed certificate); DEV without enrolment: the relay heard the seat.
+    checkedIn: i.bound ? i.bound.filter((c) => i.roster.includes(c)).length : relay.filter((v) => v.senderHead >= 0 && i.roster.includes(v.cand)).length,
     unlocked: sheets.filter((s) => s.entries.length > 0).length,
     submitted,
     receipts: sheets.filter((s) => s.receipt).length,
