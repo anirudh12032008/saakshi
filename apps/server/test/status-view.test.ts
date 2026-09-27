@@ -30,12 +30,14 @@ test('the public status page: centres and public incidents in EN and HI — and 
   ob.draft(draftNotice(incidents[0], 'DEMO-2026', 'S1', 6));
   ob.approve('N-X-1', 'CONTROL-OFFICER-ANITA', 7);
   const s = publicStatus({ exam: 'DEMO-2026', shift: 'S1', now: 10, fleet, incidents, notices: ob.sent() });
-  expect(s.summary).toEqual({ en: '1 of 3 centres running normally', hi: '3 में से 1 केंद्र सामान्य रूप से चल रहे हैं' });
+  expect(s.summary).toEqual({ en: '1 of 3 centres running normally', hi: '3 में से 1 केंद्र सामान्य रूप से चल रहे हैं', ta: expect.stringMatching(/[஀-௿]/) });
   expect(s.centres.map((c) => [c.centre, c.en])).toEqual([['CEN001', 'Exam server being restored'], ['CEN042', 'Not started yet'], ['CEN007', 'Running normally']]);
+  for (const c of s.centres) expect(c.ta).toMatch(/[஀-௿]/);                                // every tone has Tamil-script text
   expect(s.incidents.map((i) => i.kind)).toEqual(['CELL_DOWN', 'RELAY_WAN_DOWN']);                  // centre-level, open incidents only
   expect(s.incidents[0].en).toBe("An exam server is being restored from the centres' copies. 2 centres affected. Candidates' time and answers are preserved.");
   expect(s.incidents[0].hi).toContain('परीक्षा सर्वर');
-  expect(s.notices).toEqual([{ at: 7, en: expect.stringContaining('Your answers and your exam time are preserved'), hi: expect.stringContaining('सुरक्षित') }]);
+  for (const i of s.incidents) expect(i.ta).toMatch(/[஀-௿]/);                              // every public incident kind has Tamil-script text
+  expect(s.notices).toEqual([{ at: 7, en: expect.stringContaining('Your answers and your exam time are preserved'), hi: expect.stringContaining('सुरक्षित'), ta: expect.stringMatching(/[஀-௿]/) }]);
   const text = JSON.stringify(s);
   for (const pii of ['C0001', 'C0002', 'C0003', 'CEN042-S02', 'INV-42-A', 'CONTROL-OFFICER-ANITA', '7777777777']) expect(text).not.toContain(pii);
   expect(text).not.toMatch(/\bC\d{4,}\b/);
