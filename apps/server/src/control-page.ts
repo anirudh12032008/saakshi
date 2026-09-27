@@ -2,7 +2,10 @@ import type { SignedSth } from '@saakshi/core/log';
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
 import type { ArchiveReport, Incident, LinkView, Notice, Severity, TimeRow } from '@saakshi/core/ops';
-import { archiveLines, commitment, findingText, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, tileText, timeCells } from './control-view.ts';
+import type { ReadinessBoard } from './readiness-view.ts';
+import { seatLine } from './readiness-view.ts';
+import type { ReviewItem } from './review.ts';
+import { archiveLines, commitment, findingText, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, readinessTile, reviewCard, tileText, timeCells } from './control-view.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const say = (id: string, text: string, tone = '') => { const el = $(id); el.textContent = text; el.className = `out ${tone}`.trim(); };
@@ -196,3 +199,41 @@ $('purge').addEventListener('click', async () => {
   catch (e) { $('archive-out').replaceChildren(el('li', (e as Error).message)); }
 });
 for (const [fn, ms] of [[incidentsTick, 1_000], [linkTick, 2_000], [timeTick, 3_000], [noticesTick, 3_000]] as const) { void fn(); setInterval(fn, ms); }
+
+async function readinessTick(): Promise<void> {
+  try {
+    const { centres } = await call<ReadinessBoard>('GET', '/v1/readiness');
+    $('readiness').replaceChildren(...centres.map((c) => {
+      const x = readinessTile(c), item = document.createElement('li');
+      item.dataset.tone = x.tone;
+      item.setAttribute('aria-label', x.aria);
+      item.append(el('strong', x.title), el('span', x.line), el('span', x.word));
+      return item;
+    }));
+    $('readiness-seats').replaceChildren(...centres.flatMap((c) => c.seats.filter((s) => s.verdict !== 'green')).map((s) => li(seatLine(s))));
+  } catch (e) { $('readiness').replaceChildren(li(`Readiness board unavailable: ${(e as Error).message}`)); }
+}
+
+async function reviewTick(): Promise<void> {
+  try {
+    const { items } = await call<{ items: ReviewItem[] }>('GET', '/v1/review');
+    $('review').replaceChildren(...items.map((i) => {
+      const c = reviewCard(i, Date.now()), li2 = el('li');
+      li2.append(el('strong', c.title), el('span', c.line));
+      if (i.thumb.startsWith('data:image/jpeg;base64,')) { const img = document.createElement('img'); img.src = i.thumb; img.alt = c.alt; li2.append(img); }
+      if (c.canDecide) {
+        const clear = el('button', 'Clear (no concern)'), confirm = el('button', 'Confirm (refer to superintendent)');
+        const by = () => $<HTMLInputElement>('review-by').value;
+        clear.addEventListener('click', () => void call('POST', '/v1/review/decide', { id: i.id, decision: 'cleared', by: by() }).then(reviewTick));
+        confirm.addEventListener('click', () => void call('POST', '/v1/review/decide', { id: i.id, decision: 'confirmed', by: by() }).then(reviewTick));
+        li2.append(clear, confirm);
+      }
+      return li2;
+    }));
+  } catch (e) { $('review').replaceChildren(li(`Review queue unavailable: ${(e as Error).message}`)); }
+}
+
+void readinessTick();
+void reviewTick();
+setInterval(readinessTick, 2000);
+setInterval(reviewTick, 2000);

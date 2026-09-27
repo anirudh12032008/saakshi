@@ -41,6 +41,17 @@
       .note { color: var(--muted); font-size: var(--s-1); }
       :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
       @media (forced-colors: active) { .tile { border-color: CanvasText; } }
+      #readiness { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: .375rem; }
+      #readiness li { border: 2px solid; border-radius: .375rem; padding: .25rem .5rem; display: grid; }
+      #readiness li strong { font-size: var(--s1); }
+      #readiness li span { font-size: var(--s-1); font-variant-numeric: tabular-nums; }
+      [data-tone="green"] { color: #0d652d; background: #e6f4ea; border-color: #0d652d; }
+      [data-tone="amber"] { color: #7a4100; background: #fef7e0; border-color: #7a4100; }
+      [data-tone="review"] { color: #0b3d91; background: #e8f0fe; border-color: #0b3d91; }
+      [data-tone="block"] { color: #8c1d18; background: #fce8e6; border-color: #8c1d18; }
+      #review { list-style: none; padding: 0; display: grid; gap: .5rem; }
+      #review li { border: 1px solid var(--line); border-radius: .5rem; padding: .5rem .75rem; display: grid; gap: .25rem; }
+      #review img { max-width: 160px; max-height: 120px; }
       #incidents { list-style: none; padding: 0; display: grid; gap: .5rem; }
       .card { border: 2px solid; border-radius: .5rem; padding: .5rem .75rem; display: grid; gap: .25rem; }
       .card.p0 { color: #8c1d18; background: #fce8e6; border-color: #c62828; } .card.p1 { color: #7a4100; background: #fef7e0; border-color: #b06000; }
@@ -51,6 +62,15 @@
   </head>
   <body>
     <h1>Control · DEMO-2026 · S1</h1>
+
+    <section aria-labelledby="clean-h">
+      <h2 id="clean-h">Clean seats only</h2>
+      <ul id="readiness" aria-label="Seat readiness by centre"></ul>
+      <ol id="readiness-seats" aria-label="Seats needing attention"></ol>
+      <h3>Review queue</h3>
+      <form id="review-form"><label>Decide as <input id="review-by" required size="14" placeholder="e.g. REVIEWER-1" /></label></form>
+      <ol id="review"></ol>
+    </section>
 
     <h2>Start on time</h2>
     <dl class="kpis" id="kpis"></dl>

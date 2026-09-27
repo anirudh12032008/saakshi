@@ -1,8 +1,12 @@
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { CentreTile, FleetView, ReleaseStatus } from '@saakshi/core/directory';
 import type { Manifest } from '@saakshi/core/paper';
+import type { Verdict } from '@saakshi/core/integrity';
 import { RUNGS, type ArchiveReport, type Incident, type LinkView, type Notice, type Severity, type TimeRow } from '@saakshi/core/ops';
 import { blastText, mmss } from './incidents.ts';
+import type { CentreReadiness } from './readiness-view.ts';
+import { VERDICT_WORD } from './readiness-view.ts';
+import type { ReviewItem } from './review.ts';
 
 export interface ReconCell { label: string; value: string; ok: boolean }
 
@@ -99,6 +103,16 @@ export function noticeText(n: Notice): string {
   const ch = n.channels.map((c) => CHANNEL[c]);
   return `To ${fmt(n.audience)} candidates at ${n.centres.length === 1 ? n.centres[0] : `${n.centres.length} centres`} by ${ch.slice(0, -1).join(', ')}${ch.length > 1 ? ' and ' : ''}${ch.at(-1)} (mock): ${n.en}`;
 }
+export function readinessTile(c: CentreReadiness): { title: string; word: string; line: string; tone: Verdict; aria: string } {
+  const k = c.counts, line = `${k.green} ready · ${k.amber} amber · ${k.review} review · ${k.block} blocked · ${c.missing} not reported`;
+  return { title: c.centre, word: VERDICT_WORD[c.verdict], tone: c.verdict, line, aria: `${c.centre}: ${VERDICT_WORD[c.verdict]}. ${line.replaceAll(' ·', ',')}` };
+}
+export function reviewCard(i: ReviewItem, now: number): { title: string; line: string; alt: string; canDecide: boolean } {
+  const what = i.code === 'face-none' ? 'no face for 10 s or more' : `${i.faces} faces seen, ${i.expected} expected${i.expected > 1 ? ' (scribe)' : ''}`;
+  const state = i.decision ? `${i.decision} by ${i.by}` : 'awaiting review';
+  return { title: `${i.cand} · ${i.seatId}`, line: `${what} · ${mmss(now - i.at)} ago · ${state}`, alt: i.thumb ? `face check frame, ${what}` : 'no image kept', canDecide: !i.decision };
+}
+
 export function archiveLines(a: ArchiveReport): string[] {
   return [
     a.ok ? `Both stores verify against the signed register head (${a.size} leaves, root ${group(a.root.slice(0, 16))} …).` : 'NOT verified — no purge until both stores verify.',

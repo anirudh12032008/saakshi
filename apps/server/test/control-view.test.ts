@@ -5,7 +5,7 @@ import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
 import type { ArchiveReport, Incident, LinkView, Notice, TimeRow } from '@saakshi/core/ops';
 import { OPS_DEMO } from '@saakshi/core/ops';
-import { archiveLines, commitment, findingText, fleetSummary, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, tileText, timeCells } from '../src/control-view.ts';
+import { archiveLines, commitment, findingText, fleetSummary, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, readinessTile, reviewCard, tileText, timeCells } from '../src/control-view.ts';
 
 const row: ReconRow = { centre: 'CEN-01', exam: 'DEMO-2026', shift: 'S1', registered: 8, checkedIn: 1, unlocked: 1, submitted: 1, receipts: 1, leaves: 1, headsEqual: true, headMismatches: [], green: true };
 
@@ -105,3 +105,17 @@ test('findings read as one line each; the headline prefers the altered answer', 
   expect(headline(fs)).toBe('Q17: record says C — the seat committed B');
   expect(headline([])).toBe('No tampering found: every record matches what the seats committed.');
 });
+
+test('readiness tile carries a word, counts and the missing seats', () => {
+  const t = readinessTile({ centre: 'CEN042', verdict: 'amber', counts: { green: 46, amber: 1, review: 0, block: 0 }, missing: 1, seats: [] });
+  expect(t).toEqual({ title: 'CEN042', word: 'Amber', tone: 'amber', line: '46 ready · 1 amber · 0 review · 0 blocked · 1 not reported',
+    aria: 'CEN042: Amber. 46 ready, 1 amber, 0 review, 0 blocked, 1 not reported' });
+});
+
+test('review card: a face flag reads plainly and says what the image is', () => {
+  const c = reviewCard({ id: '1', cand: 'C0002', seatId: 'CEN042-S02', code: 'face-extra', at: 0, faces: 3, expected: 2, thumb: '' }, 90_000);
+  expect(c).toEqual({ title: 'C0002 · CEN042-S02', line: '3 faces seen, 2 expected (scribe) · 1:30 ago · awaiting review',
+    alt: 'no image kept', canDecide: true });
+});
+
+test('the control page keeps the type scale', () => { expect(typeScaleOk(readFileSync(join(import.meta.dir, '../src/control.html'), 'utf8'))).toBe(true); });
