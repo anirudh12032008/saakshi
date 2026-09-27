@@ -8,3 +8,5 @@ __pycache__/
 .DS_Store
 .claude/
 apps/seat/src/renderer/public/mediapipe/wasm/
+data/
+.pnpm-store/
