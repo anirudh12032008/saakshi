@@ -71,15 +71,21 @@ export class Stack {
   }
 }
 
-export function demoSpecs(o: { exam: string; data: string; stackUrl: string; cohort?: string; speed?: number; cellPorts?: number[]; relayPort?: number; controlPort?: number }): NodeSpec[] {
+export function demoSpecs(o: { exam: string; data: string; stackUrl: string; cohort?: string; paper?: string; speed?: number; cellPorts?: number[]; relayPort?: number; controlPort?: number }): NodeSpec[] {
   const exam = resolve(o.exam), data = resolve(o.data), relayPort = o.relayPort ?? 7070;
+  const paper = resolve(o.paper ?? join(ROOT, 'fixtures/paper'));
   const specs: NodeSpec[] = (o.cellPorts ?? [7080, 7081, 7082]).map((port, i) => {
     const db = join(data, `cell-${i + 1}.db`);
     return { name: `cell-${i + 1}`, db, env: { MODE: 'cell', CELL_ID: `cell-${i + 1}`, PORT: String(port), EXAM: exam, DB: db } };
   });
   specs.push({ name: 'relay', db: join(data, 'relay.db'), env: { MODE: 'relay', PORT: String(relayPort), EXAM: exam, DB: join(data, 'relay.db') } });
-  specs.push({ name: 'control', env: { MODE: 'control', PORT: String(o.controlPort ?? 7090), EXAM: exam, DIR: join(data, 'control'), STACK_URL: o.stackUrl, RELAY_URL: `http://127.0.0.1:${relayPort}` } });
-  if (o.cohort) specs.push({ name: 'swarm', cmd: ['bun', join(ROOT, 'tools/swarm.ts'), '--exam', exam, '--cohort', resolve(o.cohort), '--speed', String(o.speed ?? 20)], ready: 'SWARM ', env: {} });
+  specs.push({
+    name: 'control', env: {
+      MODE: 'control', PORT: String(o.controlPort ?? 7090), EXAM: exam, DIR: join(data, 'control'), STACK_URL: o.stackUrl, RELAY_URL: `http://127.0.0.1:${relayPort}`,
+      FORMS: join(paper, 'forms.json'), KEY: join(paper, 'key.json'), PAPER: paper,
+    },
+  });
+  if (o.cohort) specs.push({ name: 'swarm', cmd: ['bun', join(ROOT, 'tools/swarm.ts'), '--exam', exam, '--cohort', resolve(o.cohort), '--paper', paper, '--speed', String(o.speed ?? 20)], ready: 'SWARM ', env: {} });
   return specs;
 }
 
@@ -87,7 +93,7 @@ if (import.meta.main) {
   const arg = (f: string) => { const i = process.argv.indexOf(f); return i > 0 ? process.argv[i + 1] : undefined; };
   const port = Number(arg('--port') ?? 7099), data = resolve(arg('--data') ?? 'data');
   mkdirSync(data, { recursive: true });
-  const specs = demoSpecs({ exam: arg('--exam') ?? 'data/exam', data, stackUrl: `http://127.0.0.1:${port}`, cohort: arg('--cohort'), speed: Number(arg('--speed') ?? 20) });
+  const specs = demoSpecs({ exam: arg('--exam') ?? 'data/exam', data, stackUrl: `http://127.0.0.1:${port}`, cohort: arg('--cohort'), paper: arg('--paper'), speed: Number(arg('--speed') ?? 20) });
   const stack = new Stack(specs, { cwd: ROOT, log: (n, l) => console.log(`[${n}] ${l}`) });
   for (const s of specs) await stack.start(s.name);
   stack.serve(port);

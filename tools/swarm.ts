@@ -29,18 +29,32 @@ import { simBindReq } from './sim-custody.ts';
 export interface Step { at: number; kind: Kind; body: Body }
 const EMPTY: Body = { item: '', state: '', answer: '', meta: [] };
 
+/** G1's own clock: activeMs = tFirstMs for a row that was ever answered; a row that was only marked/cleared without ever
+ *  being answered has no tFirstMs, so it is placed right after the previous step, 1 s later, in form order. */
 export function plan(ctx: Ctx, form: string, items: readonly string[], rows: CohortRow[]): Step[] {
   const pos = new Map(items.map((id, i) => [id, i]));
   const steps: Step[] = [];
-  let t = 0;
+  let at = 0;
   for (const r of [...rows].filter((x) => pos.has(x.item)).sort((a, b) => pos.get(a.item)! - pos.get(b.item)!)) {
     if (r.state === 'NV') continue;
-    t += Math.max(1000, r.dwellMs);
+    at = r.tFirstMs >= 0 ? Math.max(r.tFirstMs, at + 1) : at + 1000;
     const kind: Kind = r.state === 'A' ? 'answer' : r.state === 'NA' ? 'clear' : 'mark';
-    steps.push({ at: t, kind, body: { item: r.item, state: r.state, answer: r.state === 'A' || r.state === 'AMR' ? r.answer : '', meta: [r.dwellMs, []] } });
+    steps.push({ at, kind, body: { item: r.item, state: r.state, answer: r.state === 'A' || r.state === 'AMR' ? r.answer : '', meta: [r.dwellMs, []] } });
   }
-  steps.push({ at: t + 1000, kind: 'submit', body: { ...EMPTY, meta: [form, finalHash(ctx, form, responsesOf(items, steps.map((s) => s.body)))] } });
+  steps.push({ at: at + 1000, kind: 'submit', body: { ...EMPTY, meta: [form, finalHash(ctx, form, responsesOf(items, steps.map((s) => s.body)))] } });
   return steps;
+}
+
+/** The rows the swarm replays (plan §5 Decision 3): candidates in the directory, not at the demo centre, items in their
+ *  form, with `shift` rewritten to the directory's shift. Used to compare "the generator's cohort" against the export. */
+export async function swarmCohort(rows: AsyncIterable<CohortRow>, dir: Directory, forms: Forms): Promise<CohortRow[]> {
+  const out: CohortRow[] = [];
+  for await (const r of rows) {
+    const c = dir.cands[r.cand];
+    if (!c || c.centre === dir.demoCentre || !forms[c.form]?.includes(r.item)) continue;
+    out.push({ ...r, shift: dir.shift });
+  }
+  return out;
 }
 
 export interface SwarmCell { send: CellSend; enrol(reqs: BindReq[]): Promise<EnrolResult[]> }
@@ -178,12 +192,12 @@ if (import.meta.main) {
   const root = resolve(arg('--exam') ?? 'data/exam'), cohort = arg('--cohort');
   if (!cohort) throw new Error('need --cohort <G1 cohort.jsonl>');
   const fx = resolve(import.meta.dirname, '../fixtures');
+  const paper = resolve(arg('--paper') ?? join(fx, 'paper'));
   const keys = JSON.parse(readFileSync(join(fx, 'keys.json'), 'utf8')) as KeysFile;
-  const forms = formsOf(JSON.parse(readFileSync(join(fx, 'paper/forms.json'), 'utf8')));
+  const forms = formsOf(JSON.parse(readFileSync(join(paper, 'forms.json'), 'utf8')));
   const dir = JSON.parse(readFileSync(join(root, FILES.directory), 'utf8')) as Directory;
   const manifest = JSON.parse(readFileSync(join(root, FILES.manifest), 'utf8')) as SignedManifest;
-  const rows: CohortRow[] = [];
-  for await (const r of readCohort(cohort)) if (dir.cands[r.cand] && forms[r.form]?.includes(r.item)) rows.push({ ...r, shift: dir.shift });   // G1's sittings merged into the demo shift
+  const rows = await swarmCohort(readCohort(cohort), dir, forms);   // G1's sittings merged into the demo shift; the demo centre skipped
   const httpCell = new Map(dir.cells.map((c) => [c.id, {
     send: httpCellSend(c.url, 10_000),
     enrol: async (reqs: BindReq[]) => {

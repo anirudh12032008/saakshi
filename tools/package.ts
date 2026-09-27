@@ -70,9 +70,10 @@ if (import.meta.main) {
   const root = resolve(arg('--exam') ?? 'data/exam');
   if (existsSync(join(root, FILES.manifest))) throw new Error(`${root} is already packaged`);
   const fx = resolve(import.meta.dirname, '../fixtures');
+  const paper = resolve(arg('--paper') ?? join(fx, 'paper'));
   const read = (f: string) => JSON.parse(readFileSync(f, 'utf8'));
   const keys = read(join(fx, 'keys.json')) as KeysFile;
-  const p = await buildPackage(read(join(root, FILES.directory)) as Directory, { bank: read(join(fx, 'paper/bank.json')), forms: read(join(fx, 'paper/forms.json')) },
+  const p = await buildPackage(read(join(root, FILES.directory)) as Directory, { bank: read(join(paper, 'bank.json')), forms: read(join(paper, 'forms.json')) },
     { priv: hexToBytes(keys.authority.priv), pub: hexToBytes(keys.authority.pub) });
   writePackage(root, p);
   console.log('Manifest (the public commitment):');
