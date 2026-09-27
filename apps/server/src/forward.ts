@@ -1,0 +1,101 @@
+import { streamKey, type Hello, type StreamView, type SyncReq, type SyncRes } from '@saakshi/core/wire';
+import type { Ingest } from './ingest.ts';
+
+export type CellSend = (req: SyncReq) => Promise<SyncRes | 'REBUILDING'>;
+export type Round = 'idle' | 'busy' | 'error';
+
+export function httpCellSend(base: string, timeoutMs = 5000): CellSend {
+  const url = new URL('/v1/sync', base);
+  return async (req) => {
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(req), signal: AbortSignal.timeout(timeoutMs) });
+    if (r.status === 503) return 'REBUILDING';
+    if (!r.ok) throw new Error(`cell answered ${r.status}`);
+    return (await r.json()) as SyncRes;
+  };
+}
+
+const hello = (v: StreamView): Hello => ({ exam: v.exam, shift: v.shift, attempt: v.attempt, cand: v.cand, head: v.head });
+
+/**
+ * Relay → cell store-and-forward. Per stream it sends committed entries from cellHead+1 (a hello when the cell's
+ * head is unknown), learns the cell's head and ack from the reply, and on 503 replays everything from genesis.
+ * With nothing pending it still sends all hellos every `heartbeatMs`, so a restarted or wiped cell is noticed
+ * even when no seat is answering.
+ */
+export class Forwarder {
+  #relay: Ingest;
+  #send: CellSend;
+  #batch: number;
+  #heartbeatMs: number;
+  #lastContact = 0;
+  #replaying = false;
+  #stopped = true;
+  #loop: Promise<void> | undefined;
+
+  constructor(relay: Ingest, send: CellSend, opts: { batch?: number; heartbeatMs?: number } = {}) {
+    this.#relay = relay;
+    this.#send = send;
+    this.#batch = opts.batch ?? 500;
+    this.#heartbeatMs = opts.heartbeatMs ?? 2000;
+  }
+
+  get replaying(): boolean { return this.#replaying; }
+
+  async round(): Promise<Round> {
+    try {
+      const req: SyncReq = { entries: [], streams: [] };
+      if (this.#replaying) req.replay = true;
+      const before = new Map<string, number>();
+      // ponytail: first streams first, no fairness; add round-robin if one centre's backlog starves the rest.
+      for (const v of this.#relay.views()) {
+        if (req.entries.length >= this.#batch || req.streams.length >= 5000) break;
+        if (v.cellHead >= 0 && v.head <= v.cellHead) continue;
+        req.streams.push(hello(v));
+        before.set(streamKey(v), v.cellHead);
+        if (v.cellHead >= 0) req.entries.push(...this.#relay.entriesAfter(v, v.cellHead, this.#batch - req.entries.length));
+      }
+      let heartbeat = false;
+      if (!req.streams.length) {
+        if (this.#replaying) {
+          if ((await this.#send({ entries: [], streams: [], replay: true, done: true })) === 'REBUILDING') return 'error';
+          this.#replaying = false;
+          return 'busy';
+        }
+        if (Date.now() - this.#lastContact < this.#heartbeatMs) return 'idle';
+        req.streams = this.#relay.views().slice(0, 5000).map(hello);
+        if (!req.streams.length) return 'idle';
+        heartbeat = true;
+      }
+      const res = await this.#send(req);
+      this.#lastContact = Date.now();
+      if (res === 'REBUILDING') {
+        if (!this.#replaying) { this.#replaying = true; this.#relay.resetCell(); }
+        return 'busy';
+      }
+      let progress = false;
+      for (const st of res.streams) {
+        if (before.get(streamKey(st)) !== st.head) progress = true;
+        this.#relay.setCellStatus(st);
+      }
+      return heartbeat ? 'idle' : progress ? 'busy' : 'error';
+    } catch {
+      return 'error';
+    }
+  }
+
+  start(idleMs = 50, errorMs = 500): void {
+    if (!this.#stopped) return;
+    this.#stopped = false;
+    this.#loop = (async () => {
+      while (!this.#stopped) {
+        const r = await this.round();
+        if (r !== 'busy') await Bun.sleep(r === 'idle' ? idleMs : errorMs);
+      }
+    })();
+  }
+
+  async stop(): Promise<void> {
+    this.#stopped = true;
+    await this.#loop;
+  }
+}
