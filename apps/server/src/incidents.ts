@@ -192,7 +192,7 @@ export class Incidents {
       else if (e.code === 'GAP') out.push({ kind: 'GAP', key: `GAP:${c}:${e.seq}`, cand: c, title: `${c} paused (${d.cause})`,
         detail: `the seat reports ${mmss(Number(d.pausedMs ?? 0))}; the credit is measured by the relay's clock and needs approval`, blast: one(e.centre), data: { ...d, seq: e.seq } });
       else if (e.code === 'INTEGRITY' && this.#ops.criticalIntegrity.includes(String(d.code)))
-        out.push({ kind: 'INTEGRITY_CRITICAL', key: `INTEGRITY_CRITICAL:${c}`, cand: c, title: `${d.code} at ${c}'s seat`, detail: 'never auto-submitted: move the candidate or clear the finding', blast: one(e.centre), data: { ...d } });
+        out.push({ kind: 'INTEGRITY_CRITICAL', key: `INTEGRITY_CRITICAL:${c}`, cand: c, title: `${d.code} at ${c}'s seat${d.names ? `: ${d.names}` : ''}`, detail: 'never auto-submitted: move the candidate or clear the finding', blast: one(e.centre), data: { ...d } });
     }
     for (const f of s.findings ?? []) {
       const k = `audit/${f.cand}/${f.seq}/${f.kind}/${f.detail}`;

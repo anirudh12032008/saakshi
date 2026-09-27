@@ -141,7 +141,7 @@ test('events: the cell notes gap and integrity entries; note() adds one; ids onl
   const ev = n.events(0);
   expect(ev.map((e) => [e.code, e.cand, e.seq, e.data])).toEqual([
     ['GAP', 'C0001', 3, { cause: 'suspend', pausedMs: 125_000 }],
-    ['INTEGRITY', 'C0001', 4, { code: 'test-mode' }],
+    ['INTEGRITY', 'C0001', 4, { code: 'test-mode', level: 'info', names: '' }],
     ['HANDOVER', 'C0001', 4, { keyEpoch: 2, fromSeq: 4, via: 'pin', approvedBy: 'INV-42-A', creditedMs: 108_000 }],
   ]);
   expect(n.events(ev[1].id).length).toBe(1);

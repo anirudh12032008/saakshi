@@ -11,6 +11,7 @@ import type { Forms } from '@saakshi/core/sheet';
 import type { Verify } from '@saakshi/core/sig';
 import type { StreamSnap } from '@saakshi/core/handover';
 import type { CellEvent, EventCode } from '@saakshi/core/ops';
+import { findingFromMeta } from '@saakshi/core/integrity';
 import {
   fromB64, streamKey, toB64,
   type NodeState, type Rejection, type RejectCode, type StreamStatus, type StreamView, type SyncReq, type SyncRes, type WireAck, type WireEntry,
@@ -262,7 +263,7 @@ export function createIngest(o: IngestOpts): Ingest {
         }
         rec = { item: body.item, state: body.state, answer: body.answer, meta: JSON.stringify(body.meta), salt: opened.salt };
         if (hd.kind === 'gap') evidence.push(['GAP', key, hd.seq, JSON.stringify({ cause: String(body.meta[0] ?? ''), pausedMs: typeof body.meta[1] === 'number' ? body.meta[1] : 0 }), e.line, null]);
-        if (hd.kind === 'integrity') evidence.push(['INTEGRITY', key, hd.seq, JSON.stringify({ code: String(body.meta[0] ?? '') }), e.line, null]);
+        if (hd.kind === 'integrity') { const f = findingFromMeta(body.meta); evidence.push(['INTEGRITY', key, hd.seq, JSON.stringify({ code: f?.code ?? String(body.meta[0] ?? ''), level: f?.level ?? '', names: (f?.names ?? []).join(', ') }), e.line, null]); }
       }
       s.hs.push(h);
       if (hd.seq === 1) s.unlockRx = rx;
