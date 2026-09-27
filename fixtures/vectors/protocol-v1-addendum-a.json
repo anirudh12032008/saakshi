@@ -1,0 +1,156 @@
+{
+  "_note": "protocol-v1 Addendum A (docs/protocol-v1.md §14). Signatures are random: verify them, never compare bytes.",
+  "ctx": {
+    "exam": "DEMO-2026",
+    "shift": "S1",
+    "attempt": 1,
+    "cand": "C0001"
+  },
+  "pseud": {
+    "key": "26830e23dbc54a3a03680850671a9169705b5724e1da662a7b25a784737fe8ce",
+    "roll": "C0001",
+    "pseud": "c8675ae5745c506cf23c80c36c5bb92100700e7b38df535297b140dfb118f4ef"
+  },
+  "responses": {
+    "formName": "F1",
+    "form": [
+      "I01",
+      "I02",
+      "I03",
+      "I04"
+    ],
+    "bodies": [
+      [
+        "body",
+        "",
+        "",
+        "",
+        []
+      ],
+      [
+        "body",
+        "I02",
+        "NA",
+        "",
+        [
+          0,
+          []
+        ]
+      ],
+      [
+        "body",
+        "I01",
+        "A",
+        "C",
+        [
+          900,
+          []
+        ]
+      ],
+      [
+        "body",
+        "I01",
+        "A",
+        "D",
+        [
+          400,
+          []
+        ]
+      ],
+      [
+        "body",
+        "I03",
+        "AMR",
+        "B",
+        [
+          700,
+          []
+        ]
+      ]
+    ],
+    "responses": [
+      [
+        "I01",
+        "A",
+        "D"
+      ],
+      [
+        "I02",
+        "NA",
+        ""
+      ],
+      [
+        "I03",
+        "AMR",
+        "B"
+      ],
+      [
+        "I04",
+        "NV",
+        ""
+      ]
+    ],
+    "finalHash": "62fbb296147e8013ee07f9c05c01340f58eed5293c9692566660b835e67cdd1c",
+    "counts": {
+      "attempted": 3,
+      "answered": 2,
+      "marked": 1
+    }
+  },
+  "sth": {
+    "sth": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "size": 13,
+      "root": "5b84a7b11c6369338be22fcc4f88d2f5755bfd97f9b189930041d1ea06f1f165",
+      "prevSTH": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ts": 1790000000000
+    },
+    "canon": "[\"sth\",\"DEMO-2026\",\"S1\",13,\"5b84a7b11c6369338be22fcc4f88d2f5755bfd97f9b189930041d1ea06f1f165\",\"0000000000000000000000000000000000000000000000000000000000000000\",1790000000000]",
+    "id": "ef9d64a2b1f9312d8f9729bb147f4a5ce4e0d5b3400b9d466042a76540e38be1",
+    "pub": "04ddfd23a034b80069356d8ee8b2d1a36fbd1a47e5b1e896d1342a11f33225a60ebe016aefd4b7a4128587b3e0c088d655505dac3952625adb1982d9213fd0c592",
+    "sig": "6b98e26d94ec9450c422973890062f15ecd4ffedf5b879b48a623f91712d066277114343d00e71477d8c6c6ea8bc73c8eb81f3b8baf1471fd142c2c17649ecce"
+  },
+  "receiptSig": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "attempt": 1,
+      "pseud": "7777777777777777777777777777777777777777777777777777777777777777",
+      "seq": 1,
+      "h": "3f36c544d3f1a98de5da799cd857a2738d454193a636291169bf8d6ed77b6877",
+      "finalHash": "57c9e6df0d30bdcdef888cd1ae4e0212692ca58d6d7000bfd9eba519af561752",
+      "attempted": 3,
+      "answered": 2,
+      "marked": 2
+    },
+    "canon": "[\"receipt\",\"DEMO-2026\",\"S1\",1,\"7777777777777777777777777777777777777777777777777777777777777777\",1,\"3f36c544d3f1a98de5da799cd857a2738d454193a636291169bf8d6ed77b6877\",\"57c9e6df0d30bdcdef888cd1ae4e0212692ca58d6d7000bfd9eba519af561752\",3,2,2]",
+    "pub": "040f7d0e310a30f2ef4c8d29db9812c6b2efb8aa1883dd44255ce8435f629cdf9df66e4ec545568ec3f9e3a903863d1f02c7aa318f8dc32179b0e8855ec999056d",
+    "sig": "989135cb9dfa5866c9baa78c79dbba943809a52fe2e47c4d6237b824a76f5b3832e82e52193671d44100b48c50803d2e53b469dbb696bfc5a8362b3d6414f0e3"
+  },
+  "ack": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "attempt": 1,
+      "cand": "C0001",
+      "keyEpoch": 1,
+      "seq": 1,
+      "h": "3f36c544d3f1a98de5da799cd857a2738d454193a636291169bf8d6ed77b6877"
+    },
+    "canon": "[\"ack\",\"DEMO-2026\",\"S1\",1,\"C0001\",1,1,\"3f36c544d3f1a98de5da799cd857a2738d454193a636291169bf8d6ed77b6877\"]",
+    "pub": "040f7d0e310a30f2ef4c8d29db9812c6b2efb8aa1883dd44255ce8435f629cdf9df66e4ec545568ec3f9e3a903863d1f02c7aa318f8dc32179b0e8855ec999056d",
+    "sig": "d2b90485f07692bc1e5e291e763c1232242f2a2d25a0741c3088fed2fc21cf451e8f70d34bf7fdd3ac2709721292953d31ffc9e07adbb6f877b17486125b1878"
+  },
+  "leaf": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "attempt": 1,
+      "pseud": "c8675ae5745c506cf23c80c36c5bb92100700e7b38df535297b140dfb118f4ef",
+      "h": "3f36c544d3f1a98de5da799cd857a2738d454193a636291169bf8d6ed77b6877",
+      "finalHash": "62fbb296147e8013ee07f9c05c01340f58eed5293c9692566660b835e67cdd1c"
+    },
+    "hash": "117b8efc2f673763e6b624b3951600f35d3f3ede1aa68f36d234d8e82863b083"
+  }
+}

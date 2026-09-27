@@ -348,3 +348,87 @@ The spec types:
   - it unwraps the offline code;
   - it rebuilds the bundle from each pair of shares.
 - The nonces, ephemeral keys, share polynomials and signatures in the vectors are random. They are checked by opening or verifying them, never by comparing bytes.
+
+## 14. Addendum A (Stage 2, 2026-09-27)
+
+This addendum is additive only. No byte defined in §1–§13 changes, so `V` stays 1.
+
+- Vectors: `fixtures/vectors/protocol-v1-addendum-a.json`, produced by `tools/gen-vectors-addendum.ts`.
+- They are checked by `packages/core/test/addendum.test.ts`, and in the browser by `/verify` on every load.
+
+**A.1 Signatures over non-entry structures.**
+- These structures are signed as `m = UTF-8(canon(array))`, with **no domain byte**.
+- The algorithm, encoding and low-S rule are those of §7. Stage 1 already signs acks this way.
+- Such a message can never be read as a domain-tagged one: every §3 message starts with a byte from 0x00 to 0x07, and canonical text starts with `[` (0x5b).
+
+| Structure | Array | Signed by |
+|---|---|---|
+| ack | `["ack",exam,shift,attempt,cand,keyEpoch,seq,h]` | the cell |
+| receipt countersignature | the §5 receipt array `B` | the cell |
+| STH | `["sth",exam,shift,size,root,prevSTH,ts]` | the exam authority |
+
+**A.2 STH fields.**
+
+| Field | Meaning |
+|---|---|
+| `size` | the number of leaves (a safe integer ≥ 0) |
+| `root` | the §10 MTH over the leaf hashes in log order, as 64 hex |
+| `prevSTH` | `hex(SHA-256(m))` of the previous STH of the same shift, or 64 × `0` for the first |
+| `ts` | milliseconds since the Unix epoch |
+
+- `sthId = hex(SHA-256(m))`.
+- Leaves are appended in seal order and are never reordered or removed. So every STH of a shift is consistent with the one before it (§10 consistency proofs).
+
+**A.3 Leaf.** For a submitted chain:
+- `h` is the submit entry's `h`;
+- `finalHash` is the submit body's `meta[1]`;
+- `pseud` follows A.4.
+
+**A.4 Pseudonym.**
+- `pseud = hex(HMAC-SHA256(K_pseud, UTF-8(roll)))`, as 64 lowercase hex characters.
+- DEV: `K_pseud = SHA-256(UTF-8("saakshi-dev-pseud"))` and `roll = cand`. This key is published.
+
+**A.5 Submit and replay.** These §6 conventions are now enforced by relay and cell.
+
+The submit body:
+- It is `["body","","","",[form,finalHash]]`.
+- `form` must be the candidate's form.
+
+How `responses` is built:
+- It has one row per item of the form's item list.
+- Each row is `[item,state,answer]`, taken from the **last** entry in chain order whose body names that item. If no entry does, the row is `[item,"NV",""]`.
+- An entry whose body names an item outside the candidate's form is rejected.
+- An item entry's `state` is never `''`.
+
+The checks:
+- The cell replays the committed bodies before the submit and recomputes `finalHash` (§5). A mismatch is `BAD_SUBMISSION`.
+- The submit is the last entry. Relay and cell reject any entry with `seq` greater than the submit's as `BAD_SUBMISSION`.
+- An exact resend of the submit, or of any earlier entry, stays a no-op.
+
+The receipt:
+- Its counts are `counts(responses)` (§6).
+- The cell countersigns `B` (A.1).
+
+**A.6 First visit.**
+- The first time an item is displayed with no journaled state, the seat appends a `clear` entry with body `["body",item,"NA","",[0,[]]]`.
+- No new kind or state is needed, because `clear`/`NA` already means "visited, not answered". `attempted` therefore counts visited items.
+
+**A.7 Response sheet and proof (non-normative JSON; the types are in `packages/core/src/sheet.ts`).**
+
+The response sheet:
+- `{ctx, form, pseud, keys:[{keyEpoch,pub}], entries:[{line, salt, body}], receipt?:{cell,seq,h,code,sig}}`.
+- `line` is the §11 signed line.
+- `salt` is 32 hex characters.
+- `body` is the body array **as recorded**, which may have been tampered with. A missing row is written as `["missing"]`.
+
+The proof:
+- `{v:1, sheet, sth:{sth, sig}, index, inclusion:[hex…]}`.
+
+A verifier checks:
+1. each key is the pinned key for `(cand, keyEpoch)`;
+2. the chain (§11), per epoch;
+3. every body against its signed `bodyCommit` (a mismatch triggers an option search with the salt);
+4. that the replayed `finalHash` equals the submit's;
+5. the receipt code and the cell countersignature;
+6. the STH signature;
+7. the inclusion of `leafArray(…, h, finalHash)` (§10).

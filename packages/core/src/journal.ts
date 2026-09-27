@@ -38,8 +38,8 @@ export function parseSignedLine(line: string): ParsedLine {
   catch (e) { return { ok: false, fault: 'shape', detail: (e as Error).message }; }
 }
 
-/** Check order: parse, shape, context, then (per spec) signature, position (seq), prev. Returns the first bad entry. */
-export function verifyChain(c: Ctx, lines: string[], verify: Verify): ChainResult {
+/** verifyChain with one key per keyEpoch; an epoch with no key is a 'sig' fault on that line. */
+export function verifyChainKeyed(c: Ctx, lines: string[], keyFor: (keyEpoch: number) => Verify | undefined): ChainResult {
   let prev = genesisPrev(c);
   for (let i = 0; i < lines.length; i++) {
     const fail = (fault: ChainFault, detail: string): ChainResult => ({ ok: false, index: i, fault, detail });
@@ -47,6 +47,8 @@ export function verifyChain(c: Ctx, lines: string[], verify: Verify): ChainResul
     if (!p.ok) return fail(p.fault, p.detail);
     const h = p.header;
     if (h.exam !== c.exam || h.shift !== c.shift || h.attempt !== c.attempt || h.cand !== c.cand) return fail('context', 'entry belongs to another exam, shift, attempt or candidate');
+    const verify = keyFor(h.keyEpoch);
+    if (!verify) return fail('sig', `no pinned key for keyEpoch ${h.keyEpoch}`);
     if (!verify(p.m, p.sig)) return fail('sig', 'signature does not verify');
     if (h.seq !== i + 1) return fail('seq', `expected seq ${i + 1}, found ${h.seq}`);
     if (h.prev !== prev) return fail('prev', 'prev does not match the previous entry hash');
@@ -54,6 +56,9 @@ export function verifyChain(c: Ctx, lines: string[], verify: Verify): ChainResul
   }
   return { ok: true, head: prev, count: lines.length };
 }
+
+/** Check order: parse, shape, context, then (per spec) signature, position (seq), prev. Returns the first bad entry. */
+export const verifyChain = (c: Ctx, lines: string[], verify: Verify): ChainResult => verifyChainKeyed(c, lines, () => verify);
 
 /** An unlock followed by n-1 answers cycling through the 20 bank items. */
 export function demoEntries(n: number): EntryIn[] {
