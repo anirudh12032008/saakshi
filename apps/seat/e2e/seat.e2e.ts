@@ -48,9 +48,8 @@ test('enrol → unlock → answer offline → sync → submit → /verify green 
     catch (e) {
       console.error(await launchDiag(['--inspect=0', '--remote-debugging-port=0', '--enable-logging=stderr', ...args]));
       console.error(await launchDiag(['--enable-logging=stderr', ...args]));
-      for (const v of [[], ['--test-mode'], [`--user-data-dir=${data}`], ['--no-camera'], ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
-        ['--relay', relayUrl], ['--cand', 'C0001', '--seat', 'CEN042-S01'], ['--inspect=0'], ['--remote-debugging-port=0']])
-        console.error(await launchDiag([...v, '--test-mode']));
+      for (let n = 1; n <= args.length; n++) console.error(await launchDiag(args.slice(0, n)));   // grow the arg list until it dies
+      for (let n = 1; n < args.length; n++) console.error(await launchDiag(args.slice(n)));      // and shrink it from the front
       throw e;
     }
     const w = await app.firstWindow();
