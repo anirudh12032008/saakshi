@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saakshi · Seat grid</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #202124; background: #fff; }
+      body { margin: 0; padding: 1rem 1.5rem; }
+      h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+      #status { color: #5f6368; margin: 0 0 1rem; }
+      #grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .5rem; }
+      .tile { border: 2px solid; border-radius: .5rem; padding: .5rem .75rem; display: grid; gap: .125rem; }
+      .tile strong { font-size: 1.125rem; }
+      .tile span { font-variant-numeric: tabular-nums; font-size: .875rem; }
+      .ok { border-color: #2e7d32; background: #e6f4ea; }
+      .lag { border-color: #b06000; background: #fef7e0; }
+      .silent { border-color: #c62828; background: #fce8e6; }
+      .legend { margin-top: 1rem; color: #5f6368; font-size: .875rem; }
+      @media (forced-colors: active) { .tile { border-color: CanvasText; } }
+    </style>
+  </head>
+  <body>
+    <h1>Seat grid</h1>
+    <p id="status">connecting…</p>
+    <ul id="grid" aria-label="Seats"></ul>
+    <p class="legend">Green: in sync · Amber: seat or cell behind · Red: silent for 30 s or more. Heads are entry counts.</p>
+    <script type="module" src="./console.ts"></script>
+  </body>
+</html>
