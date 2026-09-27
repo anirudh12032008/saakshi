@@ -3715,7 +3715,7 @@ Pointing the seat at the Wi-Fi IP rather than `127.0.0.1` is deliberate: with Wi
   4. **Keyboard only.** Tab through the language toggle, the options (arrow keys), the three buttons and the palette. The focus ring is always visible, and after Save & Next focus lands on the question heading.
   5. **200% zoom.** Relaunch with `SAAKSHI_ZOOM=2 release/mac-arm64/Saakshi.app/Contents/MacOS/Saakshi --relay http://$IP:7070`. The palette stacks under the question with no horizontal scroll.
   6. **Wi-Fi off.** Answer 3 more. The ticks stay at ✓, the header says "Offline — your answers are safe on this computer", and the console tile turns red after 30 s. Turn Wi-Fi on: within a few seconds everything is blue.
-  7. **`kill -9` the cell.** Run `kill -9 $(lsof -ti tcp:7080)`, then answer 3 more. They go ✓ → ✓✓ (the relay) but not blue, and the console shows `cell` lagging. Restart the cell (`DEV=1 MODE=cell bun apps/server/src/main.ts &`); the backlog turns blue. Run `curl -s localhost:7080/v1/heads` and check that the head equals the seat's local count.
+  7. **`kill -9` the cell.** Run `kill -9 $(lsof -ti tcp:7080 -sTCP:LISTEN)`, then answer 3 more. They go ✓ → ✓✓ (the relay) but not blue, and the console shows `cell` lagging. Restart the cell (`DEV=1 MODE=cell bun apps/server/src/main.ts &`); the backlog turns blue. Run `curl -s localhost:7080/v1/heads` and check that the head equals the seat's local count.
   8. **Resume.** Force-quit the app (`kill -9` its PID) and relaunch. The same answers, palette and ticks are back, and the timer continues where it left off, never resetting to 30:00.
   9. **Face chip.** It shows `Faces: 1`; covering the camera gives `Faces: 0`, with an amber border.
 
