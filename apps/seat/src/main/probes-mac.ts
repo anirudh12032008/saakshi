@@ -27,7 +27,7 @@ function str(d: unknown, k: unknown): string {
   const buf = Buffer.alloc(512); return CFStringGetCString(v, buf, buf.length, UTF8) ? buf.toString('utf8').replace(/\0.*$/s, '') : '';
 }
 
-/** On-screen layer-0 windows of other processes whose sharing state is None (excluded from capture). */
+/** On-screen app-level (layer 0–19) windows of other processes whose sharing state is None (excluded from capture). */
 export function captureExcludedWindowsMac(): { visibleWindows: number; excluded: { pid: number; owner: string; sharing: number }[] } {
   const arr = CGWindowListCopyWindowInfo(OnScreenOnly | ExcludeDesktop, 0);
   if (!arr) throw new Error('CGWindowListCopyWindowInfo returned NULL');
@@ -36,7 +36,8 @@ export function captureExcludedWindowsMac(): { visibleWindows: number; excluded:
     let visibleWindows = 0;
     for (let i = 0; i < n; i++) {
       const d = CFArrayGetValueAtIndex(arr, i);
-      if ((num(d, K.layer) ?? 0) !== 0) continue;                  // menu bar, dock, status items live on other layers
+      const layer = num(d, K.layer) ?? 0;
+      if (layer < 0 || layer >= 20) continue;                      // app levels (normal 0, floating 3, modal 8); Dock (20), menu bar, status items sit higher
       visibleWindows++;
       const pid = num(d, K.pid) ?? 0, sharing = num(d, K.sharing);
       if (sharing === 0 && pid !== process.pid) excluded.push({ pid, owner: str(d, K.owner), sharing });

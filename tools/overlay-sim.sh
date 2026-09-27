@@ -8,7 +8,7 @@ case "$1" in
          mv "$T/overlay-sim.app/Contents/MacOS/Saakshi" "$T/overlay-sim.app/Contents/MacOS/overlay-sim"
          /usr/libexec/PlistBuddy -c 'Set :CFBundleExecutable overlay-sim' "$T/overlay-sim.app/Contents/Info.plist"; xattr -cr "$T/overlay-sim.app"
          "$T/overlay-sim.app/Contents/MacOS/overlay-sim" --overlay-sim >/dev/null 2>&1 &
-         cp /bin/sleep "$T/AnyDesk"; "$T/AnyDesk" 3600 & echo "started overlay-sim and AnyDesk" ;;
+         cp /bin/sleep "$T/AnyDesk"; codesign -s - -f "$T/AnyDesk" 2>/dev/null; "$T/AnyDesk" 3600 & echo "started overlay-sim and AnyDesk" ;;
   stop)  pkill -f "$T/overlay-sim.app" || true; pkill -f "$T/AnyDesk" || true; echo stopped ;;
   *) echo "usage: $0 start|stop"; exit 2 ;;
 esac

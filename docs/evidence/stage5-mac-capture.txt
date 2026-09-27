@@ -1,0 +1,28 @@
+Stage 5 — macOS capture-excluded probe, 27.0, 2026-09-27T14:49:02Z
+overlay-sim (setContentProtection, alwaysOnTop) reports kCGWindowSharingState=0 on layer 3.
+Fix: probe counts app layers 0–19, not only layer 0.
+--gate-selftest --expect anydesk,overlay-sim with both running:
+{
+  "ok": true,
+  "verdict": "block",
+  "findings": [
+    {
+      "code": "blocklisted",
+      "level": "block",
+      "detail": "AnyDesk (pid 21692)",
+      "names": [
+        "AnyDesk"
+      ]
+    },
+    {
+      "code": "capture-excluded",
+      "level": "block",
+      "detail": "hidden from screen capture: overlay-sim",
+      "names": [
+        "overlay-sim"
+      ]
+    }
+  ],
+  "missing": []
+}
+…with both stopped: exit 1 (missing both). --inspect / --remote-debugging-port: exit 3. ELECTRON_RUN_AS_NODE: ignored. Second instance: exits 0.
