@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saakshi · Control</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #202124; background: #fff; }
+      body { margin: 0; padding: 1rem 1.5rem 3rem; max-width: 72rem; }
+      h1 { font-size: 2rem; margin: 0 0 1rem; } h2 { font-size: 1.25rem; margin: 1.5rem 0 .5rem; }
+      table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+      th, td { border: 1px solid #dadce0; padding: .375rem .5rem; text-align: left; }
+      td.ok { background: #e6f4ea; } td.bad { background: #fce8e6; font-weight: 700; }
+      .ok { color: #1e6b25; } .bad { color: #b3261e; }
+      button { font: inherit; padding: .5rem 1rem; border-radius: .375rem; border: 1px solid #5f6368; background: #fff; cursor: pointer; min-height: 2.75rem; }
+      button.primary { background: #1565c0; color: #fff; border-color: #1565c0; }
+      button.chaos { background: #b3261e; color: #fff; border-color: #b3261e; }
+      form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; }
+      label { display: grid; gap: .125rem; font-size: .8rem; }
+      input, select { font: inherit; padding: .375rem; min-height: 2.25rem; }
+      .out { font: .8rem ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0 0; }
+      #audit-headline { font-size: 1.6rem; font-weight: 700; margin: .5rem 0; }
+      .note { color: #5f6368; font-size: .8rem; }
+      :focus-visible { outline: 3px solid #1565c0; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <h1>Control · DEMO-2026 · S1</h1>
+
+    <h2>Reconciliation (per centre-shift)</h2>
+    <table>
+      <thead><tr><th scope="col">Centre · shift</th><th scope="col">Registered</th><th scope="col">Checked in</th><th scope="col">Unlocked</th><th scope="col">Submitted</th><th scope="col">Receipts</th><th scope="col">Register leaves</th><th scope="col">Relay = cell heads</th></tr></thead>
+      <tbody><tr id="recon-row"></tr></tbody>
+    </table>
+    <p id="recon-status" role="status">…</p>
+
+    <h2>Sealed public register</h2>
+    <button id="seal" class="primary">Seal the shift — publish the register head</button>
+    <p id="seal-out" class="out" role="status"></p>
+
+    <h2>Chaos</h2>
+    <form id="rogue">
+      <label>Candidate <input name="cand" value="C0001" size="7" /></label>
+      <label>Question <input name="q" type="number" min="1" max="20" value="17" /></label>
+      <label>New answer <select name="answer"><option>A</option><option>B</option><option selected>C</option><option>D</option></select></label>
+      <button class="chaos">Rogue insider edits an answer</button>
+    </form>
+    <p class="note">DEV chaos: runs an UPDATE on the exam cell's database, as an insider with DB access would. The cell's terminal prints it.</p>
+    <p id="rogue-out" class="out" role="status"></p>
+
+    <h2>Audit</h2>
+    <button id="audit" class="primary">Run the audit</button>
+    <p id="audit-headline" role="status"></p>
+    <ul id="audit-list"></ul>
+
+    <h2>Evidence</h2>
+    <form id="evidence">
+      <label>Candidate <input id="ev-cand" name="cand" value="C0001" size="7" /></label>
+      <button class="primary">Export the evidence pack</button>
+      <a id="verify-link" href="/verify?cand=C0001">Open /verify for this candidate</a>
+    </form>
+    <p id="evidence-out" class="out" role="status"></p>
+
+    <script type="module" src="./control-page.ts"></script>
+  </body>
+</html>
