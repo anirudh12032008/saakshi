@@ -1,4 +1,5 @@
 import type { HeadsRes, NodeState, StreamView } from '@saakshi/core/wire';
+import type { ReleaseMsg } from '@saakshi/core/paper';
 
 export type Tone = 'ok' | 'lag' | 'silent';
 export interface Tile { key: string; cand: string; tone: Tone; text: string; aria: string }
@@ -25,4 +26,11 @@ export function applyEvent(views: Map<string, StreamView>, event: string, data: 
   if (event === 'stream') { const s = data as StreamView; views.set(keyOf(s), s); return {}; }
   if (event === 'state') return { state: (data as { state: NodeState }).state };
   return {};
+}
+
+export function paperStatus(releases: ReleaseMsg[]): { text: string; tone: 'locked' | 'released' } {
+  if (!releases.length) return { text: 'Paper locked — waiting for T0 (or for the code phoned in by control if this centre is offline).', tone: 'locked' };
+  const how = releases.some((r) => r.sig) ? 'released by control at T0' : 'unlocked here with the phoned code';
+  const at = new Date(Math.max(...releases.map((r) => r.ts))).toISOString().slice(11, 19);
+  return { text: `Paper ${how} (${releases.map((r) => r.form).join(', ')}) at ${at} UTC. Every seat checks the key against the published commitment.`, tone: 'released' };
 }

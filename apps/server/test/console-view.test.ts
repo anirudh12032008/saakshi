@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { StreamView } from '@saakshi/core/wire';
-import { applyEvent, SILENT_MS, tile } from '../src/console-view.ts';
+import type { ReleaseMsg } from '@saakshi/core/paper';
+import { applyEvent, paperStatus, SILENT_MS, tile } from '../src/console-view.ts';
 
 const v = (o: Partial<StreamView>): StreamView => ({ exam: 'DEMO-2026', shift: 'S1', attempt: 1, cand: 'C0001', head: 10, cellHead: 10, senderHead: 10, seenAt: 1_000, ...o });
 
@@ -24,4 +25,11 @@ test('snapshot replaces the grid, stream upserts one tile, state reports the nod
   expect(applyEvent(views, 'state', { state: 'REBUILDING' })).toEqual({ state: 'REBUILDING' });
   applyEvent(views, 'snapshot', { mode: 'relay', state: 'LIVE', streams: [] });
   expect(views.size).toBe(0);
+});
+
+test('paper status: locked, released by control, or unlocked here with the phoned code', () => {
+  const r = (via: 'push' | 'code', form = 'F1'): ReleaseMsg => ({ exam: 'DEMO-2026', shift: 'S1', form, kcf: '', ts: Date.UTC(2026, 8, 27, 4, 30), key: '', sig: via === 'push' ? 'ab' : '', via });
+  expect(paperStatus([])).toEqual({ text: 'Paper locked — waiting for T0 (or for the code phoned in by control if this centre is offline).', tone: 'locked' });
+  expect(paperStatus([r('push'), r('push', 'F2')]).text).toBe('Paper released by control at T0 (F1, F2) at 04:30:00 UTC. Every seat checks the key against the published commitment.');
+  expect(paperStatus([r('code'), r('code', 'F2')]).text).toBe('Paper unlocked here with the phoned code (F1, F2) at 04:30:00 UTC. Every seat checks the key against the published commitment.');
 });

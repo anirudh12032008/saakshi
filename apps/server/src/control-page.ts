@@ -1,6 +1,7 @@
 import type { SignedSth } from '@saakshi/core/log';
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
-import { findingText, headline, reconCells } from './control-view.ts';
+import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
+import { commitment, findingText, fleetSummary, group, headline, kpis, reconCells, releaseLines, tileText } from './control-view.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const say = (id: string, text: string, tone = '') => { const el = $(id); el.textContent = text; el.className = `out ${tone}`.trim(); };
@@ -68,3 +69,63 @@ $('evidence').addEventListener('submit', async (ev) => {
 
 void recon();
 setInterval(recon, 2000);
+
+const li = (text: string): HTMLLIElement => { const x = document.createElement('li'); x.textContent = text; return x; };
+let lastSummary = '';
+
+async function fleetTick(): Promise<void> {
+  try {
+    const f = await call<FleetView>('GET', '/v1/fleet');
+    $('kpis').replaceChildren(...kpis(f).map((k) => {
+      const d = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = k.label; dd.textContent = k.value; d.append(dt, dd); return d;
+    }));
+    $('tiles').replaceChildren(...f.centres.map((t) => {
+      const x = tileText(t), item = document.createElement('li');
+      item.className = `tile ${t.tone}`;
+      item.setAttribute('aria-label', x.aria);
+      const title = document.createElement('strong'), line = document.createElement('span'), word = document.createElement('span');
+      title.textContent = x.title; line.textContent = x.line; word.textContent = x.word;
+      item.append(title, line, word);
+      return item;
+    }));
+    const summary = fleetSummary(f);
+    if (summary !== lastSummary) { $('fleet-summary').textContent = summary; lastSummary = summary; }   // the live region speaks only on change
+    $('cells').textContent = f.cells.map((c) => `${c.id}: ${c.state === 'DOWN' ? 'down' : c.state.toLowerCase()} · ${c.entries.toLocaleString('en-IN')} entries`).join(' · ');
+    const sel = $<HTMLSelectElement>('off-centre');
+    if (!sel.options.length) sel.replaceChildren(...f.centres.map((t) => new Option(t.centre, t.centre)));
+  } catch (e) { $('fleet-summary').textContent = `Fleet view unavailable: ${(e as Error).message}`; }
+}
+
+async function releaseTick(): Promise<void> {
+  try {
+    const s = await call<ReleaseStatus>('GET', '/v1/release/status');
+    $('commitment').replaceChildren(...commitment(s.manifest).map(li));
+    $('release').replaceChildren(...releaseLines(s).map(li));
+  } catch { $('release').replaceChildren(li('No exam package loaded (control runs without EXAM).')); }
+}
+
+$('offline').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target as HTMLFormElement);
+  try {
+    const r = await call<{ centre: string; shift: string; code: string }>('POST', '/v1/release/code', { centre: f.get('centre'), superintendent: f.get('superintendent'), callback: f.get('callback') === 'on' });
+    $('off-code').textContent = group(r.code);
+    say('off-out', `Read this to the superintendent of ${r.centre} for ${r.shift}. The reveal is logged.`, 'ok');
+    void releaseTick();
+  } catch (e) { $('off-code').textContent = ''; say('off-out', (e as Error).message, 'bad'); }
+});
+
+$('wan').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const up = ((ev as SubmitEvent).submitter as HTMLButtonElement).value === 'true';
+  try {
+    await call('POST', '/v1/chaos/wan', { up });
+    say('wan-out', up ? "Centre 42's link is back." : "Centre 42's link is cut: its relay cannot reach the exam server.", up ? 'ok' : 'bad');
+  } catch (e) { say('wan-out', (e as Error).message, 'bad'); }
+});
+
+void fleetTick();
+void releaseTick();
+setInterval(fleetTick, 1000);
+setInterval(releaseTick, 2000);

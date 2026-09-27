@@ -1,5 +1,6 @@
 import type { StreamView } from '@saakshi/core/wire';
-import { applyEvent, tile, type Tone } from './console-view.ts';
+import type { ReleaseMsg } from '@saakshi/core/paper';
+import { applyEvent, paperStatus, tile, type Tone } from './console-view.ts';
 
 const views = new Map<string, StreamView>();
 const grid = document.getElementById('grid') as HTMLUListElement;
@@ -33,3 +34,33 @@ for (const ev of ['snapshot', 'stream', 'state']) {
 es.onopen = () => { conn = 'live'; render(); };
 es.onerror = () => { conn = 'reconnecting…'; render(); };
 setInterval(render, 1000);                           // ages "silent" tiles between events
+
+const paper = document.getElementById('paper') as HTMLParagraphElement;
+const say = (id: string, text: string, tone: 'good' | 'bad') => { const el = document.getElementById(id)!; el.textContent = text; el.className = `out ${tone}`; };
+
+async function paperTick(): Promise<void> {
+  try {
+    const r = await fetch('/release/current');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const s = paperStatus(((await r.json()) as { releases: ReleaseMsg[] }).releases);
+    paper.textContent = s.text;
+    paper.className = s.tone;
+  } catch { paper.textContent = 'This relay has no exam package (it runs without EXAM).'; paper.className = 'locked'; }
+}
+
+document.getElementById('offline')!.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const code = (document.getElementById('code') as HTMLInputElement).value;
+  const r = await fetch('/v1/release/offline', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+  const j = (await r.json().catch(() => ({}))) as { error?: string };
+  say('offline-out', r.ok ? 'Unlocked: the key went to every seat at this centre, and each one checks it against the published commitment.' : (j.error ?? `HTTP ${r.status}`), r.ok ? 'good' : 'bad');
+  void paperTick();
+});
+
+document.getElementById('forge')!.addEventListener('click', async () => {
+  const r = await fetch('/v1/dev/forge', { method: 'POST' });
+  say('forge-out', r.ok ? 'A forged key went out. Every seat should say it rejected a key.' : `Not available (HTTP ${r.status}).`, r.ok ? 'good' : 'bad');
+});
+
+void paperTick();
+setInterval(paperTick, 2000);

@@ -5,40 +5,94 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Saakshi · Control</title>
     <style>
-      :root { font-family: system-ui, sans-serif; color: #202124; background: #fff; }
-      body { margin: 0; padding: 1rem 1.5rem 3rem; max-width: 72rem; }
-      h1 { font-size: 2rem; margin: 0 0 1rem; } h2 { font-size: 1.25rem; margin: 1.5rem 0 .5rem; }
+      :root {
+        --s-1: .8rem; --s0: 1rem; --s1: 1.25rem; --s2: 1.563rem; --s3: 1.953rem; --s4: 2.441rem;
+        --ink: #202124; --muted: #5f6368; --line: #dadce0; --blue: #1565c0;
+        font-family: system-ui, sans-serif; color: var(--ink); background: #fff;
+      }
+      body { margin: 0; padding: 1rem 1.5rem 3rem; max-width: 80rem; font-size: var(--s0); line-height: 1.5; }
+      h1 { font-size: var(--s3); margin: 0 0 1rem; } h2 { font-size: var(--s2); margin: 2rem 0 .5rem; } h3 { font-size: var(--s1); margin: 1.25rem 0 .25rem; }
+      .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; margin: 0; }
+      .kpis div { border: 1px solid var(--line); border-radius: .5rem; padding: .5rem .75rem; }
+      .kpis dt { font-size: var(--s-1); color: var(--muted); }
+      .kpis dd { margin: 0; font-size: var(--s4); font-weight: 700; font-variant-numeric: tabular-nums; }
+      #tiles { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: .375rem; }
+      .tile { border: 2px solid; border-radius: .375rem; padding: .25rem .5rem; display: grid; }
+      .tile strong { font-size: var(--s1); }
+      .tile span { font-size: var(--s-1); font-variant-numeric: tabular-nums; }
+      .tile.green { color: #0d5222; background: #e6f4ea; border-color: #1e6b25; }
+      .tile.partial { color: #7a4100; background: #fef7e0; border-color: #b06000; }
+      .tile.locked { color: #3c4043; background: #f1f3f4; border-color: #9aa0a6; }
+      .tile.down { color: #8c1d18; background: #fce8e6; border-color: #c62828; }
       table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-      th, td { border: 1px solid #dadce0; padding: .375rem .5rem; text-align: left; }
+      th, td { border: 1px solid var(--line); padding: .375rem .5rem; text-align: left; }
       td.ok { background: #e6f4ea; } td.bad { background: #fce8e6; font-weight: 700; }
       .ok { color: #1e6b25; } .bad { color: #b3261e; }
-      button { font: inherit; padding: .5rem 1rem; border-radius: .375rem; border: 1px solid #5f6368; background: #fff; cursor: pointer; min-height: 2.75rem; }
-      button.primary { background: #1565c0; color: #fff; border-color: #1565c0; }
+      button { font: inherit; padding: .5rem 1rem; border-radius: .375rem; border: 1px solid var(--muted); background: #fff; color: var(--ink); cursor: pointer; min-height: 2.75rem; }
+      button.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
       button.chaos { background: #b3261e; color: #fff; border-color: #b3261e; }
       form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; }
-      label { display: grid; gap: .125rem; font-size: .8rem; }
+      label { display: grid; gap: .125rem; font-size: var(--s-1); }
       input, select { font: inherit; padding: .375rem; min-height: 2.25rem; }
-      .out { font: .8rem ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0 0; }
-      #audit-headline { font-size: 1.6rem; font-weight: 700; margin: .5rem 0; }
-      .note { color: #5f6368; font-size: .8rem; }
-      :focus-visible { outline: 3px solid #1565c0; outline-offset: 2px; }
+      .check { display: flex; gap: .5rem; align-items: center; min-height: 2.75rem; }
+      .out { font: var(--s-1)/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0 0; }
+      .code { font: 700 var(--s3)/1.3 ui-monospace, Menlo, monospace; letter-spacing: .06em; margin: .25rem 0; }
+      #audit-headline { font-size: var(--s2); font-weight: 700; margin: .5rem 0; }
+      .note { color: var(--muted); font-size: var(--s-1); }
+      :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+      @media (forced-colors: active) { .tile { border-color: CanvasText; } }
     </style>
   </head>
   <body>
     <h1>Control · DEMO-2026 · S1</h1>
 
-    <h2>Reconciliation (per centre-shift)</h2>
+    <h2>Start on time</h2>
+    <dl class="kpis" id="kpis"></dl>
+    <p id="fleet-summary" role="status">…</p>
+    <p id="cells" class="note"></p>
+    <h3>Centres</h3>
+    <ul id="tiles" aria-label="Centres"></ul>
+    <p class="note">Each tile: unlocked / registered. All unlocked: every registered candidate's paper is open · Unlocking: some are · Locked: none yet · Exam server down: its cell does not answer.</p>
+
+    <h2>Custody — the two-key locker</h2>
+    <h3>Published commitment (the signed manifest)</h3>
+    <ul id="commitment" class="out"></ul>
+    <h3>Release</h3>
+    <ul id="release"></ul>
+    <p><a href="/custodian">Open the custodian page</a> — each custodian uses their own share file and passphrase.</p>
+
+    <h3>Phoned-in fallback</h3>
+    <form id="offline">
+      <label>Centre <select id="off-centre" name="centre"></select></label>
+      <label>Superintendent ID <input name="superintendent" autocomplete="off" required size="10" /></label>
+      <label class="check"><input type="checkbox" name="callback" required /> I called back the centre's registered number</label>
+      <button class="primary">Reveal this centre's code</button>
+    </form>
+    <p class="note">Reveals only that centre's code, for this shift only. Every reveal is logged.</p>
+    <p id="off-code" class="code"></p>
+    <p id="off-out" class="out" role="status"></p>
+
+    <h3>Chaos</h3>
+    <form id="wan">
+      <button class="chaos" name="up" value="false">Cut Centre 42's link</button>
+      <button name="up" value="true">Restore Centre 42's link</button>
+    </form>
+    <p class="note">DEV chaos: the demo centre's relay stops reaching its exam server, as if the WAN line were cut.</p>
+    <p id="wan-out" class="out" role="status"></p>
+
+    <h2>Prove it — Centre 42</h2>
+    <h3>Reconciliation (per centre-shift)</h3>
     <table>
       <thead><tr><th scope="col">Centre · shift</th><th scope="col">Registered</th><th scope="col">Checked in</th><th scope="col">Unlocked</th><th scope="col">Submitted</th><th scope="col">Receipts</th><th scope="col">Register leaves</th><th scope="col">Relay = cell heads</th></tr></thead>
       <tbody><tr id="recon-row"></tr></tbody>
     </table>
     <p id="recon-status" role="status">…</p>
 
-    <h2>Sealed public register</h2>
+    <h3>Sealed public register</h3>
     <button id="seal" class="primary">Seal the shift — publish the register head</button>
     <p id="seal-out" class="out" role="status"></p>
 
-    <h2>Chaos</h2>
+    <h3>Rogue insider</h3>
     <form id="rogue">
       <label>Candidate <input name="cand" value="C0001" size="7" /></label>
       <label>Question <input name="q" type="number" min="1" max="20" value="17" /></label>
@@ -48,12 +102,12 @@
     <p class="note">DEV chaos: runs an UPDATE on the exam cell's database, as an insider with DB access would. The cell's terminal prints it.</p>
     <p id="rogue-out" class="out" role="status"></p>
 
-    <h2>Audit</h2>
+    <h3>Audit</h3>
     <button id="audit" class="primary">Run the audit</button>
     <p id="audit-headline" role="status"></p>
     <ul id="audit-list"></ul>
 
-    <h2>Evidence</h2>
+    <h3>Evidence</h3>
     <form id="evidence">
       <label>Candidate <input id="ev-cand" name="cand" value="C0001" size="7" /></label>
       <button class="primary">Export the evidence pack</button>
