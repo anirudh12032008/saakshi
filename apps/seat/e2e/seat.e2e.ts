@@ -27,7 +27,7 @@ function bunStack() {
 // When Playwright can't attach, run the exe the way it does and show why it exited (CI has no other window into it).
 function launchDiag(args: string[], exe = EXE): Promise<string> {
   return new Promise((res) => {
-    const p = spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1', ELECTRON_ENABLE_STACK_DUMPING: '1' } });
+    const p = spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1', ELECTRON_ENABLE_STACK_DUMPING: '1', SAAKSHI_TRACE: '1' } });
     let out = '';
     p.stdout!.on('data', (d) => { out += d; }); p.stderr!.on('data', (d) => { out += d; });
     const t = setTimeout(() => { p.kill(); res(`launch diag [${args.slice(0, 3).join(' ')}]: still running after 15 s\n${out}`); }, 15_000);

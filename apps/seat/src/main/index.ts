@@ -18,6 +18,14 @@ import { Seat } from './seat.ts';
 const argValue = (flag: string): string | undefined => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : undefined; };
 const setting = (flag: string, envName: string, dflt: string): string => argValue(flag) ?? process.env[envName] ?? dflt;
 
+// A crash in main must say why, not exit silently (Windows CI saw a bare exit -1). SAAKSHI_TRACE=1 also logs start-up steps.
+const trace = (m: string): void => { if (process.env.SAAKSHI_TRACE === '1') process.stderr.write(`[saakshi] ${m}\n`); };
+process.on('uncaughtException', (e) => { process.stderr.write(`[saakshi] fatal: ${e.stack ?? e}\n`); app.exit(70); });
+process.on('unhandledRejection', (e) => { process.stderr.write(`[saakshi] fatal (promise): ${(e as Error)?.stack ?? e}\n`); app.exit(70); });
+app.on('child-process-gone', (_e, d) => process.stderr.write(`[saakshi] child gone: ${d.type} ${d.reason} ${d.exitCode}\n`));
+app.on('render-process-gone', (_e, _w, d) => process.stderr.write(`[saakshi] renderer gone: ${d.reason} ${d.exitCode}\n`));
+trace(`main loaded; argv ${JSON.stringify(process.argv.slice(1))}`);
+
 const refusal = launchRefusal(process.argv, E2E);
 if (refusal) { process.stderr.write(refusal + '\n'); app.exit(3); }
 else if (process.argv.includes('--probe-selftest')) {
@@ -41,8 +49,8 @@ else if (process.argv.includes('--probe-selftest')) {
   writeFile(argValue('--out') ?? 'fuse-check.json', JSON.stringify({ execArgv: process.execArgv, inspectorUrl: inspectorUrl() ?? null, runAsNode: !!process.env.ELECTRON_RUN_AS_NODE, e2e: E2E }))
     .then(() => app.exit(0), () => app.exit(2));
 } else if (process.argv.includes('--overlay-sim')) overlaySim();
-else if (!app.requestSingleInstanceLock()) app.exit(0);
-else start();
+else if (!app.requestSingleInstanceLock()) { trace('another instance holds the lock'); app.exit(0); }
+else { trace('start'); start(); }
 
 // A capture-excluded window for the Act 1 demo and the CI gate self-test. Never starts a seat; skips the single-instance lock.
 function overlaySim(): void {
@@ -98,6 +106,7 @@ function start(): void {
   ipcMain.on('gate:blur', () => {});   // kept for API stability; main measures blur itself, so a starved renderer cannot hide it
 
   app.whenReady().then(async () => {
+    trace('ready');
     let wrap: Wrapper;
     try { wrap = pickWrapper({ testMode: test, safeStorage, dir: app.getPath('userData') }); }
     catch (e) { dialog.showErrorBox('Saakshi', (e as Error).message); app.exit(1); return; }
@@ -106,6 +115,7 @@ function start(): void {
       integrity: { collect: () => collect(host) },
       onBoot: (b) => win?.webContents.send('boot', b), onSync: (v) => win?.webContents.send('sync', v) });
     await seat.open();
+    trace('seat open');
     void skewCheck(); setInterval(skewCheck, 30_000).unref();
     // plan §3.6: suspend and screen lock pause the timer and become gap entries on resume (powerMonitor only after whenReady).
     powerMonitor.on('suspend', () => seat?.pause('suspend'));
