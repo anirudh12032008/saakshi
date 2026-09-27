@@ -27,8 +27,7 @@ Seat (Electron) ──LAN──► Centre relay (untrusted) ──WAN──► C
 ```
 
 **Status (27 Sep 2026):**
-- **Done:** Stages 0–2 (foundations, "never lose an answer", "prove it") and analytics A1–A4.
-- **Being planned:** Stage 3 (custody, enrolment, swarm).
+- **Done:** Stages 0–3 (foundations, "never lose an answer", "prove it", custody + enrolment + swarm) and analytics A1–A4.
 - **Not built:** Stages 4–8. See [Honest limits](#honest-limits).
 
 ---
@@ -45,6 +44,8 @@ Every number below comes from a test, a commit message, or a CI artifact, and ca
 | Golden vectors re-checked in the browser on every `/verify` load | **30 of 30** checks pass (protocol v1 + Addendum A) | same | `packages/core/test/selftest.test.ts` |
 | Tampering on a real cell DB: edit, deleted row, truncated chain, changed signature, edited header, removed submit | **every case located**; edits and deleted rows are restored from the sealed archive | `bun test --timeout 60000 apps/server` | `apps/server/test/tamper.test.ts`, `audit.test.ts` |
 | Act 4 end to end (real seat session → relay → cell → control) | Slip code = the cell's countersigned code; the audit reports **"Q17: record says C — the seat committed B"** and recovers B; `/verify` fails only `bodies`; the evidence pack's manifest verifies | `bun tools/act4.ts` | commit `d7efb47`; CI `server` job |
+| Act 2 end to end (real processes: provision → package → 3 cells + the Centre 42 relay + control; a swarm of simulated centres; a real seat at Centre 42, test mode, camera off) | 2-of-3 custodians release; 6 of 7 centres go green while Centre 42 stays locked (its link cut); a typo and another centre's code are refused; the **phoned code** unlocks Centre 42 and the seat checks it against `kc_f`; a forged key pushed by the relay is rejected; a relay restart re-delivers the release with exactly one unlock; 6,585 entries committed, 300 candidates submitted | `bun tools/act2.ts` | commit `cec0ebb`; CI `server` job |
+| Swarm throughput (`tools/swarm.ts`, 99 simulated centres in one process, replaying the full G1 cohort) | ~1.1k entries/s sustained on one core (Apple M5, full G1 cohort at `--speed 20`, cells in-process); lower under heavy machine load; the cross-process HTTP number is not yet measured | `bun tools/swarm.ts --exam data/exam --cohort data/g1/cohort.jsonl --speed 20` | commit `5cd2f0a` |
 | The relay cannot read answers | No answer text reaches the relay's disk | `bun test --timeout 60000 apps/server` | `apps/server/test/ingest.test.ts` |
 | Offline `/verify` | One 84 KB file with no external URLs; works from `file://` with DNS blocked | `bun test --timeout 60000 apps/server` | commit `f95c76f`; `verify-page.test.ts` |
 | Packaged Windows exe probe self-test | JSON from koffi (user32) and `tasklist` on `windows-latest` | CI `windows` job | [`docs/evidence/stage0-windows-probe.json`](docs/evidence/stage0-windows-probe.json) |
@@ -53,7 +54,7 @@ Every number below comes from a test, a commit message, or a CI artifact, and ca
 | Fairness on G2 (**synthetic**) | 0 honest flags in EN, HI, TA, PwD, and in each of the 100 centres | same | `analytics/README.md` |
 | Decision engine golden cases (**synthetic** 2k cohort) | CUET-2026 replay → **Compensated 161 · Re-tested 29 · Re-conducted 0 · Spared 160**. NEET-2024 separable → no full re-conduct (10 centre-shifts in 4 centres; 1,318 spared). Systemic, not separable → full re-conduct. Leak of 10 items → re-score, nothing re-conducted | `uv run pytest -q tests/test_decide.py tests/test_a4.py` | commits `f3d171e`, `db2b95e` |
 | Centre risk model (**synthetic** histories; fit on seed 1, measured on 4,000 independent histories, seed 2) | "At risk" precision **0.290** (2.1× the base rate of 0.138); "do not allot" precision **0.523** (3.8×) | `uv run python -m saakshi_analytics.scorecard` | commit `db2b95e` |
-| Test suites at `6e0c31e` | core 64 · seat 35 · server 99 · analytics 66, all passing | see Quickstart | — |
+| Test suites at `cec0ebb` | core 77 · seat 61 · server 153 · analytics 66, all passing | see Quickstart | — |
 
 Run the analytics commands from `analytics/`.
 
@@ -80,13 +81,15 @@ bun test --timeout 60000 apps/server               # server only
 (cd analytics && uv run pytest -q)                 # adds the full 20k G1 → G2 run
 ```
 
-### The three scripted proofs
+### The scripted proofs
 
 ```sh
 bun tools/chaos-kill.ts [--seats 8] [--entries 200]   # kill -9 + wipe the cell → sent = stored, lost = 0, PASS
 bun tools/act4.ts                                     # submit → seal → rogue insider → audit → /verify → evidence, PASS
+bun tools/act2.ts [--cohort path/to/cohort.jsonl]     # provision → package → 3 cells + relay + control → custody release → phoned-code unlock → PASS
 node tools/tamper-lab.ts [--entries 40] [--offset N]  # flip one byte of a signed journal → "located exactly: line N"
 node tools/tamper-lab.ts verify <journal.jsonl>       # re-verify a file you edited by hand (reads <file>.pub.json)
+bun tools/swarm.ts --exam data/exam --cohort data/g1/cohort.jsonl [--speed 20]   # 99 simulated centres, one process, entries/s printed live
 ```
 
 ### Analytics: radar, decision engine, scorecard
@@ -213,12 +216,12 @@ docs/               plan, research, protocol spec, threat model, claims ledger, 
 - `fixtures/keys.json` holds the **private** keys for the authority, 3 cells and 8 seats. It is published and bundled into the seat app.
 - The pseudonym key `K_pseud` is also a published DEV value.
 - Every server mode refuses to start without `DEV=1`.
-- Enrolment, binding certificates and cell keys provisioned by control arrive in Stage 3.
+- Enrolment and binding certificates use these same published DEV cell keys; production keys come from an HSM, provisioned by control (nothing in the protocol changes).
 
 ### What runs today, and what doesn't
 
 **Topology**
-- One relay, one cell and one control. The three-cell layout and the directory come later.
+- The hand-run quickstart above is one relay, one cell and one control. `bun tools/act2.ts` runs the three-cell layout and the directory together with a real seat; the spare relay is still Stage 4.
 - Relay → cell traffic is plain HTTP.
 - Cell and control routes are unauthenticated, so both refuse to bind anywhere but loopback (commit `6e0c31e`).
 
@@ -243,8 +246,7 @@ docs/               plan, research, protocol spec, threat model, claims ledger, 
 
 | Stage | Not built yet |
 |---|---|
-| 3 (being planned) | Enrolment and binding certificates (attestHash, PIN, provisional state); directory; cell keys outside the cell DB, provisioned by control; signed policies; packager, manifest and public commitment; `/custodian`; release by push with a pull fallback; offline-code unlock; active-time timer; swarm (99 simulated centres, 20k candidates); control-room tiles |
-| 4 | Resume on another seat (old-key signature, or PIN + invigilator); `rxWall`; suspend gaps and caps; 3 cells, spare relay, archive to 2 stores; `tools/chaos.ts --runs 20` with RTO; incidents P0–P3, escalation ladder, CERT-In template; SYNC_LAG prediction; in-exam banner and status page |
+| 4 | Resume on another seat (old-key signature, or PIN + invigilator); `rxWall`; suspend gaps and caps; spare relay, archive to 2 stores; `tools/chaos.ts --runs 20` with RTO; incidents P0–P3, escalation ladder, CERT-In template; SYNC_LAG prediction; in-exam banner and status page; Addendum C (`/verify` for enrolled candidates) |
 | 5 | Integrity gate and in-exam monitor; VM score; egress and accommodation allowlists (NVDA, VoiceOver, scribe seat); pointer provenance; face flags and review queue; readiness board; fused-build smoke test; Playwright e2e |
 | 6 | Radar and decision engine reading the cells' export live; Claude provider (templates by default); scorecard on the readiness board; Tamil |
 | 7 | Windows laptop bring-up; detection matrix on both OSes; measured load (p50/p99, RPO/RTO, WAN bytes, seat CPU); witness (S6); TLS (S7) |

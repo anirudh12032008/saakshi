@@ -1,6 +1,6 @@
 # Claims ledger
 
-This ledger lists every claim the pitch, the deck and the README make, the evidence behind each one, and its status. It reflects commit `6e0c31e`.
+This ledger lists every claim the pitch, the deck and the README make, the evidence behind each one, and its status. It reflects commit `cec0ebb`: Stages 0–3 and analytics A1–A4 are built; Stages 4–8 are not.
 
 ## Statuses
 
@@ -22,7 +22,7 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | R4 | Relay and cell ack only after the commit is durable (group commit every 10 ms or 500 entries) | `store.test.ts` (commit visibility, 500-row flush, shared window); pragmas WAL + `synchronous=FULL` + `fullfsync` checked at boot | **Proven** for behaviour; throughput **Planned (Stage 7)** |
 | R5 | Power-loss durability | WAL, `synchronous=FULL`, `fullfsync` on the servers; seat fsync, which is not `F_FULLFSYNC` on macOS | **Built, not measured** (holds by design) |
 | R6 | A spare relay takes over | Seat side: `sync.test.ts` "a fresh (spare) relay gets the whole journal again" | Seat side **Proven**; operations **Planned (Stage 4)** |
-| R7 | Cells ×3 are independent failure domains, with a blast radius shown live | — | **Planned (Stage 3–4)** |
+| R7 | Cells ×3 are independent failure domains, with a blast radius shown live | Three independent cells (`cell-1`, `cell-2`, `cell-3`) run together, each countersigning its own share of the cohort: `bun tools/act2.ts` | **Built**: three cells run in the Stage 3 demo; blast radius shown live is **Planned (Stage 4)** |
 | R8 | RPO and RTO are measured; 20 chaos runs are logged | — (the kill test prints restart times but is not an RTO benchmark) | **Planned (Stages 4, 7, 8)** |
 | R9 | Signed per-shift archive to 2 independent stores | Control writes one archive copy at seal (`control.ts`) | **Planned (Stage 4)** |
 | R10 | Resume on another seat (old-key signature, or PIN + invigilator); credited time approved | — | **Planned (Stage 4)** |
@@ -53,16 +53,18 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 
 | # | Claim | Evidence | Status |
 |---|---|---|---|
-| P1 | Any 2 of 3 custodians (NTA, NIC, observer) can release the paper keys; 1 cannot | `custody.test.ts` | **Proven** for the primitive; release flow **Planned (Stage 3)** |
-| P2 | An offline code unlocks only its own centre and shift, and tolerates phone dictation | `custody.test.ts` | **Proven** for the primitive; phoned unlock **Planned (Stage 3)** |
-| P3 | A wrong or corrupted key is rejected against the public commitment `kc_f` | `custody.test.ts` "a corrupted share is caught by the published key commitment" | **Proven** for the primitive; the seat's `kc_f` check **Planned (Stage 3)** |
-| P4 | The paper cannot be read before T0; the exam starts on time even offline | — | **Planned (Stage 3)** |
-| P5 | Enrolment and binding certificates (attestHash, PIN, provisional binding) | — | **Planned (Stage 3)** |
+| P1 | Any 2 of 3 custodians (NTA, NIC, observer) can release the paper keys; 1 cannot | `custody.test.ts`; `release-control.test.ts` (two distinct custodians; one custodian twice counts once; a damaged share cannot release); `bun tools/act2.ts` | **Proven** |
+| P2 | An offline code unlocks only its own centre and shift, and tolerates phone dictation | `custody.test.ts`; `package.test.ts`; `relay-routes.test.ts` "Review Focus #3"; `bun tools/act2.ts` (a typo and another centre's code fail; the phoned code unlocks Centre 42) | **Proven** |
+| P3 | A wrong or corrupted key is rejected against the public commitment `kc_f` | `custody.test.ts` "a corrupted share is caught by the published key commitment"; `stage3-core.test.ts` "checkRelease (B.7)"; `release.test.ts` and `seat.test.ts` "exit check — kc_f on both paths"; `bun tools/act2.ts` (a forged key pushed by the relay is rejected) | **Proven** |
+| P4 | The paper cannot be read before T0; the exam starts on time even offline | `package.test.ts` "ciphertext only"; the seat bundle carries no plaintext paper or private key (`(cd apps/seat && pnpm build)`, then grep `out/` for the paper text and for `"priv"`); `bun tools/act2.ts` (the paper stays ciphertext on disk; the phoned code starts Centre 42 with its WAN link cut) | **Proven** |
+| P5 | Enrolment and binding certificates (attestHash, PIN, provisional binding) | `bindings.test.ts`; `identity.test.ts`; `seat.test.ts` "provisional (no WAN at check-in) …" | **Proven** |
 | P6 | Remote-access tools, capture-excluded overlays and VMs are blocked before start, and flagged (never auto-submitted) during the exam | Probes exist as a self-test only (`probes.ts`, `probes-win.ts`; CI artifact) | **Planned (Stage 5)** |
 | P7 | The packaged Windows exe runs its probes | CI `windows` job; [`evidence/stage0-windows-probe.json`](evidence/stage0-windows-probe.json) | **Proven** (it runs; detection of real tools is not yet shown) |
 | P8 | Face presence runs on the device; no video, no face recognition | Live count in the packaged macOS app ([evidence](evidence/stage0-seat-faces-1.png)); `FaceChip.tsx` | **Built, not measured**. Flags and review queue **Planned (Stage 5)** |
 | P9 | Hardened Electron: fuses, context isolation, sandbox, CSP, `app://` | `electron-builder.yml`, `apps/seat/src/main/index.ts`; `app-path.test.ts` | **Built, not measured**. Fused-build smoke test, `--inspect` refusal and single-instance lock **Planned (Stage 5)** |
 | P10 | Centre risk model: "at risk" precision 0.290 (2.1× base rate), "do not allot" precision 0.523 (3.8×) | `scorecard` CLI; `test_scorecard.py` (asserts ≥ 1.8× the base rate); commit `db2b95e` | **Proven on synthetic histories** |
+
+**Stage 3 honest limits** (detail in [`threat-model.md`](threat-model.md)): the `/custodian` page is served by control, so a compromised control could serve a page that captures a passphrase; enrolment is first-come, so a rogue relay could try to bind a candidate before they arrive (the real candidate is then refused with `ALREADY_BOUND`); while `DEV=1`, the relay's chaos routes (`/v1/dev/wan`, `/v1/dev/forge`) are reachable on the centre LAN; control zeroises `K_f` after every cell has the release, but this is best effort in a garbage-collected runtime; `/verify` still pins the fixture seat keys from `fixtures/trust-dev.json`, so an **enrolled** candidate's proof shows the keys row failing there until Addendum C (Stage 4) extends the proof with the bind and cell certificates.
 
 ## Detection and response: analytics
 
@@ -94,7 +96,7 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | C2 | EN and HI with a bundled Devanagari font | `exam-state.test.ts` "EN and HI catalogues have the same keys … HI is Devanagari" | **Proven**. Tamil **Planned (Stage 6)** |
 | C3 | Accessible: keyboard-only use, ARIA, 200% zoom | Built in Stage 1 and checked by hand | **Built, not measured**. No WCAG 2.1 AA / GIGW 3.0 audit; Playwright e2e **Planned (Stage 5)** |
 | C4 | In-exam banner, public status page, notice outbox | — | **Planned (Stage 4, 6)** |
-| C5 | 20k live candidates across 100 centres | — | **Planned (Stage 3 swarm)** |
+| C5 | 20k live candidates across 100 centres | `tools/swarm.ts`: 99 simulated centres replay the full G1 cohort (≈20k candidates) in one process, live (commit `5cd2f0a`); `bun tools/act2.ts` runs the same flow end to end on real cell/relay/control processes with a small cohort (300 candidates, 7 centres) | **Built**. Throughput: **~1.1k entries/s sustained on one core** (Apple M5, full G1 cohort at `--speed 20`, cells in-process; commit `5cd2f0a`), lower under heavy machine load; the cross-process HTTP number is **Planned (Stage 7)** |
 | C6 | Throughput, p50/p99, WAN bytes per candidate-hour, seat CPU on low-end hardware | — | **Planned (Stage 7)** |
 | C7 | A Rust cell ingest matches the TypeScript one on the same vectors | — | **Planned (optional Stage R)** |
 

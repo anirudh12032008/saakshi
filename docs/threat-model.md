@@ -1,6 +1,6 @@
 # Saakshi threat model
 
-This document is honest about the limits. It reflects the code at commit `6e0c31e`: Stages 0–2 and analytics A1–A4 are built; Stages 3–8 are not.
+This document is honest about the limits. It reflects the code at commit `cec0ebb`: Stages 0–3 and analytics A1–A4 are built; Stages 4–8 are not.
 
 **Status tags** used throughout:
 
@@ -80,7 +80,8 @@ Everything below follows from that. The seat signature and the cell's countersig
 - The receipt slip is printable and needs no phone. **Built:** `apps/seat/src/renderer/src/Slip.tsx`.
 
 **Residual risk:**
-- Identity rests on the existing Aadhaar or biometric gate check, which is recorded as `attestHash` (Stage 3).
+- Identity rests on the existing Aadhaar or biometric gate check, recorded as `attestHash` at enrolment. **Built:** `apps/seat/test/identity.test.ts`, `apps/server/test/bindings.test.ts`.
+- Enrolment is first-come: a rogue relay could try to bind a candidate before they arrive. It cannot forge the cell's certificate, and the real candidate's own enrolment is then refused (`ALREADY_BOUND`, "call the invigilator"); matching `attestHash` against the gate's own log is later work.
 - Collusion inside the room is visible only statistically.
 
 ### 3. Centre operator (vendor staff at the venue)
@@ -96,7 +97,7 @@ Everything below follows from that. The seat signature and the cell's countersig
 
 **Detects:**
 - The blocklist, remote-session and capture-exclusion probes. **Built as a self-test**; the gate is **Stage 5**.
-- Per-centre, per-shift offline codes whose use control logs. **Primitive:** `packages/core/src/custody.ts`; the flow is Stage 3.
+- Per-centre, per-shift offline codes whose use control logs. **Built:** `packages/core/src/custody.ts`; the release flow, the relay's phoned-code route and the custody log entry (`bun tools/act2.ts`, step 11: `grep -E '"action":"(release|keys-zeroised|offline-code-revealed|chaos-wan)"'`).
 
 **Recovers:**
 - Power loss or a crash: the seat resumes from its fsynced journal. **Built.**
@@ -133,6 +134,8 @@ The SSC CGL 2025 Dhanbad case was a **server manager** at a centre.
 - Denial of service: the relay can stall a whole centre. Seats keep answering at ✓; the spare relay is Stage 4.
 - Metadata leaks: headers show the entry kind, `seq`, `tMonoMs` and `activeMs`, so the relay learns *when* a candidate answers, but not *what*.
 - Until Stage 7 (S7), relay → cell traffic is plain HTTP.
+- A rogue relay could try to bind a candidate before they arrive; it cannot forge the cell's certificate, and the real candidate's enrolment is then refused (see the invigilator actor's residual risk, above).
+- While `DEV=1`, the relay's chaos routes (`/v1/dev/wan`, `/v1/dev/forge`, exercised by `tools/act2.ts`) are reachable on the centre LAN. Production builds must not ship with `DEV=1`.
 
 ### 5. Cell insider (national data-centre DBA)
 
@@ -168,6 +171,7 @@ The SSC CGL 2025 Dhanbad case was a **server manager** at a centre.
 - The insider can **read** answers. That is by design: the cell has to score.
 - Before the seal, an insider who also controls the relay and the single archive could rewrite consistently. There are only two archive stores in Stage 4, and a witness only in Stage 7.
 - `/v1/shift` and the DEV rogue route are unauthenticated and bound to loopback (commit `6e0c31e`). mTLS is on the roadmap.
+- `/verify` still pins the seat keys from `fixtures/trust-dev.json`. An **enrolled** candidate's key is not in that file, so `/verify` shows the keys row failing for them (chain, bodies, receipt, STH and inclusion still verify) until Addendum C (Stage 4) extends the proof with the candidate's bind certificate and the cell's key certificate, and `/verify` pins only the authority key.
 
 ### 6. Printing-press insider, and anyone upstream of T0
 
@@ -177,8 +181,7 @@ NEET-UG 2026 leaked from inside the paper's custody chain before the exam ([rese
 - The paper keys are split Shamir 2-of-3 between NTA, NIC and an independent observer. Custodians hold their own shares.
 - A public key commitment `kc_f` is published in advance.
 - An offline code only unwraps its own centre and shift.
-- **Primitive:** `packages/core/src/custody.ts`; `custody.test.ts` "any 2 of 3 … 1 share does not", "a corrupted share is caught by the published key commitment", "offline code unwraps only its own centre and shift".
-- The packager, `/custodian` and the release flow are **Stage 3**.
+- **Built:** `packages/core/src/custody.ts`; `custody.test.ts` "any 2 of 3 … 1 share does not", "a corrupted share is caught by the published key commitment", "offline code unwraps only its own centre and shift"; the packager (`tools/package.ts`), `/custodian` (`apps/server/src/custodian-view.ts`) and the release flow (`release-control.test.ts`, `relay-routes.test.ts`, `bun tools/act2.ts`).
 
 **Detects:**
 - Beneficiaries of a leak are found statistically: signals 1 and 3 locate the items, centres and shifts affected. **Built on synthetic data.**
@@ -192,7 +195,8 @@ NEET-UG 2026 leaked from inside the paper's custody chain before the exam ([rese
 
 **Residual risk:**
 - **Setters see the plaintext paper.** Custody cannot stop a setter leak; only detection and response can.
-- Control sees `K_f` at T0.
+- Control sees `K_f` at T0 and zeroises it after every cell has the release — best effort in a garbage-collected runtime, not a guarantee. Control restarting before the release completes makes a new release key, and the custodians re-send.
+- The `/custodian` page is served by control, so a compromised control could serve a page that captures a custodian's passphrase. Production: a signed, offline custodian app.
 - The packager destroying its material is a procedural control.
 - A leak to strong candidates shows up weakly in the statistics.
 
@@ -246,7 +250,7 @@ The cases in [research.md](research.md#research-landscape):
 | Cell crash, or its database deleted | REBUILDING; 503 for live traffic; the relay replays; lost = 0 | **Built** (kill test) |
 | Relay dies | Seats resync to a fresh relay from their journals | Seat side **Built**; spare-relay operations **Stage 4** |
 | Seat hardware dies | Resume on another seat; loss is at most the time since the last ✓✓ | **Stage 4** |
-| Paper keys can't reach a centre at T0 | Per-centre offline code | **Primitive**; flow **Stage 3** |
+| Paper keys can't reach a centre at T0 | Per-centre offline code, read out and typed at the relay console | **Built** (`bun tools/act2.ts`) |
 
 ## Detection matrix (current)
 
