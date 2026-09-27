@@ -22,7 +22,7 @@ export type ChainResult = { ok: true; head: string; count: number } | { ok: fals
 
 const SIG_HEX = /^[0-9a-f]{128}$/;
 
-/** Check order per spec: signature, then position (seq), then prev. Returns the first bad entry. */
+/** Check order: parse, shape, context, then (per spec) signature, position (seq), prev. Returns the first bad entry. */
 export function verifyChain(c: Ctx, lines: string[], verify: Verify): ChainResult {
   let prev = genesisPrev(c);
   for (let i = 0; i < lines.length; i++) {
