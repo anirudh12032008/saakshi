@@ -22,6 +22,7 @@ function syncDir(dir: string): void {
 }
 
 export function writeDurable(path: string, data: Uint8Array): void {
+  mkdirSync(dirname(path), { recursive: true });     // a fresh profile has no journal/ yet (first run)
   const tmp = `${path}.tmp`;
   const fd = openSync(tmp, 'w');
   try { writeSync(fd, data); fsyncSync(fd); } finally { closeSync(fd); }

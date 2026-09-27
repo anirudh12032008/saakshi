@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { randomBytes } from '@saakshi/core/bytes';
 import { buildChain, demoEntries } from '@saakshi/core/journal';
 import { newKeyPair, signer, verifier } from '@saakshi/core/node';
-import { SeatJournal, type Rec, type Wrapper } from '../src/main/journal-store.ts';
+import { SeatJournal, writeDurable, type Rec, type Wrapper } from '../src/main/journal-store.ts';
 
 const ctx = { exam: 'DEMO-2026', shift: 'S1', attempt: 1, cand: 'C0001' };
 const key = newKeyPair();
@@ -94,4 +94,13 @@ test('append refuses anything that does not extend the chain', () => {
   assert.throws(() => j.append(recs[1]), /seq 3/);
   j.close();
   rmSync(dir, { recursive: true });
+});
+
+test('writeDurable creates a missing parent directory (a fresh profile on first run)', () => {
+  const d = mkdtempSync(join(tmpdir(), 'saakshi-wd-'));
+  try {
+    const p = join(d, 'journal', 'package.json');
+    writeDurable(p, new TextEncoder().encode('{}'));
+    assert.equal(readFileSync(p, 'utf8'), '{}');
+  } finally { rmSync(d, { recursive: true, force: true }); }
 });
