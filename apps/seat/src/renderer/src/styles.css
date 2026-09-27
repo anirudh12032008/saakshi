@@ -82,3 +82,9 @@ button.submit { margin-left: auto; border-color: var(--ink); font-weight: 700; }
 .badge.provisional { border-color: #b06000; color: #7a4100; background: #fef7e0; }
 .badge.refused, .badge.none { border-color: var(--na); color: var(--na); }
 .commit { font: 700 1.5rem/1.3 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .06em; }
+
+.banner { grid-column: 1 / -1; padding: .5rem 1rem; border-bottom: 2px solid; }
+.banner.cell, .banner.link { color: #7a4100; background: #fef7e0; border-color: #b06000; }
+.banner.slow, .banner.paused { color: #0b3d91; background: #e8f0fe; border-color: #1565c0; }
+.badge.credit { color: #0d5222; background: #e6f4ea; }
+.move { margin-top: 1.5rem; border-top: 1px solid var(--line); padding-top: 1rem; }

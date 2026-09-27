@@ -50,25 +50,51 @@ export function Enrol({ boot, t, lang, setLang }: P) {
       <LangToggle lang={lang} setLang={setLang} t={t} />
       <p>{t.enrolNote}</p>
       <form className="gate" onSubmit={submit} noValidate>
-        <label>{t.pin}
-          <input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} aria-describedby="enrol-problem" required />
-        </label>
-        <label>{t.pinConfirm}
-          <input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={confirm} onChange={(e) => setConfirm(e.target.value)} aria-describedby="enrol-problem" required />
-        </label>
-        <fieldset>
-          <legend>{t.gateCheck}</legend>
-          <label>{t.operator}<input value={op} onChange={(e) => setOp(e.target.value)} autoComplete="off" aria-describedby="enrol-problem" required /></label>
-          <label>{t.method}
-            <select value={method} onChange={(e) => setMethod(e.target.value as GateMethod)}>
-              {GATE.map((m) => <option key={m} value={m}>{t.methods[m]}</option>)}
-            </select>
+        <fieldset disabled={boot.moveable}>
+          <label>{t.pin}
+            <input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} aria-describedby="enrol-problem" required />
           </label>
+          <label>{t.pinConfirm}
+            <input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={confirm} onChange={(e) => setConfirm(e.target.value)} aria-describedby="enrol-problem" required />
+          </label>
+          <fieldset>
+            <legend>{t.gateCheck}</legend>
+            <label>{t.operator}<input value={op} onChange={(e) => setOp(e.target.value)} autoComplete="off" aria-describedby="enrol-problem" required /></label>
+            <label>{t.method}
+              <select value={method} onChange={(e) => setMethod(e.target.value as GateMethod)}>
+                {GATE.map((m) => <option key={m} value={m}>{t.methods[m]}</option>)}
+              </select>
+            </label>
+          </fieldset>
+          <button className="primary" disabled={busy}>{t.enrol}</button>
         </fieldset>
-        <button className="primary" disabled={busy}>{t.enrol}</button>
       </form>
       <p id="enrol-problem" role="alert" className="problem">{problem || boot.notice}</p>
+      {boot.moveable && <Move t={t} />}
     </main>
+  );
+}
+
+function Move({ t }: { t: Strings }) {
+  const [pin, setPin] = useState(''), [problem, setProblem] = useState(''), [busy, setBusy] = useState(false);
+  async function submit(ev: FormEvent) {
+    ev.preventDefault();
+    if (!/^[0-9]{6}$/.test(pin)) { setProblem(t.problems.pinDigits); return; }
+    setBusy(true);
+    const r = await window.saakshi.handover(pin);
+    setBusy(false); setPin('');
+    setProblem(r.ok ? '' : r.error);
+  }
+  return (
+    <section className="move" aria-labelledby="move-h">
+      <h2 id="move-h">{t.moveTitle}</h2>
+      <p>{t.moveNote}</p>
+      <form className="gate" onSubmit={submit} noValidate>
+        <label>{t.pin}<input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} aria-describedby="move-problem" required /></label>
+        <button className="primary" disabled={busy}>{t.moveButton}</button>
+      </form>
+      <p id="move-problem" role="alert" className="problem">{problem}</p>
+    </section>
   );
 }
 
@@ -83,6 +109,29 @@ export function Locked({ boot, t, lang, setLang }: P) {
       <p>{t.lockedNote}</p>
       <p className="commit"><span className="sr-only">{t.commitment}: </span>{shortHex(boot.commitment)}</p>
       <p role="status" className="notice">{boot.notice}</p>
+    </main>
+  );
+}
+
+export function Moving({ boot, t, lang, setLang }: P) {
+  return (
+    <main className="start" aria-labelledby="moving-h">
+      <h1 id="moving-h">{t.movingTitle}</h1>
+      <p>{t.candidate}: {boot.cand} · {boot.seatId}</p>
+      <LangToggle lang={lang} setLang={setLang} t={t} />
+      <p>{t.movingNote}</p>
+      <p className="commit"><span>{t.yourKey}: </span>{shortHex(boot.moveKey)}</p>
+      <p role="status" className="notice">{boot.notice}</p>
+    </main>
+  );
+}
+
+export function Moved({ boot, t }: P) {
+  return (
+    <main className="start" aria-labelledby="moved-h">
+      <h1 id="moved-h">{t.movedTitle}</h1>
+      <p>{t.candidate}: {boot.cand} · {boot.seatId}</p>
+      <p role="alert">{t.movedNote}</p>
     </main>
   );
 }

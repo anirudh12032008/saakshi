@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Action, ExamBoot, ItemState, Lang, Paper, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
-import { clearResponse, fmtRemaining, GLYPH, legendCounts, markAndNext, PALETTE_STATES, saveAndNext, tickOf, visitAction } from './exam-state.ts';
+import type { Action, Credit as CreditView, ExamBoot, ItemState, Lang, Paper, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
+import { bannerOf, clearResponse, fmtRemaining, GLYPH, legendCounts, markAndNext, mmss, PALETTE_STATES, saveAndNext, tickOf, visitAction } from './exam-state.ts';
 import { FaceChip } from './FaceChip.tsx';
-import { Connecting, Enrol, LangToggle, Locked, TestBanner } from './Gate.tsx';
+import { Connecting, Enrol, LangToggle, Locked, Moved, Moving, TestBanner } from './Gate.tsx';
 import { T, type Strings } from './i18n.ts';
 import { Palette } from './Palette.tsx';
 import { Slip } from './Slip.tsx';
@@ -26,6 +26,8 @@ export function App() {
   else if (!boot) body = <p>…</p>;
   else if (boot.phase === 'connecting') body = <Connecting boot={boot} {...g} />;
   else if (boot.phase === 'enrol') body = <Enrol boot={boot} {...g} />;
+  else if (boot.phase === 'moving') body = <Moving boot={boot} {...g} />;
+  else if (boot.phase === 'moved') body = <Moved boot={boot} {...g} />;
   else if (boot.phase === 'locked') body = <Locked boot={boot} {...g} />;
   else if (!paper) body = <p>…</p>;
   else body = <Exam boot={boot} paper={paper} {...g} />;
@@ -150,11 +152,13 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
         <div role="timer" aria-live="off" className={remaining < 5 * 60_000 ? 'timer low' : 'timer'}>
           <span className="sr-only">{t.timeLeft} </span>{fmtRemaining(remaining)}
         </div>
+        {boot.credited && <Credit c={boot.credited} t={t} />}
         <LangToggle lang={lang} setLang={setLang} t={t} />
         <SyncStatus v={sync} t={t} />
         <FaceChip label={t.faces} unavailable={t.cameraOff} off={!boot.camera} offLabel={t.cameraTest} />
         <button className="submit" onClick={() => setConfirming(true)}>{t.submit}</button>
       </header>
+      <Banner boot={boot} sync={sync} t={t} />
       <main className="question" aria-labelledby="qh">
         <h2 id="qh" ref={heading} tabIndex={-1}>
           {t.question} {idx + 1}
@@ -181,6 +185,18 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
   );
 }
 
+function Banner({ boot, sync, t }: { boot: ExamBoot; sync: SyncView; t: Strings }) {
+  const b = bannerOf(boot.status, sync, boot.paused ?? false);
+  if (!b) return null;
+  return (
+    <div className={`banner ${b.kind}`} role="status" aria-live="polite">
+      <strong>{t.banner[b.kind]}</strong>{b.etaMs !== undefined && <> {t.eta(mmss(b.etaMs))}</>} {t.preserved(sync.local, sync.relay, sync.cell)}
+    </div>
+  );
+}
+function Credit({ c, t }: { c: CreditView; t: Strings }) {
+  return <span className="badge credit">{c.approvedBy ? t.credited(mmss(c.ms), c.approvedBy) : t.awaitingApproval(mmss(c.ms))}</span>;
+}
 function SyncStatus({ v, t }: { v: SyncView; t: Strings }) {
   return (
     <div className="sync">

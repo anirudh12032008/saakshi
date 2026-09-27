@@ -1,7 +1,7 @@
 import type { State } from '@saakshi/core/protocol';
 import type { BindState, GateMethod, Lang } from '../../shared/ipc.ts';
 import type { EnrolProblem } from './enrol-state.ts';
-import type { Tick } from './exam-state.ts';
+import type { BannerKind, Tick } from './exam-state.ts';
 
 export interface Strings {
   title: string; candidate: string; form: string; start: string; startNote: string; question: string;
@@ -15,6 +15,9 @@ export interface Strings {
   methods: Record<GateMethod, string>; enrol: string; problems: Record<Exclude<EnrolProblem, ''>, string>;
   lockedTitle: string; lockedNote: string; commitment: string; bind: Record<BindState, string>;
   unlocked: string; viaCode: string; provisional: string; testBanner: string;
+  banner: Record<BannerKind, string>; eta: (t: string) => string; preserved: (local: number, relay: number, cell: number) => string;
+  moveTitle: string; moveNote: string; moveButton: string; movingTitle: string; movingNote: string; yourKey: string;
+  movedTitle: string; movedNote: string; credited: (t: string, by: string) => string; awaitingApproval: (t: string) => string;
 }
 
 export const T: Record<Lang, Strings> = {
@@ -53,6 +56,24 @@ export const T: Record<Lang, Strings> = {
     viaCode: '(unlocked at this centre with the code phoned in by the superintendent)',
     provisional: 'provisional',
     testBanner: 'TEST MODE — not for real exams (journal key not in the OS keychain)',
+    banner: {
+      cell: 'The exam server is being restored from the centre\'s copy.',
+      link: 'The centre\'s link to the exam server is down.',
+      slow: 'The centre\'s link to the exam server is slow.',
+      paused: 'This computer was asleep or locked, so your timer was paused.',
+    },
+    eta: (t) => `Expected back in about ${t}.`,
+    preserved: (l, r, c) => `Your time and answers are preserved: ${l} saved on this computer · ${r} at the centre · ${c} at the exam server.`,
+    moveTitle: 'Continue on this computer',
+    moveNote: 'You are checked in on another computer. If it failed, type your PIN. The invigilator approves the move, and your answers and time come back here.',
+    moveButton: 'Ask to continue here',
+    movingTitle: 'Waiting for the invigilator',
+    movingNote: 'The invigilator is checking your admit card and will approve the move at the centre console.',
+    yourKey: 'This computer\'s key (the invigilator compares it)',
+    movedTitle: 'You have moved to another computer',
+    movedNote: 'Your exam continues on the other computer. Nothing typed here counts. Please call the invigilator.',
+    credited: (t, by) => `+${t} credited · approved by ${by}`,
+    awaitingApproval: (t) => `+${t} credited · awaiting approval`,
   },
   hi: {
     title: 'साक्षी परीक्षा', candidate: 'अभ्यर्थी', form: 'प्रश्न-पत्र', start: 'परीक्षा शुरू करें',
@@ -89,5 +110,23 @@ export const T: Record<Lang, Strings> = {
     viaCode: '(अधीक्षक द्वारा फ़ोन पर बताए गए कोड से इसी केंद्र पर खोला गया)',
     provisional: 'अस्थायी',
     testBanner: 'परीक्षण मोड — असली परीक्षा के लिए नहीं (जर्नल कुंजी OS कीचेन में नहीं है)',
+    banner: {
+      cell: 'परीक्षा सर्वर को केंद्र की प्रति से बहाल किया जा रहा है।',
+      link: 'केंद्र का परीक्षा सर्वर से संपर्क टूट गया है।',
+      slow: 'केंद्र का परीक्षा सर्वर से संपर्क धीमा है।',
+      paused: 'यह कंप्यूटर सो गया था या लॉक था, इसलिए आपका समय रुका रहा।',
+    },
+    eta: (t) => `लगभग ${t} में वापस आने की उम्मीद है।`,
+    preserved: (l, r, c) => `आपका समय और उत्तर सुरक्षित हैं: इस कंप्यूटर पर ${l} · केंद्र पर ${r} · परीक्षा सर्वर पर ${c} सहेजे गए।`,
+    moveTitle: 'इस कंप्यूटर पर जारी रखें',
+    moveNote: 'आपका चेक-इन किसी दूसरे कंप्यूटर पर है। यदि वह खराब हो गया है, तो अपना PIN टाइप करें। निरीक्षक स्थानांतरण स्वीकृत करेंगे, और आपके उत्तर व समय यहाँ वापस आ जाएँगे।',
+    moveButton: 'यहाँ जारी रखने का अनुरोध करें',
+    movingTitle: 'निरीक्षक की प्रतीक्षा',
+    movingNote: 'निरीक्षक आपका प्रवेश पत्र जाँच रहे हैं और केंद्र कंसोल पर स्थानांतरण स्वीकृत करेंगे।',
+    yourKey: 'इस कंप्यूटर की कुंजी (निरीक्षक इसका मिलान करेंगे)',
+    movedTitle: 'आप दूसरे कंप्यूटर पर चले गए हैं',
+    movedNote: 'आपकी परीक्षा दूसरे कंप्यूटर पर जारी है। यहाँ टाइप किया गया कुछ भी नहीं गिना जाएगा। कृपया निरीक्षक को बुलाएँ।',
+    credited: (t, by) => `+${t} जोड़ा गया · ${by} द्वारा स्वीकृत`,
+    awaitingApproval: (t) => `+${t} जोड़ा गया · स्वीकृति की प्रतीक्षा`,
   },
 };

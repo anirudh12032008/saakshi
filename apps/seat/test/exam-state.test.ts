@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ItemState, SyncView } from '../src/shared/ipc.ts';
-import { clearResponse, displayState, fmtRemaining, legendCounts, markAndNext, saveAndNext, slipCode, tickOf, visitAction } from '../src/renderer/src/exam-state.ts';
+import { bannerOf, clearResponse, displayState, fmtRemaining, legendCounts, markAndNext, mmss, saveAndNext, slipCode, tickOf, visitAction } from '../src/renderer/src/exam-state.ts';
 import { T } from '../src/renderer/src/i18n.ts';
 
 const v: SyncView = { local: 10, relay: 7, cell: 4, online: true, error: '' };
@@ -51,6 +51,26 @@ test('the first display of an item with no journaled state is journaled as visit
 
 test('the slip code is grouped in fours for copying by hand', () => {
   assert.equal(slipCode('N5JY1E59BR0FGNVQW'), 'N5JY-1E59-BR0F-GNVQ-W');
+});
+
+test('the in-exam banner: paused beats everything; a rebuilding server carries its ETA; a down link or an offline seat; a slow link; else none', () => {
+  const sync = { local: 46, relay: 46, cell: 31, online: true, error: '' };
+  assert.deepEqual(bannerOf(undefined, sync, true), { kind: 'paused' });
+  assert.deepEqual(bannerOf({ link: 'up', cell: 'REBUILDING', etaMs: 90_000, at: 0 }, sync, false), { kind: 'cell', etaMs: 90_000 });
+  assert.deepEqual(bannerOf({ link: 'down', cell: 'unreachable', at: 0 }, sync, false), { kind: 'link' });
+  assert.deepEqual(bannerOf({ link: 'up', cell: 'LIVE', at: 0 }, { ...sync, online: false }, false), { kind: 'link' });
+  assert.deepEqual(bannerOf({ link: 'degraded', cell: 'LIVE', at: 0 }, sync, false), { kind: 'slow' });
+  assert.equal(bannerOf({ link: 'up', cell: 'LIVE', at: 0 }, sync, false), null);
+  assert.equal(mmss(108_000), '1:48');
+});
+
+test('the Stage 4 strings exist in EN and HI and read the tick counts', () => {
+  for (const l of ['en', 'hi'] as const) {
+    assert.match(T[l].preserved(46, 46, 31), /46.*46.*31/);
+    assert.match(T[l].credited('1:48', 'INV-42-A'), /1:48.*INV-42-A/);
+    assert.ok(T[l].banner.cell && T[l].banner.link && T[l].banner.slow && T[l].banner.paused && T[l].moveTitle && T[l].movedTitle);
+  }
+  assert.match(T.hi.movingTitle, /[ऀ-ॿ]/);
 });
 
 test('every new string exists in both languages; the Hindi count puts the total first', () => {

@@ -1,4 +1,5 @@
 import type { State } from '@saakshi/core/protocol';
+import type { CentreStatus } from '@saakshi/core/ops';
 import type { Action, ItemState, SyncView } from '../../shared/ipc.ts';
 
 export type Tick = 'none' | 'local' | 'relay' | 'cell';
@@ -49,3 +50,14 @@ export function visitAction(item: string, cur: ItemState | undefined): Action | 
 
 /** N5JY1E59BR0FGNVQW → N5JY-1E59-BR0F-GNVQ-W (decoding ignores the dashes). */
 export const slipCode = (code: string): string => code.replace(/(.{4})(?=.)/g, '$1-');
+
+export type BannerKind = 'cell' | 'link' | 'slow' | 'paused';
+/** The in-exam banner (plan §3.10): the cause, an ETA when the relay can estimate one. The tick counts come from the sync view. */
+export function bannerOf(status: CentreStatus | undefined, sync: SyncView, paused: boolean): { kind: BannerKind; etaMs?: number } | null {
+  if (paused) return { kind: 'paused' };
+  if (status?.cell === 'REBUILDING') return status.etaMs !== undefined ? { kind: 'cell', etaMs: status.etaMs } : { kind: 'cell' };
+  if (status?.link === 'down' || !sync.online) return { kind: 'link' };
+  if (status?.link === 'degraded') return { kind: 'slow' };
+  return null;
+}
+export const mmss = (ms: number): string => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
