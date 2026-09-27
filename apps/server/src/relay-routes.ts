@@ -13,10 +13,24 @@ import type { ReleaseStore } from './release-store.ts';
 import type { Routes } from './serve.ts';
 import type { Hub } from './sse.ts';
 
-/** DEV chaos: "Cut Centre 42's link". While down, nothing from this relay reaches its cell. */
+/** DEV chaos: "Cut Centre 42's link" (up = false) and "Degrade Centre 42's link" (a growing delay, some requests lost). */
 export class Wan {
   up = true;
-  wrap(send: CellSend): CellSend { return (req) => (this.up ? send(req) : Promise.reject(new Error('WAN down (DEV chaos)'))); }
+  degraded = false;
+  #delay = 0;
+  #rand: () => number;
+  #sleep: (ms: number) => Promise<unknown>;
+  constructor(o: { rand?: () => number; sleep?: (ms: number) => Promise<unknown> } = {}) { this.#rand = o.rand ?? Math.random; this.#sleep = o.sleep ?? ((ms) => Bun.sleep(ms)); }
+  wrap(send: CellSend): CellSend {
+    return async (req) => {
+      if (!this.up) throw new Error('WAN down (DEV chaos)');
+      if (!this.degraded) { this.#delay = 0; return send(req); }
+      this.#delay = Math.min(4_000, this.#delay + 250);                               // under httpCellSend's 5 s timeout
+      await this.#sleep(this.#delay);
+      if (this.#rand() < 0.3) throw new Error('WAN degraded (DEV chaos): request lost');
+      return send(req);
+    };
+  }
 }
 
 export interface RelayOpts {
