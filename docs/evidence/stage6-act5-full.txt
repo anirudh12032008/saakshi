@@ -1,24 +1,6 @@
-STATUS: PENDING — the 20k run did NOT complete (2026-09-28, this Mac).
-The export stage passed: 19,811 candidates, 2,010,880 entries, and 1,981,100 export rows equal to swarmCohort on every radar field.
-Then /v1/analytics/run returned 502: the incident posted by the act5 script puts the disruption at CEN042/S1, but CEN042 is the real demo centre and is removed from the 20k swarm cohort (the 20k golden puts the outage at CEN002).
-This is a bug in how act5.ts --full builds the incident. It is not fixed here. Headline not produced; the 20k numbers (pytest golden, -m full) are in stage6-pytest.txt.
+STATUS: PASS — bun tools/act5.ts --full, 2026-09-27T19:35:02Z, darwin-arm64, after fix f807cbd.
+ACT5-NUMBERS {"twin":"20k","headline":"Compensated 0 · Re-tested 225 · Re-conducted 3 centres · Spared 18,994 · ₹ avoided 2,84,91,000","flags":322,"annotated":322,"corroborated":55,"rows":1981100,"runSeconds":114.677,"totalSeconds":935,"host":"darwin-arm64"}
+PASS
 
---- raw output ---
-wrote 20000 candidates x 100 items to /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act5-fC48xv/g1
-gen-paper-g1: wrote /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act5-fC48xv/paper/{bank,forms,key}.json (100 items)
-✓ G1 twin (20k, seed 7) and its 100-item paper
-provision: 189 cohort candidates at CEN042 not replayed (CEN042 is the real centre)
-✓ stack up (3 cells, CEN042's relay, control on templates, the swarm: 19811 candidates); released by NTA + NIC
-✓ 19811 candidates submitted on G1's clock (2010880 entries, 744 s)
-✓ export rows equal swarmCohort rows on radar fields: 1981100 rows, every one equal
-29 |   return { proc, out };
-30 | }
-31 | 
-32 | export async function call<T>(url: string, method = 'GET', body?: unknown): Promise<T> {
-33 |   const r = await fetch(url, { method, headers: body === undefined ? {} : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
-34 |   if (!r.ok) throw new Error(`${method} ${url} → ${r.status} ${await r.text()}`);
-                            ^
-error: POST http://127.0.0.1:58604/v1/analytics/run → 502 {"error":"pipeline failed: pipeline: disruption at 'CEN042/S1': no such centre-shift in the cohort"}
-      at call (/Users/anirudh/probtester/tools/procs.ts:34:24)
-
-Bun v1.3.14 (macOS arm64)
+The headline equals the pinned 20k golden (analytics/tests/test_act5.py FULL_HEADLINE).
+Earlier attempt (before f807cbd): the export matched on 1,981,100 rows, but the run failed because a live RELAY_WAN_DOWN at CEN042 (the demo centre, absent from the 20k swarm cohort) became a disruption at a missing centre-shift. Fix: outages at centres with no candidates in the export are dropped.
