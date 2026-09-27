@@ -1,4 +1,4 @@
-# saakshi-analytics: G1/G2 generators, radar (A1 / M11, A3 / S1) and thin decision engine (A2 / M12)
+# saakshi-analytics: G1/G2 generators, radar (A1 / M11, A3 / S1), decision engine (A2 / M12, A4 / S2) and centre scorecard (A4 / S4)
 
 ## Generate a cohort
 
@@ -174,7 +174,7 @@ On G1 the CUSUM dates the mid-exam leak at 45 min, which is when it was planted.
 - **G2 is independent in its noise and pacing, not in its structure.** It shares G1's item model, room layout and look-alike design, and it was written by the same team as the radar. It is a stronger out-of-sample check than G1, not field data.
 - **The G2 misses are real.** Leak buyers who pace themselves at 2.5× sit inside G2's heavier fast tail, so signal 1 recall falls to 0.59. The staggered 60-min mid-exam leak reaches each candidate's items late, so 30% of mid-exam recipients are missed (most likely too few of their fast-and-correct answers fall after the detected change point). Ring recall falls to 0.77 with 80% copying.
 - **Signal 3 needs density.** One cell has only one room's answers (~67), so a leak shows up only when several people in that room have it. In the 2k test cohort, 6 mid-exam recipients per room are invisible to it. The tests therefore plant a dense mid-exam leak in an honest room.
-- **The decision engine's tier-1 test still reads only `speed-accuracy` as the leak signal** (`policy.tier1.leakSignal`). Signal 3 flags go to human review like any other flag, but they don't yet count towards (a) or (b).
+- **Since A4, the decision engine's tier-1 test counts signal 1 OR signal 3 as leak evidence** (`policy.tier1.leakSignal`). See "Controller decision" in the A4 section for the effect on each golden case.
 
 ## Decision engine (A2 / M12)
 
@@ -215,8 +215,12 @@ It is labelled **ILLUSTRATIVE**: every threshold is a committee parameter. The r
 | `gapCapMin` | 30 | Credited gaps up to this total are compensated; beyond it, the candidate is re-tested (§3.6) |
 | `reviewGapCount` | 2 | Two or more gaps raise a review flag |
 | `tier1.systemicRoomShare` | 0.5 | (a) holds if the breach is evidenced (perimeter ∪ rooms with radar leak flags) in at least this share of centre-shifts |
-| `tier1.leakSignal` | `speed-accuracy` | The radar signal that marks leak beneficiaries |
+| `tier1.leakSignal` | `["speed-accuracy", "cusum"]` | The radar signals that mark leak beneficiaries (signal 1 OR signal 3, since A4). A single string still works |
 | `tier1.maxLeakFlagShareOutsidePerimeter` | 0.1 | (b) holds if at most this share of leak flags falls outside the declared perimeter |
+| `tier1.maxLeakedItemShare` | 0.1 | Re-score branch: a widespread leak of at most this share of the paper is dropped for everyone (A4) |
+| `comparability` | δ ±0.05, α 0.05, N_min 30 | TOST margin on the post-disruption residual score, its α, and the smallest group tested (A4) |
+| `scoring` | +4 / −1 | Marking scheme for re-scoring (A4) |
+| `retest` | RT1, 08:30 | Re-test session printed on the mock admit cards (A4) |
 | `cost.reexamPerCandidateInr` | 1500 | Illustrative per-candidate re-exam cost for "₹ avoided". Not an NTA figure |
 
 ### Rules
@@ -225,6 +229,7 @@ It is labelled **ILLUSTRATIVE**: every threshold is a committee parameter. The r
    - (a) *Systemic*: the committee declares it, **or** the perimeter is `"unknown"`, **or** the evidenced rooms reach `systemicRoomShare`.
    - (b) *Separable*: a perimeter is declared **and** the radar's leak flags stay inside it (at most `maxLeakFlagShareOutsidePerimeter` outside). With no flags, it rests on the declared perimeter.
    - Full re-conduct only when (a) holds and (b) does not. Otherwise only the perimeter's centre-shifts are re-conducted, and leak flags outside it are referred to the committee.
+   - (c) Leak branch (A4): see "Leak branches" below. The one override is re-scoring: a widespread leak of at most 10% of the items is dropped for everyone, and nothing is re-conducted.
 2. **Per candidate** (not in a re-conducted room):
    - Left, or cannot resume → re-test.
    - Credited gap within the cap → compensate, with extra time equal to the gap.
@@ -279,5 +284,238 @@ Human sign-off: PENDING  name / role / date: ______________
 ### Decision-engine caveats
 
 - **Separability is a proxy.** It rests on the declared perimeter plus the radar's leak flags, whose recall is about 0.85. It says the known beneficiaries sit inside the perimeter; it cannot prove that none sit outside it.
-- **Leak branches are not built yet.** Re-scoring without leaked items, TOST comparability and the re-test allocator are S2 (A4). A separable breach here always re-conducts its perimeter.
 - **The ₹ figure is only as good as `cost.reexamPerCandidateInr`,** and the counterfactual is stated in the report.
+
+## A4 (S2): decision hardening
+
+```sh
+uv run python -m saakshi_analytics.decide --policy policy.illustrative.json \
+    --incident golden/cuet-2026.incident.json --cohort OUT/cohort.jsonl \
+    --key OUT/key.json --centres centres.mock.json --tickets golden/tickets.jsonl \
+    --admit-cards cards.txt [--flags OUT/flags.json] [--json report.json]
+```
+
+Each new input is optional. The M12 report is unchanged without them.
+
+- `--key` loads the responses and turns on comparability and re-scoring.
+- `--centres` turns on the re-test allocator.
+- `--tickets` lists the open dispute tickets.
+- Every file passed is hashed into the evidence block.
+
+### What S2 adds
+
+- **Comparability (TOST).** Each compensated centre-shift is one group.
+  - Per candidate, the residual score is the mean of (correct − P(correct | item, ability decile)) over the items first answered after the disruption began. The decile and P come from the radar's `features`.
+  - The group is compared with every undisturbed candidate on the same items and window, using two one-sided Welch t-tests with margin ±0.05 (5 points of proportion correct) and α 0.05.
+  - The result is *equivalent* when both one-sided tests reject.
+  - A group smaller than `N_min` = 30, or one that is *not equivalent*, goes to the committee. Nothing is automatic.
+- **Leak branches** (tier-1 reason (c)):
+
+  | Situation | Branch | Action |
+  |---|---|---|
+  | Not systemic | `localised` | Re-conduct the perimeter's centre-shifts |
+  | Systemic, `breach.items` declared and ≤ 10% of the paper | `rescore` | Re-score everyone without those items; nothing is re-conducted |
+  | Systemic and not separable (and no re-scorable item list) | `full` | Full re-conduct |
+  | Systemic but separable | `separable` | Re-conduct the perimeter's centre-shifts |
+
+  `breach.items` is the committee's list of leaked items (for example, the items on the leaked copy). With items but no `--key`, the engine refuses to run.
+- **Scoring.**
+  - Raw = +4 per correct and −1 per wrong (`policy.scoring`).
+  - Equating is NTA-style percentile normalisation *within each shift*: 100 × (number in the shift with raw ≤ yours) / shift size.
+  - The re-test session is percentile-normalised within itself, as stated on each admit card.
+- **Re-test allocator** (greedy).
+  - PwD candidates go first, then the rest by id.
+  - Each candidate takes the nearest centre (from their home centre) that has a spare seat, offers their language, and has PwD access if they need it.
+  - If no centre qualifies, the candidate goes to the committee.
+  - Centre locations (a km grid), spare seats, access and languages are mocked in `centres.mock.json`.
+  - The output is the roster (in the report and the JSON) plus mock text admit cards (`--admit-cards`), each with a short integrity hash.
+- **Dispute tickets.**
+  - A candidate's "raise objection" calls `decide.objection(cand, item, receipt, reason)`.
+  - It returns `{"ticket": "OBJ-<hash[:10]>", "cand", "item", "receipt", "reason", "status": "open", "hash"}`, where `hash` = sha256 of the canonical JSON of cand, item, receipt and reason.
+  - The engine lists every open ticket and re-checks its hash (`hash ok` / `HASH MISMATCH`). A ticket for an unknown candidate is rejected.
+  - `golden/tickets.jsonl` holds two examples.
+- **Report line** kept verbatim: `Compensated N · Re-tested M · Re-conducted K centres · Spared S · ₹ avoided`. JSON `summary` also has `rescored` and `openTickets`.
+
+### Full decision report: CUET-2026 replay with roster, comparability and tickets (G1 small cohort, seed 7)
+
+```
+SAAKSHI DECISION REPORT: CUET-2026 replay
+policy saakshi-decision-policy v1: ILLUSTRATIVE: every threshold here is a committee parameter, ...
+
+Compensated 161 · Re-tested 29 · Re-conducted 0 centres · Spared 160 · ₹ avoided 2,40,000
+
+Tier 1, the NEET-UG 2024 Supreme Court test (full re-conduct only if (a) systemic AND NOT (b) separable):
+  no breach alleged: tier 1 does not apply
+  => no full re-conduct
+Re-conduct: 0 centre-shifts, 0 candidates
+Compensate 161: extra time = credited gap, 8-30 min (total 3048 min); per-candidate list in --json
+Re-test 29:
+  C00137  left the centre or could not resume
+  ... (29 rows, as in A2)
+Re-test roster (29; greedy: PwD first, nearest centre with a seat, language, access):
+  cand     from    -> to       km    lang pwd
+  C00137  CEN007 -> CEN008   15.6  hi   no
+  C00200  CEN002 -> CEN002    0.0  hi   no
+  C00220  CEN004 -> CEN004    0.0  en   no
+  C00454  CEN007 -> CEN007    0.0  en   no
+  C00487  CEN007 -> CEN007    0.0  en   no
+  C00542  CEN002 -> CEN002    0.0  en   no
+  C00603  CEN004 -> CEN004    0.0  en   no
+  C00664  CEN004 -> CEN004    0.0  en   no
+  C00760  CEN002 -> CEN002    0.0  hi   no
+  C00796  CEN007 -> CEN006   18.7  ta   no
+  C00863  CEN004 -> CEN004    0.0  en   no
+  C00954  CEN004 -> CEN004    0.0  en   no
+  C01020  CEN002 -> CEN002    0.0  hi   no
+  C01115  CEN004 -> CEN005   14.4  en   no
+  C01160  CEN002 -> CEN001    8.5  en   no
+  C01291  CEN007 -> CEN007    0.0  en   no
+  C01312  CEN004 -> CEN005   14.4  en   no
+  C01329  CEN002 -> CEN001    8.5  hi   no
+  C01352  CEN007 -> CEN008   15.6  en   no
+  C01396  CEN002 -> CEN001    8.5  en   no
+  C01519  CEN007 -> CEN008   15.6  en   no
+  C01529  CEN004 -> CEN005   14.4  hi   no
+  C01545  CEN002 -> CEN001    8.5  en   no
+  C01739  CEN007 -> CEN008   15.6  en   no
+  C01782  CEN004 -> CEN005   14.4  en   no
+  C01938  CEN007 -> CEN008   15.6  en   no
+  C01955  CEN004 -> CEN005   14.4  en   no
+  C01962  CEN002 -> CEN001    8.5  hi   no
+  C01964  CEN007 -> CEN008   15.6  en   no
+Comparability (TOST on post-disruption residual scores):
+  CEN001/S3  n=1    from 0 min: committee (n = 1 < N_min = 30)
+  CEN002/S1  n=55   from 40 min: equivalent (diff -0.011, p 4.9e-05)
+  CEN004/S1  n=55   from 40 min: equivalent (diff +0.004, p 1.6e-10)
+  CEN007/S1  n=50   from 40 min: equivalent (diff -0.007, p 1.8e-05)
+Human review 7 (nothing is auto-penalised):
+  C00354  2 gaps (review at >= 2)
+  C00672  2 gaps (review at >= 2)
+  C00720  2 gaps (review at >= 2)
+  C01131  2 gaps (review at >= 2)
+  C01424  2 gaps (review at >= 2)
+  C01649  2 gaps (review at >= 2)
+  C01844  2 gaps (review at >= 2)
+Open dispute tickets 2:
+  OBJ-2eeaaefcd1  C00036 I07 receipt RC-2B91-E04D: After resuming on a spare seat my timer showed 15 minutes less than the credited gap  [hash ok]
+  OBJ-3714f3e903  C00200 I12 receipt RC-7F3A-19C2: The Hindi text of I12 points to a different option than the English text  [hash ok]
+Assumptions:
+  - ₹ avoided = spared × ₹1,500 per candidate re-exam, from policy.cost. ...
+  - spared = candidates in the counterfactual who are not re-examined; counterfactual = a blanket re-exam of every candidate in the disrupted centre-shifts
+  - credited gaps come from the M6 gap journal; a candidate in a disrupted centre-shift with no journal ...
+  - comparability: TOST (two one-sided Welch t-tests) on post-disruption residual scores, each compensated centre-shift vs every undisturbed candidate, margin ±0.05, alpha 0.05; groups under N_min = 30 go to the committee
+  - re-test seats: greedy, PwD first, nearest centre with a spare seat, the candidate's language and access (mock centre fixture); re-test scores are percentile-normalised within the re-test session
+Evidence (sha256): policy, incident, cohort, key, centres, tickets
+Human sign-off: PENDING  name / role / date: ______________
+```
+
+Notes on this report:
+
+- All 29 re-test candidates get a seat. Home centres fill first: CEN007 has only 3 spare seats, so the other English-medium candidates move 15.6 km to CEN008.
+- C00137 (Hindi) moves because CEN007 has no Hindi medium. C00796 (Tamil) goes to CEN006, the nearest Tamil centre.
+- No re-test candidate in this case is PwD. The PwD-first rule is pinned by `test_allocator_is_greedy_nearest_with_seats_pwd_and_language`.
+- The one unrelated 15-min seat gap (CEN001/S3, n = 1) is below N_min, so it goes to the committee.
+- All three disrupted rooms pass TOST: the synthetic cohort has no real disruption effect. `test_comparability_catches_a_group_that_was_hurt_after_the_disruption` doctors CEN002/S1 (every post-40-min correct answer made wrong) and checks that the room turns *not equivalent* while the others stay *equivalent*.
+
+One mock admit card:
+
+```
+==== SAAKSHI RE-TEST ADMIT CARD (MOCK) ====
+Candidate   C00137
+Session     RT1 (illustrative date) · report by 08:30
+Centre      CEN008 · Mock Centre 8 (illustrative)
+Travel      15.6 km from CEN007
+Medium      hi
+PwD         no
+Scoring     percentile-normalised within the re-test session
+Card hash   28d44927eb7c8c23
+```
+
+### Golden case `rescore-items` (new)
+
+- **Incident:** 10 items (I02 … I56, half of G1's leaked set) circulated on a public channel an hour before the exam. The perimeter is unknown and the leak is declared systemic.
+- **Result:** 10/100 = 10% ≤ 10%, so the **re-score** branch applies.
+- **Headline:** Compensated 0 · Re-tested 0 · Re-conducted 0 centres · Spared 2000 · ₹ avoided 30,00,000. The same incident with 11 items goes to full re-conduct (`test_leak_branches`).
+- **Effect on scores:**
+  - The 30 G1 leak buyers drop **−9.4 percentile points** on average.
+  - Everyone else moves **+0.17** on average (median |Δ| 1.3, which is equating noise).
+  - The largest single drop is −13.9.
+
+### Controller decision: tier-1 leak evidence = signal 1 OR signal 3
+
+`policy.tier1.leakSignal` is now `["speed-accuracy", "cusum"]`, because signal 3 is the item-leak detector. The table shows the effect on each golden case (2k G1 cohort, radar at its default thresholds, flags supplied).
+
+| Case | Before (signal 1 only) | After (signal 1 or 3) | Effect |
+|---|---|---|---|
+| `cuet-2026` | no breach; 161 / 29 / 0 / 160 | identical | None: tier 1 does not apply |
+| `neet-2024-separable` | (a) no, 10/30; (b) yes, 0/29 outside; re-conduct 10 centre-shifts, spared 1318 | identical, (b) now reads "0/29 radar speed-accuracy or cusum flags" | None |
+| `systemic` | (a) yes; (b) no, 20/29 outside; full re-conduct | identical, 20/29 | None |
+| `rescore-items` | perimeter unknown; re-score | identical | None: an unknown perimeter uses no flags |
+
+- **Why nothing moves:** on the 2k cohort the radar raises **0** signal-3 flags. It raises 29 signal-1 and 24 signal-2 flags. At 2k a cell holds about 67 answers, and the leak is too sparse per room for the CUSUM (see the A3 caveat "Signal 3 needs density"). So the leak-flag set is the same under both policies.
+- **Where the change does bite:** `test_cusum_flags_now_count_towards_separability` shows CUSUM-only flags outside the perimeter now make (b) fail. `test_a_single_string_leak_signal_still_works` shows they did not count under the old policy.
+- **At 20k (not run as a golden case):** signal 3 catches the mid-exam leak that signal 1 half-misses (A3). Those extra flags sit inside the NEET perimeter (CEN008/S2 in the 2k layout), which would strengthen (b) rather than break it. This is an expectation, not a measurement.
+
+## A4 (S4): predicted centre risk and the scorecard
+
+```sh
+uv run python -m saakshi_analytics.scorecard [--centres 10] [--seed 7] [--telemetry drill.json] [--json scorecard.json]
+```
+
+- **Synthetic centre histories** (`scorecard.simulate(n, seed)`).
+  - Each centre has four latent fragilities: network, power, disk and management.
+  - They drive both its T−1 mock-drill telemetry and whether it has an exam-day incident.
+  - The telemetry is heartbeat jitter p95 (ms), UPS/battery backup (min), free disk (%), and past incidents in the last 5 exams.
+  - The telemetry is noisy, and incidents are Bernoulli: any cause can fire.
+- **Model.** Logistic regression (L2, scipy BFGS) on standardised, risk-ward features. It is fitted on 4,000 histories (seed 1).
+  - The top 3 reasons for a centre are its three largest per-feature contributions w·z, each shown against the fleet median.
+- **Scorecard.** The ranking puts P ≥ 0.5 at **do not allot**, P ≥ 0.2 at **add observer**, and the rest at **allot**. These are illustrative committee cut-offs.
+  - `scorecard.claude_note_hook(row)` is the named hook for Claude's explanatory note (S3: aggregated, pseudonymous facts only). No LLM is called; it returns template text, and `scorecard(model, telemetry, note=...)` swaps it.
+- **`--telemetry`** scores real drill telemetry, given as a JSON list of `{centre, jitterMs, upsMin, diskFreePct, pastIncidents}`, instead of the synthetic fleet.
+
+### Risk-model precision (fitted on seed 1, measured on 4,000 independent histories, seed 2)
+
+| Label | Centres | Later had an incident | Precision | Recall | Lift over base rate 0.138 |
+|---|---|---|---|---|---|
+| At risk (P ≥ 0.2: add observer or worse) | 787 | 228 | **0.290** | 0.413 | 2.1× |
+| Do not allot (P ≥ 0.5) | 44 | 23 | **0.523** | 0.042 | 3.8× |
+
+The tests assert precision ≥ 1.8× the base rate and ≥ 0.25, and that the stricter label is the more precise.
+
+### Scorecard sample (synthetic fleet, seed 7, 10 centres; notes shown for the first row only)
+
+```
+SAAKSHI CENTRE SCORECARD (predicted risk from T-1 mock-drill telemetry; ILLUSTRATIVE cut-offs)
+do not allot at P >= 50% · add observer at P >= 20% · otherwise allot
+
+  1. CEN005  risk 23.2%  ADD OBSERVER
+       raises risk: 2 incident(s) in the last 5 exams (fleet median 0)
+       raises risk: heartbeat jitter p95 43 ms (fleet median 30)
+       raises risk: UPS/battery backup 35 min (fleet median 40)
+       note: CEN005 is ranked 1 with predicted incident risk 23%: add observer. Main drivers: ...
+  2. CEN002  risk 18.2%  ALLOT
+       raises risk: UPS/battery backup 28 min (fleet median 40)
+       raises risk: 1 incident(s) in the last 5 exams (fleet median 0)
+       raises risk: heartbeat jitter p95 33 ms (fleet median 30)
+  3. CEN008  risk 17.3%  ALLOT
+       raises risk: heartbeat jitter p95 65 ms (fleet median 30)
+       raises risk: 2 incident(s) in the last 5 exams (fleet median 0)
+       lowers risk: disk free 74% (fleet median 55%)
+  ...
+ 10. CEN009  risk  2.2%  ALLOT
+       raises risk: disk free 42% (fleet median 55%)
+       lowers risk: 0 incident(s) in the last 5 exams (fleet median 0)
+       lowers risk: heartbeat jitter p95 18 ms (fleet median 30)
+
+Risk-model precision (fitted on 4000 synthetic centre-histories, seed 1; measured on 4000 independent ones, seed 2; base rate 0.138):
+  at risk (P >= 20%): 787 centres, 228 later had an incident -> precision 0.290, recall 0.413 (lift 2.1x)
+  do not allot (P >= 50%): 44 centres, 23 later had an incident -> precision 0.523, recall 0.042 (lift 3.8x)
+```
+
+### A4 caveats
+
+- **The risk model and its histories come from the same author**, just as G1 and the radar do. Precision 0.29 is a model result on a generator whose noise levels we chose. It shows that the pipeline and the lift work, not a field precision.
+- **Comparability has no real disruption to find** in the synthetic cohort. It is exercised by the doctored-room test. The ±0.05 margin is a committee parameter.
+- **Re-scoring trusts the committee's item list.** The radar does not yet name the leaked items per flag, so `breach.items` is declared, not inferred.
+- **The allocator is greedy, not optimal.** An early candidate can take a seat that a later one needed more. PwD-first ordering covers the scarce-access case; a min-cost assignment would be the upgrade. It also sends candidates back to the centre that had the outage (the re-test is another day).
+- **Tier-1 with signal 3 changes nothing on the 2k golden cases** (above). Its effect is shown only by the unit tests.

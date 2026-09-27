@@ -1,0 +1,132 @@
+{
+ "CEN001": {
+  "name": "Mock Centre 1 (illustrative)",
+  "km": [
+   0,
+   0
+  ],
+  "spareSeats": 6,
+  "pwdAccessible": true,
+  "langs": [
+   "en",
+   "hi"
+  ]
+ },
+ "CEN002": {
+  "name": "Mock Centre 2 (illustrative)",
+  "km": [
+   8,
+   3
+  ],
+  "spareSeats": 4,
+  "pwdAccessible": false,
+  "langs": [
+   "en",
+   "hi"
+  ]
+ },
+ "CEN003": {
+  "name": "Mock Centre 3 (illustrative)",
+  "km": [
+   15,
+   -4
+  ],
+  "spareSeats": 6,
+  "pwdAccessible": true,
+  "langs": [
+   "en",
+   "hi"
+  ]
+ },
+ "CEN004": {
+  "name": "Mock Centre 4 (illustrative)",
+  "km": [
+   30,
+   10
+  ],
+  "spareSeats": 5,
+  "pwdAccessible": true,
+  "langs": [
+   "en",
+   "hi"
+  ]
+ },
+ "CEN005": {
+  "name": "Mock Centre 5 (illustrative)",
+  "km": [
+   42,
+   2
+  ],
+  "spareSeats": 8,
+  "pwdAccessible": true,
+  "langs": [
+   "en",
+   "hi",
+   "ta"
+  ]
+ },
+ "CEN006": {
+  "name": "Mock Centre 6 (illustrative)",
+  "km": [
+   55,
+   -6
+  ],
+  "spareSeats": 6,
+  "pwdAccessible": false,
+  "langs": [
+   "en",
+   "ta"
+  ]
+ },
+ "CEN007": {
+  "name": "Mock Centre 7 (illustrative)",
+  "km": [
+   60,
+   12
+  ],
+  "spareSeats": 3,
+  "pwdAccessible": true,
+  "langs": [
+   "en"
+  ]
+ },
+ "CEN008": {
+  "name": "Mock Centre 8 (illustrative)",
+  "km": [
+   70,
+   0
+  ],
+  "spareSeats": 6,
+  "pwdAccessible": true,
+  "langs": [
+   "en",
+   "hi"
+  ]
+ },
+ "CEN009": {
+  "name": "Mock Centre 9 (illustrative)",
+  "km": [
+   80,
+   -8
+  ],
+  "spareSeats": 5,
+  "pwdAccessible": false,
+  "langs": [
+   "en",
+   "ta"
+  ]
+ },
+ "CEN010": {
+  "name": "Mock Centre 10 (illustrative)",
+  "km": [
+   90,
+   5
+  ],
+  "spareSeats": 6,
+  "pwdAccessible": true,
+  "langs": [
+   "en",
+   "hi"
+  ]
+ }
+}

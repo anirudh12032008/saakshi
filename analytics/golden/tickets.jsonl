@@ -1,0 +1,2 @@
+{"ticket": "OBJ-3714f3e903", "cand": "C00200", "item": "I12", "receipt": "RC-7F3A-19C2", "reason": "The Hindi text of I12 points to a different option than the English text", "status": "open", "hash": "3714f3e9030b6426968a99b2e9e6a544559ca8f798b2da36bffeb736232714de"}
+{"ticket": "OBJ-2eeaaefcd1", "cand": "C00036", "item": "I07", "receipt": "RC-2B91-E04D", "reason": "After resuming on a spare seat my timer showed 15 minutes less than the credited gap", "status": "open", "hash": "2eeaaefcd14bdeae6662711f9be93013ead3562a4374267306dad117602bc00a"}

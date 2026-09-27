@@ -1,0 +1,21 @@
+{
+ "id": "Partial leak, re-score",
+ "note": "Ten items circulated on a public channel an hour before the exam, so any candidate anywhere could have seen them (widespread, perimeter unknown). 10/100 items is within the 10% re-score branch: drop them for everyone instead of a full re-conduct.",
+ "breach": {
+  "perimeter": "unknown",
+  "systemic": true,
+  "items": [
+   "I02",
+   "I20",
+   "I23",
+   "I29",
+   "I44",
+   "I47",
+   "I49",
+   "I53",
+   "I54",
+   "I56"
+  ],
+  "evidence": "Screenshot of 10 items on a public channel, timestamped T-60 min (illustrative)"
+ }
+}

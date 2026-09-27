@@ -7,8 +7,25 @@
   "reviewGapCount": 2,
   "tier1": {
     "systemicRoomShare": 0.5,
-    "leakSignal": "speed-accuracy",
-    "maxLeakFlagShareOutsidePerimeter": 0.1
+    "leakSignal": [
+      "speed-accuracy",
+      "cusum"
+    ],
+    "maxLeakFlagShareOutsidePerimeter": 0.1,
+    "maxLeakedItemShare": 0.1
+  },
+  "comparability": {
+    "deltaResidual": 0.05,
+    "alpha": 0.05,
+    "nMin": 30
+  },
+  "scoring": {
+    "correct": 4,
+    "wrong": -1
+  },
+  "retest": {
+    "session": "RT1 (illustrative date)",
+    "reportingTime": "08:30"
   },
   "cost": {
     "reexamPerCandidateInr": 1500,
