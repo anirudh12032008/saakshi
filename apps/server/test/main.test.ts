@@ -64,3 +64,11 @@ test('a cell serves its response sheets at /v1/shift (400 without exam and shift
     expect(await (await fetch(`http://127.0.0.1:${port}/v1/shift?exam=DEMO-2026&shift=S1`)).json()).toEqual({ cell: 'cell-1', exam: 'DEMO-2026', shift: 'S1', sheets: [] });
   } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('cell and control refuse a non-loopback HOST (their routes are unauthenticated until control↔cell auth)', async () => {
+  for (const mode of ['cell', 'control']) {
+    const p = Bun.spawn(['bun', MAIN], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: mode, DEV: '1', PORT: '0', HOST: '0.0.0.0' } });
+    expect(await p.exited).toBe(2);
+    expect(await new Response(p.stderr).text()).toContain('must bind loopback');
+  }
+});

@@ -25,10 +25,18 @@ const forms = formsOf(await Bun.file(env.FORMS ?? `${fixtures}/paper/forms.json`
 const formOf = (cand: string) => (devSeat(keys, cand) ? devForm(cand) : undefined);
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
+// ponytail: cell and control have unauthenticated routes (/v1/shift, the DEV rogue edit) until control↔cell auth (S7 mTLS)
+// lands, so they refuse to bind anywhere but loopback. Only the relay faces the centre LAN.
+const LOOPBACK = ['127.0.0.1', 'localhost', '::1'];
+if (mode !== 'relay' && env.HOST && !LOOPBACK.includes(env.HOST)) {
+  console.error(`MODE=${mode} must bind loopback until control↔cell auth exists (got HOST=${env.HOST})`); process.exit(2);
+}
+
 if (mode === 'control') {
   const server = Bun.serve({
     port: Number(env.PORT ?? 7090),
     hostname: env.HOST ?? '127.0.0.1',
+    maxRequestBodySize: 64 * 1024,
     routes: controlRoutes({
       dir: resolve(env.DIR ?? 'data/control'),
       authority: { priv: hexToBytes(keys.authority.priv), pub: hexToBytes(keys.authority.pub) },
