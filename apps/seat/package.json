@@ -11,7 +11,7 @@
     "build": "pnpm copy-mediapipe && electron-vite build",
     "pack:mac": "pnpm build && electron-builder --mac --dir && sh scripts/adhoc-sign.sh",
     "pack:win": "pnpm build && electron-builder --win --dir",
-    "pack:e2e": "SAAKSHI_E2E=1 pnpm build && electron-builder --dir -c electron-builder.e2e.yml",
+    "pack:e2e": "SAAKSHI_E2E=1 pnpm build && electron-builder --dir -c electron-builder.e2e.yml && (test \"$(uname)\" != Darwin || sh scripts/adhoc-sign.sh release-e2e)",
     "pack:e2e:win": "set SAAKSHI_E2E=1&& pnpm build && electron-builder --win --dir -c electron-builder.e2e.yml",
     "dist:win": "pnpm build && electron-builder --win nsis",
     "typecheck": "tsc -p tsconfig.json",

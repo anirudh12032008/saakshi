@@ -13,7 +13,7 @@ concurrency:
 jobs:
   windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
@@ -32,6 +32,57 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: probe-selftest, path: probe.json }
+      - name: Gate self-test — a renamed notepad (AnyDesk.exe) and overlay-sim must BLOCK, named
+        shell: pwsh
+        run: |
+          $d = "apps\seat\release\win-unpacked"
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\t" | Out-Null
+          # notepad.exe on Server 2022+ can be a Store-app stub that exits at once; fall back to a renamed copy of the seat itself.
+          Copy-Item "$env:SystemRoot\System32\notepad.exe" "$env:RUNNER_TEMP\t\AnyDesk.exe"
+          $a = Start-Process "$env:RUNNER_TEMP\t\AnyDesk.exe" -PassThru
+          Start-Sleep -Seconds 3
+          if (-not (Get-Process -Id $a.Id -ErrorAction SilentlyContinue)) {
+            Write-Host "renamed notepad exited; using a renamed copy of the seat as AnyDesk.exe"
+            Copy-Item "$d\*" "$env:RUNNER_TEMP\t" -Recurse -Force
+            Copy-Item "$env:RUNNER_TEMP\t\Saakshi.exe" "$env:RUNNER_TEMP\t\AnyDesk.exe" -Force
+            $a = Start-Process "$env:RUNNER_TEMP\t\AnyDesk.exe" -ArgumentList '--overlay-sim' -PassThru
+          }
+          Copy-Item "$d\Saakshi.exe" "$d\overlay-sim.exe"
+          $o = Start-Process "$d\overlay-sim.exe" -ArgumentList '--overlay-sim' -PassThru
+          Start-Sleep -Seconds 5
+          if (-not (Get-Process -Id $a.Id -ErrorAction SilentlyContinue)) { throw "AnyDesk.exe (renamed copy) is not running" }
+          $p = Start-Process "$d\Saakshi.exe" -ArgumentList '--gate-selftest','--expect','anydesk,overlay-sim','--out',"$PWD\gate.json" -Wait -PassThru
+          Get-Content gate.json
+          Get-Process -Name AnyDesk,overlay-sim -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          if ($p.ExitCode -ne 0) { throw "gate self-test did not block both by name (exit $($p.ExitCode))" }
+          $n = Start-Process "$d\Saakshi.exe" -ArgumentList '--gate-selftest','--expect','anydesk,overlay-sim','--out',"$PWD\gate-clean.json" -Wait -PassThru
+          Get-Content gate-clean.json
+          if ($n.ExitCode -eq 0) { throw "gate self-test named tools that were closed" }
+          Remove-Item "$d\overlay-sim.exe" -Force
+      - name: Fused build — --inspect and --remote-debugging-port are refused; RunAsNode is off
+        shell: pwsh
+        run: |
+          $d = "apps\seat\release\win-unpacked\Saakshi.exe"
+          $i = Start-Process $d -ArgumentList '--inspect=9229','--fuse-check','--out',"$PWD\fuse-inspect.json" -Wait -PassThru
+          if ($i.ExitCode -ne 3) { throw "--inspect was not refused (exit $($i.ExitCode))" }
+          $r = Start-Process $d -ArgumentList '--remote-debugging-port=9222' -Wait -PassThru
+          if ($r.ExitCode -ne 3) { throw "--remote-debugging-port was not refused (exit $($r.ExitCode))" }
+          $f = Start-Process $d -ArgumentList '--fuse-check','--out',"$PWD\fuse.json" -Wait -PassThru
+          Get-Content fuse.json
+          $j = Get-Content fuse.json | ConvertFrom-Json
+          if ($j.inspectorUrl -or $j.e2e) { throw "fused build has an inspector or is the e2e build" }
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          $n = Start-Process $d -ArgumentList '-e','process.exit(42)','--probe-selftest','--out',"$PWD\runasnode.json" -Wait -PassThru
+          Remove-Item Env:ELECTRON_RUN_AS_NODE
+          if ($n.ExitCode -eq 42) { throw "RunAsNode fuse is on" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: gate-selftest, path: "*.json" }
+      - run: pnpm --filter @saakshi/seat pack:e2e:win
+      - name: Playwright e2e on the e2e build (camera off)
+        env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
+        run: node --test --test-timeout=180000 apps/seat/e2e/seat.e2e.ts
       - if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: pnpm --filter @saakshi/seat dist:win
       - if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
