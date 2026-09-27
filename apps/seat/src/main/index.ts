@@ -9,6 +9,8 @@ import type { Action, ExamBoot, SubmitResult } from '../shared/ipc.ts';
 import { resolveAppPath } from './app-path.ts';
 import { cameraEnabled } from './camera.ts';
 import { ExamSession } from './exam.ts';
+import type { Wrapper } from './journal-store.ts';
+import { pickWrapper, testMode } from './keystore.ts';
 import { runSelftest } from './probes.ts';
 import { httpSend, SeatSync } from './sync.ts';
 
@@ -47,6 +49,7 @@ function start(): void {
   const form = devForm(cand);
   const durationMs = forms.durationMin * 60_000;
   const camera = cameraEnabled(process.argv, process.env);
+  const test = testMode(process.argv, process.env);
   let exam: ExamSession | undefined;
   let sync: SeatSync | undefined;
   let win: BrowserWindow | undefined;
@@ -54,7 +57,7 @@ function start(): void {
   const guard = <T>(fn: () => T): T | { ok: false; error: string } => { try { return fn(); } catch (e) { return { ok: false, error: (e as Error).message }; } };
   ipcMain.handle('exam:load', (): ExamBoot => ({
     cand, seatId: seat!.seatId, form, durationMs, activeMs: exam!.activeMs(), started: exam!.started, items: exam!.items(), sync: sync!.view(),
-    receipt: exam!.receipt(), camera,
+    receipt: exam!.receipt(), camera, testMode: test,
   }));
   ipcMain.handle('exam:start', () => guard(() => { const r = exam!.start(); sync!.kick(); return r; }));
   ipcMain.handle('exam:submit', (): SubmitResult => guard(() => { const r = exam!.submit(); sync!.kick(); return r; }));
@@ -62,9 +65,12 @@ function start(): void {
 
   app.whenReady().then(async () => {
     if (!seat) { dialog.showErrorBox('Saakshi', `No DEV seat key for candidate ${cand}`); app.exit(1); return; }
-    if (!safeStorage.isEncryptionAvailable()) { dialog.showErrorBox('Saakshi', 'OS key storage (safeStorage) is unavailable, so the journal cannot be encrypted.'); app.exit(1); return; }
+    let wrap: Wrapper;
+    try { wrap = pickWrapper({ testMode: test, safeStorage, dir: app.getPath('userData') }); }
+    catch (e) { dialog.showErrorBox('Saakshi', (e as Error).message); app.exit(1); return; }
+    if (test) console.warn('SAAKSHI TEST MODE — not for real exams (journal key not in the OS keychain)');
     try {
-      exam = new ExamSession({ dir: join(app.getPath('userData'), 'journal'), ctx: { ...DEV_EXAM, cand }, keyEpoch: 1, seat, cellPub: cell.pub, wrap: safeStorage, durationMs, items: forms[form], form, pseud: devPseud(cand) });
+      exam = new ExamSession({ dir: join(app.getPath('userData'), 'journal'), ctx: { ...DEV_EXAM, cand }, keyEpoch: 1, seat, cellPub: cell.pub, wrap, durationMs, items: forms[form], form, pseud: devPseud(cand), testMode: test });
     } catch (e) { dialog.showErrorBox('Saakshi — journal problem, please call the invigilator', (e as Error).message); app.exit(1); return; }
     sync = new SeatSync(exam, httpSend(relayUrl), verifier(cell.pub), (v) => win?.webContents.send('sync', v));
     sync.start(1000);

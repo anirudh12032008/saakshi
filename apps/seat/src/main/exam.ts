@@ -1,4 +1,5 @@
 import { randomBytes } from '@saakshi/core/bytes';
+import type { Canon } from '@saakshi/core/canon';
 import { signedLine } from '@saakshi/core/journal';
 import { responsesOf } from '@saakshi/core/log';
 import { sealBody, signer, verifier, type KeyPair } from '@saakshi/core/node';
@@ -6,6 +7,7 @@ import { counts, finalHash, genesisPrev, receiptCode, type Body, type Ctx, type 
 import { toB64, type WireEntry } from '@saakshi/core/wire';
 import type { Action, ActResult, ItemState, Receipt, SubmitResult } from '../shared/ipc.ts';
 import { SeatJournal, type Wrapper } from './journal-store.ts';
+import { TEST_MODE_NOTE } from './keystore.ts';
 import type { SyncSource } from './sync.ts';
 
 export interface SessionOpts {
@@ -16,6 +18,8 @@ export interface SessionOpts {
   /** The candidate's pseudonym (Addendum A.4) — goes into receipt B. DEV: devPseud(cand). */
   pseud: string;
   clock?: () => number;
+  /** DEV test keystore in use: journal it at unlock (never silent). */
+  testMode?: boolean;
 }
 
 export const IDLE_MS = 60_000;
@@ -57,11 +61,14 @@ export class ExamSession implements SyncSource {
     return out;
   }
 
-  /** Stage 1 unlock: the candidate presses Start (custody release arrives in Stage 3). */
-  start(): ActResult {
+  /** Unlock: meta is [form, kc_f, via] (Addendum B.9). Idempotent. In test mode an integrity entry follows at once. */
+  start(meta: Canon[] = []): ActResult {
     if (this.started) return { ok: true, seq: 1, activeMs: this.activeMs() };
     this.#runStart = this.#clock();
-    return { ok: true, seq: this.#append('unlock', EMPTY), activeMs: 0 };
+    this.#append('unlock', { ...EMPTY, meta });
+    // ponytail: a crash between these two appends leaves no integrity entry; the banner and the chain's first entries still show it.
+    if (this.#o.testMode) this.#append('integrity', { ...EMPTY, meta: ['test-mode', TEST_MODE_NOTE] });
+    return { ok: true, seq: 1, activeMs: 0 };
   }
 
   act(a: Action): ActResult {

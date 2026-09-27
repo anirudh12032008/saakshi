@@ -160,3 +160,18 @@ test('submit is refused before start and allowed after time is up', () => {
   s.close();
   rmSync(dir, { recursive: true });
 });
+
+test('test mode is never silent: an integrity entry follows the unlock; normal mode journals none; start(meta) fills the unlock body', () => {
+  for (const testMode of [true, false]) {
+    const dir = mkdtempSync(join(tmpdir(), 'saakshi-exam-'));
+    const s = new ExamSession({ dir, ctx: { ...DEV_EXAM, cand: 'C0001' }, keyEpoch: 1, seat: devSeat(keys, 'C0001')!, cellPub: cell.pub, wrap, durationMs: D, items: ['I01'], form: 'F1', pseud: devPseud('C0001'), clock: () => 0, testMode });
+    assert.deepEqual(s.start(['F1', 'ab'.repeat(32), 'push']), { ok: true, seq: 1, activeMs: 0 });
+    assert.deepEqual(s.journal.recs[0].body.meta, ['F1', 'ab'.repeat(32), 'push']);
+    assert.deepEqual(s.journal.headers.map((h) => h.kind), testMode ? ['unlock', 'integrity'] : ['unlock']);
+    if (testMode) assert.deepEqual(s.journal.recs[1].body, { item: '', state: '', answer: '', meta: ['test-mode', 'journal key not in the OS keychain'] });
+    s.start();                                                                        // idempotent: nothing more
+    assert.equal(s.head(), testMode ? 2 : 1);
+    s.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

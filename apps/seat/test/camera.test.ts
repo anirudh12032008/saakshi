@@ -8,3 +8,8 @@ test('the camera is on by default and off with --no-camera or SAAKSHI_NO_CAMERA=
   assert.equal(cameraEnabled(['electron', '.'], { SAAKSHI_NO_CAMERA: '1' }), false);
   assert.equal(cameraEnabled(['electron', '.'], { SAAKSHI_NO_CAMERA: '0' }), true);
 });
+
+test('test mode also turns the camera off', () => {
+  assert.equal(cameraEnabled(['electron', '.', '--test-mode'], {}), false);
+  assert.equal(cameraEnabled(['electron', '.'], { SAAKSHI_TEST_MODE: '1' }), false);
+});
