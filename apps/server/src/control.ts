@@ -23,6 +23,8 @@ export interface ControlOpts {
   seatKeys?: () => Promise<Record<string, string>>;
   /** Addendum C.1: every cell's key certificate, for proofs. */
   cells?: CellCert[];
+  /** Stage 4: every audit's findings go to the incident engine (TAMPER). */
+  onFindings?: (f: Finding[]) => void;
 }
 
 class HttpError extends Error {
@@ -103,6 +105,7 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
     }) },
     '/v1/audit': { POST: handle(async () => {
       const f = await findings();
+      o.onFindings?.(f);
       custody('audit', { findings: f.length, sha256: sha(JSON.stringify(f)) });
       return json({ at: now(), findings: f });
     }) },

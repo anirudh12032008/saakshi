@@ -7,6 +7,7 @@ import { devPseud, type KeysFile } from '@saakshi/core/dev';
 import { FILES, rosterOf, type CellKeyFile, type Directory } from '@saakshi/core/directory';
 import { cellKeyArray, cellKeyId, msg } from '@saakshi/core/enrol';
 import { verifier } from '@saakshi/core/node';
+import { OPS_DEMO } from '@saakshi/core/ops';
 import { openPolicy, type SignedPolicy } from '@saakshi/core/policy';
 import { provision, type CohortCand } from '../../../tools/provision.ts';
 
@@ -64,4 +65,10 @@ test('refuses to provision over an existing exam directory', () => {
   provision({ out, keys, cands });
   expect(() => provision({ out, keys, cands })).toThrow(/already provisioned/);
   expect(existsSync(join(out, FILES.directory))).toBe(true);
+});
+
+test('provision --demo writes the DEMO ops into the directory; without it there are none (the defaults apply)', () => {
+  const a = provision({ out: join(tmp, 'a'), keys, cands: [], ops: OPS_DEMO });
+  expect(a.ops).toEqual(OPS_DEMO);
+  expect(provision({ out: join(tmp, 'b'), keys, cands: [] }).ops).toBeUndefined();
 });

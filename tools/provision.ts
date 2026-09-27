@@ -1,6 +1,7 @@
 // Control's provisioning for one exam-shift (DEV): the directory, each cell's key file (outside any DB) with an authority
 // certificate and cellKeyId, a fresh pseudonym key, and one signed policy per centre that pins that centre's cell key.
-//   bun tools/provision.ts --out data/exam [--cohort data/g1/cohort.jsonl] [--demo-centre CEN042] [--cell-urls u1,u2,u3]
+//   bun tools/provision.ts --out data/exam [--cohort data/g1/cohort.jsonl] [--demo-centre CEN042] [--cell-urls u1,u2,u3] [--demo]
+// --demo writes OPS_DEMO (10 s ladder timers) into the directory; without it the defaults (OPS) apply.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { hexToBytes, randomBytes, toHex } from '../packages/core/src/bytes.ts';
@@ -9,11 +10,12 @@ import { FILES, type CellEntry, type CellKeyFile, type Directory } from '../pack
 import { cellKeyArray, cellKeyId, msg } from '../packages/core/src/enrol.ts';
 import { pseudOf } from '../packages/core/src/log.ts';
 import { signer } from '../packages/core/src/node.ts';
+import { OPS_DEMO, type Ops } from '../packages/core/src/ops.ts';
 import { signPolicy, type Policy, type RosterEntry } from '../packages/core/src/policy.ts';
 import { readCohort } from './cohort.ts';
 
 export interface CohortCand { cand: string; centre: string; form: 'F1' | 'F2'; pwd: 0 | 1 }
-export interface ProvisionOpts { out: string; keys: KeysFile; cands: CohortCand[]; demoCentre?: string; cellUrls?: string[]; durationMs?: number; now?: number }
+export interface ProvisionOpts { out: string; keys: KeysFile; cands: CohortCand[]; demoCentre?: string; cellUrls?: string[]; durationMs?: number; now?: number; ops?: Ops }
 
 /** Compensatory time: PwD candidates get 20 minutes per hour, so D_i = D + D/3. */
 export const extraFor = (pwd: 0 | 1, durationMs: number): number => (pwd ? Math.round(durationMs / 3) : 0);
@@ -57,7 +59,7 @@ export function provision(o: ProvisionOpts): Directory {
   const centres: Directory['centres'] = { [demo]: { cell: cells[0].id } };
   [...byCentre.keys()].filter((c) => c !== demo).sort().forEach((c, i) => { centres[c] = { cell: cells[i % cells.length].id }; });
 
-  const dir: Directory = { v: 1, exam: DEV_EXAM.exam, shift: DEV_EXAM.shift, durationMs, demoCentre: demo, issuedAt: now, cells, centres, cands };
+  const dir: Directory = { v: 1, exam: DEV_EXAM.exam, shift: DEV_EXAM.shift, durationMs, demoCentre: demo, issuedAt: now, cells, centres, cands, ...(o.ops ? { ops: o.ops } : {}) };
   for (const [centre, { cell: cellId }] of Object.entries(centres)) {
     const cell = cells.find((c) => c.id === cellId)!;
     const policy: Policy = { v: 1, exam: dir.exam, shift: dir.shift, centre, cell: { id: cell.id, keyId: cell.keyId, pub: cell.pub }, durationMs, roster: Object.fromEntries(byCentre.get(centre) ?? []), issuedAt: now };
@@ -74,6 +76,6 @@ if (import.meta.main) {
   const arg = (f: string) => { const i = process.argv.indexOf(f); return i > 0 ? process.argv[i + 1] : undefined; };
   const keys = JSON.parse(readFileSync(resolve(import.meta.dirname, '../fixtures/keys.json'), 'utf8')) as KeysFile;
   const cohort = arg('--cohort'), out = arg('--out') ?? 'data/exam';
-  const d = provision({ out, keys, cands: cohort ? await cohortCands(cohort) : [], demoCentre: arg('--demo-centre'), cellUrls: arg('--cell-urls')?.split(',') });
+  const d = provision({ out, keys, cands: cohort ? await cohortCands(cohort) : [], demoCentre: arg('--demo-centre'), cellUrls: arg('--cell-urls')?.split(','), ops: process.argv.includes('--demo') ? OPS_DEMO : undefined });
   console.log(`provisioned ${Object.keys(d.cands).length} candidates at ${Object.keys(d.centres).length} centres on ${d.cells.length} cells → ${out}`);
 }

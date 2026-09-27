@@ -93,10 +93,10 @@ const post = (url: string, body: unknown) => fetch(url, { method: 'POST', header
 
 test('EXAM: a cell boots with its certified key file, enrols a seat of its centre, and reports per-centre stats', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'saakshi-main-'));
-  const p = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'cell', DEV: '1', PORT: '0', DB: join(dir, 'c.db'), EXAM: await examDir(dir), CELL_ID: 'cell-1' } });
+  const p = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'cell', DEV: '1', PORT: '0', DB: join(dir, 'c.db'), EXAM: await examDir(dir), CELL_ID: 'cell-1', REBUILD_RELAYS: '1' } });
   try {
     const u = `http://127.0.0.1:${(await ready(p.stdout)).port}`;
-    await post(`${u}/v1/sync`, { entries: [], streams: [], replay: true, done: true });            // a fresh cell rebuilds until a relay says done
+    await post(`${u}/v1/sync`, { entries: [], streams: [], replay: true, done: true });            // a fresh cell rebuilds until its one relay says done
     const r = (await (await post(`${u}/v1/enrol`, { enrols: [simBindReq('C0001', newKeyPair(), hexToBytes(KEYS.cells[0].pub))] })).json()) as { results: { ok: boolean }[] };
     expect(r.results[0].ok).toBe(true);
     const s = (await (await fetch(`${u}/v1/stats`)).json()) as { centres: Record<string, { registered: number; bound: number }> };
@@ -139,5 +139,37 @@ test('EXAM: control serves /custodian, its release key, the public manifest and 
     expect(await (await fetch(`${u}/v1/manifest`)).json()).toEqual(JSON.parse(readFileSync(join(exam, FILES.manifest), 'utf8')));
     await Bun.sleep(2500);
     expect(((await (await fetch(`${u}/v1/fleet`)).json()) as { cells: { state: string }[] }).cells.map((c) => c.state)).toEqual(['DOWN', 'DOWN', 'DOWN']);
+  } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('EXAM, Stage 4: a cell waits for the relays of its centres; a relay serves its link, the seats\' status and the move routes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-main4-'));
+  const exam = await examDir(dir);                                                   // CEN042 and CEN001 are both on cell-1
+  const c = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'cell', DEV: '1', PORT: '0', DB: join(dir, 'c.db'), EXAM: exam, CELL_ID: 'cell-1' } });
+  const r = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'relay', DEV: '1', PORT: '0', HOST: '127.0.0.1', DB: join(dir, 'r.db'), EXAM: exam, CENTRE: 'CEN042' } });
+  try {
+    const cr = (await ready(c.stdout)) as unknown as Record<string, unknown>;
+    expect(cr).toMatchObject({ mode: 'cell', state: 'REBUILDING', rebuildRelays: 2, ops: 'default' });
+    const rr = await ready(r.stdout);
+    const base = `http://127.0.0.1:${rr.port}`;
+    expect(await (await fetch(`${base}/v1/status`)).json()).toMatchObject({ link: 'up', cell: 'LIVE' });
+    expect(await (await fetch(`${base}/v1/link`)).json()).toMatchObject({ centre: 'CEN042', cut: false });
+    expect(await (await fetch(`${base}/v1/handover/pending`)).json()).toEqual({ pending: [] });
+    expect((await fetch(`${base}/v1/purge`, { method: 'POST', body: '{}' })).status).toBe(400);
+  } finally { c.kill(); r.kill(); await Promise.all([c.exited, r.exited]); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('EXAM, Stage 4: control serves /status, the incidents with their timers, and says how to start chaos without the supervisor', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-main4c-'));
+  const exam = await examDir(dir);
+  const p = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'control', DEV: '1', PORT: '0', DIR: join(dir, 'control'), EXAM: exam, RELAY_URL: 'http://127.0.0.1:9' } });
+  try {
+    const base = `http://127.0.0.1:${(await ready(p.stdout)).port}`;
+    expect((await fetch(`${base}/status`)).status).toBe(200);
+    const inc = (await (await fetch(`${base}/v1/incidents`)).json()) as { demo: boolean; incidents: unknown[] };
+    expect(inc.demo).toBe(false);
+    const plug = await fetch(`${base}/v1/chaos/plug`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cell: 'cell-2', wipe: true }) });
+    expect([plug.status, ((await plug.json()) as { error: string }).error]).toEqual([409, expect.stringContaining('bun tools/stack.ts')]);
+    expect((await (await fetch(`${base}/v1/status/public`)).json()) as { summary: { en: string } }).toMatchObject({ summary: { en: expect.stringContaining('centres running normally') } });
   } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
 });
