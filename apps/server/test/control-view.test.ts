@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
-import { commitment, findingText, fleetSummary, headline, kpis, reconCells, releaseLines, tileText } from '../src/control-view.ts';
+import type { ArchiveReport, Incident, LinkView, Notice, TimeRow } from '@saakshi/core/ops';
+import { OPS_DEMO } from '@saakshi/core/ops';
+import { archiveLines, commitment, findingText, fleetSummary, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, tileText, timeCells } from '../src/control-view.ts';
 
 const row: ReconRow = { centre: 'CEN-01', exam: 'DEMO-2026', shift: 'S1', registered: 8, checkedIn: 1, unlocked: 1, submitted: 1, receipts: 1, leaves: 1, headsEqual: true, headMismatches: [], green: true };
 
@@ -59,6 +61,38 @@ test('reconciliation cells: all ok when green; leaves behind receipts and head m
   ]);
   const bad = reconCells({ ...row, leaves: 0, headsEqual: false, headMismatches: ['C0001: relay 22 · cell 21'], green: false });
   expect(bad.filter((c) => !c.ok).map((c) => c.value)).toEqual(['0', 'C0001: relay 22 · cell 21']);
+});
+
+const incident = (o: Partial<Incident> = {}): Incident => ({ id: 'CELL_DOWN-3', kind: 'CELL_DOWN', severity: 'P1', key: 'k', title: 'Data Centre 2 is down', detail: 'no answer from it',
+  blast: { cells: ['cell-2'], centres: Array.from({ length: 33 }, (_, i) => `CEN${i}`), candidates: 6_600, answersLost: null }, openedAt: 0, updatedAt: 0, rung: 2,
+  ladder: [{ rung: 'control', at: 0 }], data: {}, ...o });
+
+test('incident card: severity as a word, the blast radius, age, the ladder with the next step and its timer; acked and resolved read plainly', () => {
+  const c = incidentCard(incident(), 7_000, OPS_DEMO.ladderMs);
+  expect(c).toEqual({
+    badge: 'P1 major', tone: 'p1', title: 'Data Centre 2 is down', blast: '1 cell · 33 centres · 6,600 candidates · answers lost: not known yet',
+    age: 'open 0:07', ladder: 'invigilator · superintendent · [control] · regulator', next: 'escalates to regulator in 3 s unless acknowledged',
+    detail: 'no answer from it', canAck: true, canResolve: false,
+  });
+  const acked = incidentCard(incident({ ack: { by: 'CONTROL-1', rung: 'control', at: 5_000 } }), 7_000, OPS_DEMO.ladderMs);
+  expect([acked.next, acked.canAck]).toEqual(['acknowledged by CONTROL-1 (control)', false]);
+  const done = incidentCard(incident({ resolvedAt: 60_000, blast: { cells: ['cell-2'], centres: ['CEN0'], candidates: 200, answersLost: 0 } }), 90_000, OPS_DEMO.ladderMs);
+  expect([done.age, done.blast, done.next]).toEqual(['closed after 1:00', '1 cell · 1 centre · 200 candidates · answers lost 0', 'closed']);
+  expect(incidentCard(incident({ kind: 'GAP', severity: 'P3', rung: 0, ladder: [{ rung: 'invigilator', at: 0 }] }), 1_000, OPS_DEMO.ladderMs)).toMatchObject({ badge: 'P3 notice', next: 'stays with the invigilator', canResolve: true });
+});
+
+test('link, time, notices and archive lines', () => {
+  const v: LinkView = { centre: 'CEN042', up: true, cut: false, degraded: true, rttMs: 2_100, errRate: 0.3, backlog: 12, lastContactAt: 0, risk: 'warn', reason: 'WAN failure likely: round trips 2.1 s (smoothed)', cell: 'LIVE' };
+  expect(linkLine(v)).toEqual({ text: 'CEN042 link: WAN failure likely: round trips 2.1 s (smoothed) · backlog 12 · round trip 2.1 s', tone: 'bad' });
+  const r: TimeRow = { cand: 'C0001', wallMs: 400_000, activeMs: 292_000, unaccountedMs: 108_000, creditedMs: 108_000, flags: [], changedAfterMove: [{ item: 'I02', q: 2 }],
+    gaps: [{ seq: 7, kind: 'handover', cause: 'moved (pin)', pausedMs: 0, measuredMs: 108_000, approved: true, approvedBy: 'INV-42-A' }] };
+  expect(timeCells(r).map((c) => c.value)).toEqual(['C0001', '6:40', '4:52', 'entry 7 moved (pin) 1:48 ✓ INV-42-A', '+1:48', 'changed after the move: Q2', '—']);
+  const n: Notice = { id: 'N-X', incident: 'X', kind: 'CELL_DOWN', centres: ['CEN001', 'CEN002'], audience: 6_600, en: 'Saakshi …', hi: 'साक्षी …', channels: ['sms', 'email', 'digilocker'], draftedAt: 0 };
+  expect(noticeText(n)).toBe('To 6,600 candidates at 2 centres by SMS, e-mail and DigiLocker (mock): Saakshi …');
+  const a: ArchiveReport = { exam: 'DEMO-2026', shift: 'S1', size: 12, root: 'ab'.repeat(32), ok: true, writtenMs: 14, verifyMs: 9,
+    stores: [{ store: 'data/control/worm-a', path: 'p', sha256: 'cd'.repeat(32), ok: true, detail: '12 leaves rebuild the signed root; SHA-256 matches' }, { store: 'data/control/worm-b', path: 'p', sha256: 'cd'.repeat(32), ok: true, detail: 'x' }] };
+  expect(archiveLines(a)).toEqual(['Both stores verify against the signed register head (12 leaves, root abab abab abab abab …).',
+    'data/control/worm-a: ✓ 12 leaves rebuild the signed root; SHA-256 matches', 'data/control/worm-b: ✓ x', 'Written in 14 ms · verified in 9 ms.']);
 });
 
 test('findings read as one line each; the headline prefers the altered answer', () => {

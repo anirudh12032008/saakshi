@@ -1,7 +1,8 @@
 import type { SignedSth } from '@saakshi/core/log';
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
-import { commitment, findingText, fleetSummary, group, headline, kpis, reconCells, releaseLines, tileText } from './control-view.ts';
+import type { ArchiveReport, Incident, LinkView, Notice, Severity, TimeRow } from '@saakshi/core/ops';
+import { archiveLines, commitment, findingText, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, tileText, timeCells } from './control-view.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const say = (id: string, text: string, tone = '') => { const el = $(id); el.textContent = text; el.className = `out ${tone}`.trim(); };
@@ -129,3 +130,69 @@ void fleetTick();
 void releaseTick();
 setInterval(fleetTick, 1000);
 setInterval(releaseTick, 2000);
+
+const el = (tag: string, text = '', cls = ''): HTMLElement => { const x = document.createElement(tag); x.textContent = text; if (cls) x.className = cls; return x; };
+async function incidentsTick(): Promise<void> {
+  try {
+    const r = await call<{ at: number; demo: boolean; ladderMs: Record<Severity, number>; incidents: Incident[] }>('GET', '/v1/incidents');
+    $('ops-mode').textContent = r.demo ? 'DEMO timers: each unacknowledged rung escalates after 10 s.' : 'Production timers.';
+    $('incidents').replaceChildren(...r.incidents.map((i) => {
+      const c = incidentCard(i, r.at, r.ladderMs), li2 = el('li', '', `card ${c.tone}${i.resolvedAt ? ' closed' : ''}`);
+      li2.append(el('span', c.badge, 'badge'), el('strong', c.title), el('span', c.blast), el('span', `${c.age} · ${c.ladder}`), el('span', c.next), el('span', c.detail));
+      if (c.canAck) { const b = el('button', `Acknowledge ${i.id}`); b.addEventListener('click', () => void act('/v1/incidents/ack', { id: i.id, by: $<HTMLInputElement>('ack-by').value })); li2.append(b); }
+      if (c.canResolve) { const b = el('button', `Resolve ${i.id}`); b.addEventListener('click', () => void act('/v1/incidents/resolve', { id: i.id })); li2.append(b); }
+      if (i.certIn) { const a = el('a', 'CERT-In report draft (6-hour window)') as HTMLAnchorElement; a.href = `/v1/incidents/certin?id=${encodeURIComponent(i.id)}`; a.target = '_blank'; li2.append(a); }
+      if ((i.kind === 'GAP' || (i.kind === 'HANDOVER' && !i.data.approvedBy)) && !i.resolvedAt) {
+        const seq = i.kind === 'GAP' ? Number(i.data.seq) : Number(i.data.fromSeq) + 1;
+        const b = el('button', `Approve credited time for ${i.cand}`); b.addEventListener('click', () => void act('/v1/gaps/approve', { cand: i.cand, seq, by: $<HTMLInputElement>('ack-by').value })); li2.append(b);
+      }
+      return li2;
+    }));
+  } catch (e) { $('incidents').replaceChildren(el('li', `Incidents unavailable: ${(e as Error).message}`)); }
+}
+async function act(path: string, body: unknown): Promise<void> {
+  try { await call('POST', path, body); } catch (e) { say('chaos-out', (e as Error).message, 'bad'); }
+  void incidentsTick();
+}
+async function linkTick(): Promise<void> {
+  try { const l = linkLine(await call<LinkView>('GET', '/v1/link')); $('link').textContent = l.text; $('link').className = l.tone === 'good' ? 'ok' : 'bad'; }
+  catch { $('link').textContent = 'The relay\'s link view is unavailable.'; }
+}
+async function timeTick(): Promise<void> {
+  try {
+    const { rows } = await call<{ rows: TimeRow[] }>('GET', '/v1/time');
+    $('time').replaceChildren(...rows.map((r) => { const tr = document.createElement('tr'); tr.append(...timeCells(r).map((c) => el('td', c.value, c.ok ? 'ok' : 'bad'))); return tr; }));
+  } catch { /* the cell may be down: keep the last table */ }
+}
+async function noticesTick(): Promise<void> {
+  try {
+    const { drafts, sent } = await call<{ drafts: Notice[]; sent: Notice[] }>('GET', '/v1/notices');
+    $('notices').replaceChildren(...drafts.map((n) => {
+      const li2 = el('li', noticeText(n)), b = el('button', `Approve and send notice ${n.id}`);
+      b.addEventListener('click', () => void call('POST', '/v1/notices/approve', { id: n.id, by: $<HTMLInputElement>('ack-by').value }).then(noticesTick, (e) => say('chaos-out', (e as Error).message, 'bad')));
+      li2.append(b);
+      return li2;
+    }), ...sent.map((n) => el('li', `Sent at ${new Date(n.approvedAt!).toLocaleTimeString()}, approved by ${n.approvedBy}: ${noticeText(n)}`)));
+  } catch { /* retry next tick */ }
+}
+const chaos = (id: string, path: string, body: unknown, done: string): void => $(id).addEventListener('click', async () => {
+  try { await call('POST', path, body); say('chaos-out', done, 'bad'); } catch (e) { say('chaos-out', (e as Error).message, 'bad'); }
+});
+chaos('plug', '/v1/chaos/plug', { cell: 'cell-2', wipe: true }, 'Data Centre 2: process killed, database deleted. Watch the P1 card.');
+chaos('restart', '/v1/chaos/restart', { cell: 'cell-2' }, 'Data Centre 2 restarting: it rebuilds from the relays.');
+chaos('degrade-on', '/v1/chaos/degrade', { on: true }, "Centre 42's link is degrading: watch for SYNC_LAG.");
+chaos('degrade-off', '/v1/chaos/degrade', { on: false }, "Centre 42's link is no longer degraded.");
+chaos('spare', '/v1/chaos/spare', {}, "Centre 42's relay replaced by the spare: seats resend from their journals.");
+$('approve').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target as HTMLFormElement);
+  try { await call('POST', '/v1/gaps/approve', { cand: f.get('cand'), seq: Number(f.get('seq')), by: $<HTMLInputElement>('ack-by').value }); say('approve-out', 'Approved and logged.', 'ok'); void timeTick(); }
+  catch (e) { say('approve-out', (e as Error).message, 'bad'); }
+});
+const showArchive = (r: ArchiveReport): void => $('archive-out').replaceChildren(...archiveLines(r).map((l) => el('li', l)));
+$('archive').addEventListener('click', async () => { try { showArchive(await call<ArchiveReport>('POST', '/v1/archive')); } catch (e) { $('archive-out').replaceChildren(el('li', (e as Error).message)); } });
+$('purge').addEventListener('click', async () => {
+  try { const r = await call<{ purged: number; report: ArchiveReport }>('POST', '/v1/archive/purge'); showArchive(r.report); $('archive-out').append(el('li', `Relay purged ${r.purged} entries on a signed order.`)); }
+  catch (e) { $('archive-out').replaceChildren(el('li', (e as Error).message)); }
+});
+for (const [fn, ms] of [[incidentsTick, 1_000], [linkTick, 2_000], [timeTick, 3_000], [noticesTick, 3_000]] as const) { void fn(); setInterval(fn, ms); }

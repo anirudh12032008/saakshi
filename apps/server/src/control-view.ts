@@ -1,6 +1,8 @@
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { CentreTile, FleetView, ReleaseStatus } from '@saakshi/core/directory';
 import type { Manifest } from '@saakshi/core/paper';
+import { RUNGS, type ArchiveReport, type Incident, type LinkView, type Notice, type Severity, type TimeRow } from '@saakshi/core/ops';
+import { blastText, mmss } from './incidents.ts';
 
 export interface ReconCell { label: string; value: string; ok: boolean }
 
@@ -63,3 +65,44 @@ export function releaseLines(s: ReleaseStatus): string[] {
 
 export const commitment = (m: Manifest): string[] =>
   m.forms.map((f) => `${f.form}: kc_f ${group(f.kcf.slice(0, 16))} … · ciphertext ${group(f.ciphertextHash.slice(0, 16))} …`);
+
+export const SEV_WORD: Record<Severity, string> = { P0: 'P0 critical', P1: 'P1 major', P2: 'P2 minor', P3: 'P3 notice' };
+const TOP: Record<Severity, number> = { P0: 3, P1: 3, P2: 2, P3: 0 };
+export interface Card { badge: string; tone: string; title: string; blast: string; age: string; ladder: string; next: string; detail: string; canAck: boolean; canResolve: boolean }
+const STATEFUL = new Set(['CELL_DOWN', 'CENTRE_OUTAGE', 'SEAT_SILENT', 'RELAY_WAN_DOWN', 'SYNC_LAG', 'KEY_RELEASE_DELAY']);
+
+export function incidentCard(i: Incident, now: number, ladderMs: Record<Severity, number>): Card {
+  const top = TOP[i.severity], every = ladderMs[i.severity], last = i.ladder[i.ladder.length - 1]?.at ?? i.openedAt;
+  const next = i.resolvedAt ? 'closed' : i.ack ? `acknowledged by ${i.ack.by} (${i.ack.rung})` : !every || top === 0 ? 'stays with the invigilator'
+    : i.rung >= top ? `at the top rung (${RUNGS[i.rung]})` : `escalates to ${RUNGS[i.rung + 1]} in ${Math.max(0, Math.ceil((last + every - now) / 1000))} s unless acknowledged`;
+  return {
+    badge: SEV_WORD[i.severity], tone: i.severity.toLowerCase(), title: i.title, blast: blastText(i.blast),
+    age: i.resolvedAt ? `closed after ${mmss(i.resolvedAt - i.openedAt)}` : `open ${mmss(now - i.openedAt)}`,
+    ladder: RUNGS.map((r, k) => (k === i.rung ? `[${r}]` : r)).join(' · '), next, detail: i.detail,
+    canAck: !i.resolvedAt && !i.ack, canResolve: !i.resolvedAt && !STATEFUL.has(i.kind),
+  };
+}
+export function linkLine(v: LinkView): { text: string; tone: 'good' | 'bad' } {
+  return { text: `${v.centre} link: ${v.reason} · backlog ${fmt(v.backlog)} · round trip ${(v.rttMs / 1000).toFixed(1)} s`, tone: v.risk === 'ok' ? 'good' : 'bad' };
+}
+export function timeCells(r: TimeRow): ReconCell[] {
+  const gaps = r.gaps.map((g) => `entry ${g.seq} ${g.cause} ${mmss(g.measuredMs)} ${g.approved ? `✓ ${g.approvedBy}` : '(needs approval)'}`).join('; ') || '—';
+  return [
+    { label: 'Candidate', value: r.cand, ok: true }, { label: 'Wall (relay clock)', value: mmss(r.wallMs), ok: true }, { label: 'Active (seat)', value: mmss(r.activeMs), ok: true },
+    { label: 'Gaps and moves', value: gaps, ok: r.gaps.every((g) => g.approved) }, { label: 'Credited', value: `+${mmss(r.creditedMs)}`, ok: true },
+    { label: 'Review', value: r.changedAfterMove.length ? `changed after the move: ${r.changedAfterMove.map((c) => `Q${c.q}`).join(', ')}` : '—', ok: true },
+    { label: 'Flags', value: r.flags.join(', ') || '—', ok: r.flags.length === 0 },
+  ];
+}
+const CHANNEL = { sms: 'SMS', email: 'e-mail', digilocker: 'DigiLocker' } as const;
+export function noticeText(n: Notice): string {
+  const ch = n.channels.map((c) => CHANNEL[c]);
+  return `To ${fmt(n.audience)} candidates at ${n.centres.length === 1 ? n.centres[0] : `${n.centres.length} centres`} by ${ch.slice(0, -1).join(', ')}${ch.length > 1 ? ' and ' : ''}${ch.at(-1)} (mock): ${n.en}`;
+}
+export function archiveLines(a: ArchiveReport): string[] {
+  return [
+    a.ok ? `Both stores verify against the signed register head (${a.size} leaves, root ${group(a.root.slice(0, 16))} …).` : 'NOT verified — no purge until both stores verify.',
+    ...a.stores.map((s) => `${s.store}: ${s.ok ? '✓' : '✗'} ${s.detail}`),
+    `${a.writtenMs !== undefined ? `Written in ${a.writtenMs} ms · ` : ''}verified in ${a.verifyMs} ms.`.replace(/^v/, 'V'),
+  ];
+}
