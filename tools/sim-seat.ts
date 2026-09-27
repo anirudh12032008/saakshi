@@ -25,6 +25,7 @@ export class SimSeat {
   #pub: Uint8Array;
   #cellPub: Uint8Array;
   #keyEpoch: number;
+  #keys = new Map<number, string>();                  // keyEpoch → pub hex, for sheet()
 
   constructor(keys: KeysFile, cand: string, cellPub: Uint8Array, keyEpoch = 1, seat?: KeyPair) {
     const k = seat ?? devSeat(keys, cand);
@@ -34,6 +35,12 @@ export class SimSeat {
     this.#pub = k.pub;
     this.#cellPub = cellPub;
     this.#keyEpoch = keyEpoch;
+    this.#keys.set(keyEpoch, toHex(k.pub));
+  }
+
+  /** Addendum C: the candidate moved — later entries are signed by `seat` at `keyEpoch`; the chain continues. */
+  rekey(keyEpoch: number, seat: KeyPair): void {
+    this.#sign = signer(seat); this.#pub = seat.pub; this.#keyEpoch = keyEpoch; this.#keys.set(keyEpoch, toHex(seat.pub));
   }
 
   get head(): number { return this.hs.length; }
@@ -58,7 +65,7 @@ export class SimSeat {
   /** The honest response sheet a cell should export for this seat (no receipt: the cell adds that). */
   sheet(form: 'F1' | 'F2' = devForm(this.ctx.cand)): ResponseSheet {
     return {
-      ctx: this.ctx, form, pseud: devPseud(this.ctx.cand), keys: [{ keyEpoch: this.#keyEpoch, pub: toHex(this.#pub) }],
+      ctx: this.ctx, form, pseud: devPseud(this.ctx.cand), keys: [...this.#keys].map(([keyEpoch, pub]) => ({ keyEpoch, pub })),
       entries: this.entries.map((e, i) => ({ line: e.line, salt: toHex(this.salts[i]), body: bodyArray(this.bodies[i]) })),
     };
   }

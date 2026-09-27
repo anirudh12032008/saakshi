@@ -1,10 +1,11 @@
 import { Buffer } from 'node:buffer';
 import type { Ctx } from './protocol.ts';
 import type { BindReq, WireBind } from './enrol.ts';
+import type { HandoverProof, HandoverReq } from './handover.ts';
 import type { ReleaseMsg } from './paper.ts';
 
-/** One journal entry on the wire: the protocol §11 signed line, plus the §8 body envelope as standard padded base64. */
-export interface WireEntry { line: string; env: string }
+/** One journal entry on the wire: the §11 signed line, the §8 envelope (padded base64), and — relay → cell only — the relay's rxWall (C.7). */
+export interface WireEntry { line: string; env: string; rx?: number }
 /** The sender's own head for a stream: a heartbeat and a status request in one. */
 export interface Hello extends Ctx { head: number }
 /** POST /v1/sync. `replay`/`done` are sent only relay → cell while the cell is REBUILDING. */
@@ -19,11 +20,15 @@ export interface SyncReq {
 export interface WireAck { keyEpoch: number; seq: number; h: string; sig: string }
 /** head: highest contiguous seq committed here; headH: its h ('' when head = 0); need: a gap was seen, resend from head+1. */
 export interface StreamStatus extends Ctx { head: number; headH: string; need: boolean; ack?: WireAck }
-export type RejectCode = 'BAD_SUBMISSION' | 'FORK';
+export type RejectCode = 'BAD_SUBMISSION' | 'FORK' | 'ORPHANED' | 'LATE';
 export interface Rejection { index: number; code: RejectCode; reason: string }
 export interface SyncRes { streams: StreamStatus[]; rejected: Rejection[]; /** Stage 3, cell → relay: every release, when the relay has fewer. */ releases?: ReleaseMsg[] }
 /** One seat-grid tile. cellHead −1 = not yet known (relay); senderHead −1 = never heard; seenAt = epoch ms of the last hello, 0 = never. */
-export interface StreamView extends Ctx { head: number; cellHead: number; senderHead: number; seenAt: number }
+export interface StreamView extends Ctx {
+  head: number; cellHead: number; senderHead: number; seenAt: number;
+  /** Stage 4: the chain ends in a submit. */
+  submitted?: true;
+}
 export type NodeState = 'LIVE' | 'REBUILDING';
 export interface HeadsRes { mode: 'cell' | 'relay'; state: NodeState; streams: StreamView[] }
 
@@ -53,7 +58,8 @@ export function parseSyncReq(x: unknown): SyncReq {
     entries: entries.map((e, i) => {
       if (!isObj(e) || typeof e.line !== 'string' || e.line.length > LIMITS.line || typeof e.env !== 'string'
         || e.env.length > LIMITS.env || e.env.length % 4 !== 0 || !B64.test(e.env)) throw new Error(`sync: entries[${i}] must be {line, env: base64}`);
-      return { line: e.line, env: e.env };
+      if (e.rx !== undefined && !nat(e.rx)) throw new Error(`sync: entries[${i}].rx must be a count of ms`);
+      return e.rx === undefined ? { line: e.line, env: e.env } : { line: e.line, env: e.env, rx: e.rx };
     }),
     streams: streams.map((h, i) => {
       if (!isObj(h) || !field(h.exam) || !field(h.shift) || !nat(h.attempt) || !field(h.cand) || !nat(h.head))
@@ -85,4 +91,21 @@ export function parseBindReq(x: unknown): BindReq {
   if (typeof attestHash !== 'string' || !/^[0-9a-f]{64}$/.test(attestHash)) throw new Error('enrol: attestHash must be 64 hex');
   if (typeof pinBox !== 'string' || pinBox.length > LIMITS.pinBox || !/^[0-9a-f]+$/.test(pinBox)) throw new Error('enrol: pinBox must be hex');
   return { exam, shift, attempt, cand, seatId, pub, keyEpoch, fromSeq, attestHash, pinBox };
+}
+
+/** Validate an untrusted handover request (seat → relay → cell, Addendum C.2/C.3); returns a clean copy. */
+export function parseHandoverReq(x: unknown): HandoverReq {
+  if (!isObj(x)) throw new Error('handover: body must be an object');
+  const { exam, shift, attempt, cand, seatId, pub, attestHash, pinBox, proof } = x;
+  if (!field(exam) || !field(shift) || !nat(attempt) || !field(cand) || !field(seatId)) throw new Error('handover: need exam, shift, attempt, cand, seatId');
+  if (typeof pub !== 'string' || !/^04[0-9a-f]{128}$/.test(pub)) throw new Error('handover: pub must be a 65-byte uncompressed P-256 key in hex');
+  if (typeof attestHash !== 'string' || !/^[0-9a-f]{64}$/.test(attestHash)) throw new Error('handover: attestHash must be 64 hex');
+  if (typeof pinBox !== 'string' || pinBox.length > LIMITS.pinBox || !/^[0-9a-f]+$/.test(pinBox)) throw new Error('handover: pinBox must be hex');
+  let p: HandoverProof;
+  if (isObj(proof) && proof.via === 'pin' && typeof proof.pin === 'string' && proof.pin.length <= LIMITS.pinBox && /^[0-9a-f]+$/.test(proof.pin)) p = { via: 'pin', pin: proof.pin };
+  else if (isObj(proof) && proof.via === 'key' && nat(proof.keyEpoch) && proof.keyEpoch >= 1 && nat(proof.fromSeq)
+    && typeof proof.fromHead === 'string' && /^[0-9a-f]{64}$/.test(proof.fromHead) && typeof proof.sig === 'string' && /^[0-9a-f]{128}$/.test(proof.sig))
+    p = { via: 'key', keyEpoch: proof.keyEpoch, fromSeq: proof.fromSeq, fromHead: proof.fromHead, sig: proof.sig };
+  else throw new Error('handover: proof must be {via:"pin", pin} or {via:"key", keyEpoch, fromSeq, fromHead, sig}');
+  return { exam, shift, attempt, cand, seatId, pub, attestHash, pinBox, proof: p };
 }

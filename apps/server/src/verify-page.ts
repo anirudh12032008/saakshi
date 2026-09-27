@@ -3,6 +3,7 @@ import formsJson from '../../../fixtures/paper/forms.json' with { type: 'json' }
 import trustJson from '../../../fixtures/trust-dev.json' with { type: 'json' };
 import V from '../../../fixtures/vectors/protocol-v1.json' with { type: 'json' };
 import A from '../../../fixtures/vectors/protocol-v1-addendum-a.json' with { type: 'json' };
+import C from '../../../fixtures/vectors/protocol-v1-addendum-c.json' with { type: 'json' };
 import { goldenSelfTest } from '@saakshi/core/selftest';
 import { formsOf, type Proof, type Trust } from '@saakshi/core/sheet';
 import { parseProof, verifyProof } from '@saakshi/core/verify';
@@ -14,10 +15,10 @@ const trust = trustJson as Trust;
 const code = $<HTMLInputElement>('code');
 let proof: Proof | undefined;
 
-const st = goldenSelfTest(V, A);
+const st = goldenSelfTest(V, A, C);
 $('selftest').textContent = st.fail.length
   ? `Golden vectors: ${st.fail.length} FAILED in this browser — do not rely on the result below (${st.fail.join('; ')})`
-  : `Golden vectors: all ${st.pass} checks pass in this browser (protocol v1 + addendum A).`;
+  : `Golden vectors: all ${st.pass} checks pass in this browser (protocol v1 + addenda A and C).`;
 $('selftest').className = st.fail.length ? 'bad' : 'good';
 
 function load(text: string, source: string): void {

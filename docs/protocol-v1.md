@@ -483,3 +483,44 @@ key = HKDF-SHA256(ikm = ECDH(ephPriv, recipientPub) x-coordinate, salt = none, i
 **B.8 Active time.** Relay and cell reject a new entry, as BAD_SUBMISSION and never FORK, when its `activeMs` is less than the previous entry's and both have the same `keyEpoch`.
 
 **B.9 Conventions (not checked).** The unlock body is `["body","","","",[form,kc_f,via]]`, `via` ∈ {`push`, `code`}. A seat running the DEV test keystore journals `integrity` with meta `["test-mode","journal key not in the OS keychain"]` right after its unlock.
+
+## 16. Addendum C (Stage 4, 2026-09-27)
+
+This addendum is additive only. No byte defined in §1–§15 changes, so `V` stays 1.
+
+- Vectors: `fixtures/vectors/protocol-v1-addendum-c.json`, produced by `tools/gen-vectors-addendum-c.ts`, checked by `packages/core/test/addendum-c.test.ts`, and in the browser by `/verify` on every load.
+- Code: `handover.ts`, `verify.ts` (C.1), `wire.ts` (`rx`, `parseHandoverReq`).
+
+**C.1 Certified keys in a proof.** A response sheet may carry `binds` (its B.1 bind certificates, every key epoch; `pinBox` may be `''`), and a proof may carry `cells: [{id, keyId, pub, cert}]` (B.2 cell key certificates). A verifier that pins only the exam authority's key accepts a seat key for `(cand, keyEpoch)` iff:
+- a bind in `binds` verifies under the key of a cell whose certificate verifies under the authority (and `cellKeyId(pub) = keyId`);
+- the bind names the sheet's `exam, shift, attempt, cand`, and its `pub` is the sheet's key for that epoch.
+
+Certified epochs must be `1, 2, …`, epoch 1 with `fromSeq 0`, each later one with a larger `fromSeq`. Entry `seq` must then be signed at `epochAt(seq)`, the highest epoch whose `fromSeq < seq`. A receipt countersignature is checked under the named certified cell. Records without certificates (DEV mode) may still be checked against pinned keys.
+
+**C.2 Handover claim** (the old-key path): `["handover",exam,shift,attempt,cand,keyEpoch,fromSeq,fromHead,newPub]`, signed as in A.1 by the key of `keyEpoch` (the old epoch). `fromHead` is 64 hex (`genesisPrev` when `fromSeq = 0`); `newPub` is 130 hex. This fixes the §5 reserved layout.
+
+**C.3 Handover PIN** (the PIN path): the UTF-8 of the 6-digit PIN in a B.4 box to the cell with `info = ["saakshi-handover-pin",1,exam,shift,attempt,cand,seatId,newPub]`. The new seat also sends a fresh B.5 record (B.4 box, `info = pinInfo(seatId)`) holding the same PIN. The cell checks the PIN against the current epoch's record and the new record against the PIN, and limits wrong PINs per candidate.
+
+**C.4 The new binding.** The cell signs a B.1 bind with `keyEpoch = E+1` and `fromSeq = F` only if `F` is its committed head for the stream, `h(F) = fromHead`, nothing is pending and the stream has no submit. At relay and cell, after the signature check:
+- `seq ≤ fromSeq(keyEpoch)` → `BAD_SUBMISSION`;
+- `seq > fromSeq(keyEpoch + 1)` → `ORPHANED`: kept as evidence with its envelope, never `FORK`, never committed.
+
+**C.5 Grant and restore.** Grant `["grant",exam,shift,attempt,cand,keyEpoch,fromSeq,fromHead,activeMs,creditedMs,respHash]`, signed by the cell (A.1), `keyEpoch` the new epoch.
+
+| Field | Value |
+|---|---|
+| `activeMs` | entry F's `activeMs` (0 when F = 0) |
+| `creditedMs` | the cell's clock at the grant − `rxWall(F)`, at least 0 (0 when F = 0) |
+| `respHash` | `hex(SHA-256(UTF-8(canon(["responses", R]))))`, R = the A.5 responses at F, in form order, without `NV` rows |
+
+The restore box is a B.4 box to `newPub` with `info = ["saakshi-restore",1,exam,shift,attempt,cand,keyEpoch,fromSeq]` and `pt = UTF-8(canon(["responses", R]))`. The new seat accepts only if the bind and the grant verify under its policy-pinned cell key, match each other and its own key, and `respHash` matches the opened box.
+
+**C.6 Conventions (not checked).** The first entry of epoch E+1 is kind `handover` at seq F+1, with `prev = fromHead`, the grant's `activeMs`, and body `["body","","","",[via,F,creditedMs]]`, `via ∈ {pin, key}`.
+
+**C.7 rxWall.** The relay stamps its wall clock (ms since the Unix epoch) on each entry it commits and forwards it as `WireEntry.rx` (non-normative JSON); the cell stores the relay's value and its own. Neither is signed. They are used only for C.8 and C.9. The §12 export field `rxWall` is the relay's value; `SheetEntry.rx = [relayRx, cellRx]`.
+
+**C.8 Hard stop.** Relay and cell reject a new entry whose `rxWall` (the relay: its own clock; the cell: the relay's `rx`, else its own) is later than `rxWall(seq 1) + D_i + gapCapMs + slackMs` as `LATE`, kept as evidence with its envelope.
+
+**C.9 Gaps (convention, not checked).** A `gap` body is `["body","","","",[cause,pausedMs]]`, `cause ∈ {suspend, lock-screen, restart}`, `pausedMs` the seat's own measure (0 if unknown). Credit for a `gap` or `handover` entry g after entry p is measured as `max(0, (rx_g − rx_p) − Δactive)`, with `Δactive = 0` across epochs.
+
+**C.10 Purge order.** `["purge",exam,shift,sthId,ts]`, signed as in A.1 by the exam authority. A relay deletes a shift's entries only on a valid order.

@@ -2,20 +2,28 @@
 import type { State } from '@saakshi/core/protocol';
 export type { GateMethod } from '@saakshi/core/enrol';
 import type { GateMethod } from '@saakshi/core/enrol';
+import type { CentreStatus } from '@saakshi/core/ops';
 
 export type Lang = 'en' | 'hi';
 /** The latest journaled state of one item; seq is the entry that set it (drives the tick). */
 export interface ItemState { state: State; answer: string; seq: number }
 /** local ✓ / relay ✓✓ / cell blue ✓✓. provisional: the cell has not ratified this seat's binding, so nothing leaves the seat. */
-export interface SyncView { local: number; relay: number; cell: number; online: boolean; error: string; provisional?: boolean }
+export interface SyncView {
+  local: number; relay: number; cell: number; online: boolean; error: string; provisional?: boolean;
+  /** Stage 4: this seat was replaced by another (its entries are ORPHANED); it stops sending. */
+  moved?: boolean;
+}
 /** Computed on the seat at submit from its own journal (protocol Addendum A.5). */
 export interface Receipt {
   exam: string; shift: string; cand: string; form: string; code: string;
   seq: number; h: string; finalHash: string; attempted: number; answered: number; marked: number; total: number;
 }
-/** connecting: no verified package yet · enrol: no seat key · locked: waiting for T0 · ready: unlocked, not started. */
-export type Phase = 'connecting' | 'enrol' | 'locked' | 'ready' | 'exam' | 'submitted';
-export type BindState = 'none' | 'provisional' | 'bound' | 'refused';
+/** connecting: no verified package yet · enrol: no seat key · locked: waiting for T0 · ready: unlocked, not started ·
+ *  moving: a move to this seat awaits approval · moved: this seat was replaced by another (its entries are ORPHANED). */
+export type Phase = 'connecting' | 'enrol' | 'moving' | 'locked' | 'ready' | 'exam' | 'submitted' | 'moved';
+export type BindState = 'none' | 'provisional' | 'bound' | 'refused' | 'moving';
+/** Time credited for a move (Addendum C.5), and who approved it ('' = pending control's approval). */
+export interface Credit { ms: number; via: 'pin' | 'key'; approvedBy: string; fromSeq: number }
 export interface PaperItem { id: string; subject: string; en: { q: string; o: string[] }; hi: { q: string; o: string[] } }
 /** The decrypted paper for this seat's form, in form order. It exists only after a key that matches kc_f. */
 export interface Paper { exam: string; form: string; items: PaperItem[] }
@@ -34,6 +42,16 @@ export interface ExamBoot {
   release?: { via: 'push' | 'code' };
   /** DEV test keystore: the renderer shows a permanent banner. */
   testMode?: boolean;
+  // Stage 4 (optional)
+  /** Check-in was refused because the candidate is bound elsewhere: offer "move here". */
+  moveable?: boolean;
+  credited?: Credit;
+  /** The relay's view of the link and the exam server (the banner). */
+  status?: CentreStatus;
+  /** The OS suspended or locked the screen; the timer is paused. */
+  paused?: boolean;
+  /** 16 hex of this seat's key, shown while a move waits so the invigilator can compare it with the console. */
+  moveKey?: string;
 }
 export interface EnrolInput { pin: string; operatorId: string; method: GateMethod }
 export type EnrolResult = { ok: true; bind: BindState } | { ok: false; error: string };
@@ -48,6 +66,8 @@ export interface SeatApi {
   start(): Promise<ActResult>;
   act(a: Action): Promise<ActResult>;
   submit(): Promise<SubmitResult>;
+  /** Stage 4: move the candidate to this seat with their PIN (Addendum C.3). */
+  handover(pin: string): Promise<EnrolResult>;
   onSync(cb: (v: SyncView) => void): () => void;
   onBoot(cb: (b: ExamBoot) => void): () => void;
 }

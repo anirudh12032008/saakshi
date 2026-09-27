@@ -1,7 +1,7 @@
 import { mismatchText, type CheckName, type SheetReport } from '@saakshi/core/verify';
 
 const LABEL: Record<CheckName, string> = {
-  keys: 'Seat keys (one per key epoch, pinned)',
+  keys: 'Seat keys (certified by the exam server, or pinned DEV keys)',
   chain: 'Signed hash chain',
   bodies: 'Answers vs. what the seat committed',
   finalHash: 'Final answer hash (replayed)',

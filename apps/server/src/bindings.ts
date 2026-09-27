@@ -36,6 +36,12 @@ export class Bindings {
   seatKey = (cand: string, keyEpoch: number): Uint8Array | undefined => this.#keys.get(`${cand}/${keyEpoch}`);
   get(cand: string, keyEpoch: number): WireBind | undefined { const r = this.#rows.get(`${cand}/${keyEpoch}`); return r && wire(r); }
   all(): WireBind[] { return [...this.#rows.values()].map(wire); }
+  /** Every binding of a candidate, oldest epoch first (Addendum C: the proof and a relay's replay carry them all). */
+  forCand(cand: string): WireBind[] {
+    const out: WireBind[] = [];
+    for (let e = 1; this.#rows.has(`${cand}/${e}`); e++) out.push(wire(this.#rows.get(`${cand}/${e}`)!));
+    return out;
+  }
   /** Candidates bound at keyEpoch 1: the reconciliation's "checked in". */
   cands(): string[] { return [...this.#rows.values()].filter((r) => r.key_epoch === 1).map((r) => r.cand).sort(); }
   tx<T>(fn: () => T): T { return this.#db.transaction(fn)(); }

@@ -75,6 +75,7 @@ if (mode === 'control') {
         dir, authority, forms, formOf, pseud, ...exam, centre: demo, cellUrl, relayUrl: env.RELAY_URL ?? 'http://127.0.0.1:7070',
         trust: X ? { ...trustFromKeys(keys), seats: {} } : trustFromKeys(keys),              // EXAM: seat keys come only from cell-signed bindings
         seatKeys, roster: X ? rosterOf(X.dir, demo) : devRoster(keys),
+        cells: X?.dir.cells.map(({ id, keyId, pub, cert }) => ({ id, keyId, pub, cert })),
       }, controlHtml),
       ...rc?.routes,
       ...fl?.routes,
@@ -124,7 +125,7 @@ if (mode === 'control') {
     '/v1/shift': { GET: (req) => {
       const u = new URL(req.url), qExam = u.searchParams.get('exam'), qShift = u.searchParams.get('shift');
       if (!qExam || !qShift) return json({ error: 'need ?exam=&shift=' }, 400);
-      return json(shiftExport(db, { exam: qExam, shift: qShift, cell: cell.id, formOf, pseud, seatKey }));
+      return json(shiftExport(db, { exam: qExam, shift: qShift, cell: cell.id, formOf, pseud, seatKey, binds: bindings ? (c: string) => bindings.forCand(c) : undefined }));
     } },
     // DEV chaos only — the "rogue insider" button. Prints the SQL so the cell's terminal shows the edit.
     '/v1/dev/rogue': { POST: async (req) => {

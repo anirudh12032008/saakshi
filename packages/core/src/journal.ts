@@ -38,9 +38,10 @@ export function parseSignedLine(line: string): ParsedLine {
   catch (e) { return { ok: false, fault: 'shape', detail: (e as Error).message }; }
 }
 
-/** verifyChain with one key per keyEpoch; an epoch with no key is a 'sig' fault on that line. */
-export function verifyChainKeyed(c: Ctx, lines: string[], keyFor: (keyEpoch: number) => Verify | undefined): ChainResult {
-  let prev = genesisPrev(c);
+/** verifyChain with one key per keyEpoch; an epoch with no key is a 'sig' fault on that line. `start`: continue from a head (Addendum C.6). */
+export function verifyChainKeyed(c: Ctx, lines: string[], keyFor: (keyEpoch: number) => Verify | undefined,
+  start: { seq: number; head: string } = { seq: 0, head: genesisPrev(c) }): ChainResult {
+  let prev = start.head;
   for (let i = 0; i < lines.length; i++) {
     const fail = (fault: ChainFault, detail: string): ChainResult => ({ ok: false, index: i, fault, detail });
     const p = parseSignedLine(lines[i]);
@@ -50,7 +51,7 @@ export function verifyChainKeyed(c: Ctx, lines: string[], keyFor: (keyEpoch: num
     const verify = keyFor(h.keyEpoch);
     if (!verify) return fail('sig', `no pinned key for keyEpoch ${h.keyEpoch}`);
     if (!verify(p.m, p.sig)) return fail('sig', 'signature does not verify');
-    if (h.seq !== i + 1) return fail('seq', `expected seq ${i + 1}, found ${h.seq}`);
+    if (h.seq !== start.seq + i + 1) return fail('seq', `expected seq ${start.seq + i + 1}, found ${h.seq}`);
     if (h.prev !== prev) return fail('prev', 'prev does not match the previous entry hash');
     prev = toHex(entryHash(h));
   }

@@ -7,6 +7,7 @@ import { signer, verifier, type KeyPair } from '@saakshi/core/node';
 import { bodyCommit, bodyFromArray } from '@saakshi/core/protocol';
 import type { LogLeaf, Proof, ResponseSheet, ShiftExport, SthRecord, Trust } from '@saakshi/core/sheet';
 import type { Verify } from '@saakshi/core/sig';
+import type { CellCert } from '@saakshi/core/handover';
 
 export interface SealOpts { authority: KeyPair; trust: Trust; pseud: (cand: string) => string; now?: () => number }
 export interface SealResult { rec: SthRecord; added: string[]; skipped: { cand: string; reason: string }[] }
@@ -59,11 +60,11 @@ export function seal(rec: SthRecord | undefined, exp: ShiftExport, o: SealOpts):
 }
 
 /** The proof /verify needs for one sheet, under the latest STH; undefined if the sheet is not in it. */
-export function proofFor(rec: SthRecord, sheet: ResponseSheet): Proof | undefined {
+export function proofFor(rec: SthRecord, sheet: ResponseSheet, cells?: CellCert[]): Proof | undefined {
   const signed = rec.sths.at(-1);
   if (!signed) return undefined;
   const index = rec.leaves.findIndex((l) => l.cand === sheet.ctx.cand && l.attempt === sheet.ctx.attempt);
   if (index < 0 || index >= signed.sth.size) return undefined;
   const hs = rec.leaves.slice(0, signed.sth.size).map((l) => hexToBytes(leafHashHex(l)));
-  return { v: 1, sheet, sth: signed, index, inclusion: inclusionProof(hs, index).map(toHex) };
+  return { v: 1, sheet, sth: signed, index, inclusion: inclusionProof(hs, index).map(toHex), ...(cells?.length ? { cells } : {}) };
 }

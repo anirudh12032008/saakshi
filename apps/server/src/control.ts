@@ -4,6 +4,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { HTMLBundle } from 'bun';
+import type { CellCert } from '@saakshi/core/handover';
 import type { KeyPair } from '@saakshi/core/node';
 import type { Finding, Forms, Proof, ShiftExport, SthRecord, Trust } from '@saakshi/core/sheet';
 import type { HeadsRes } from '@saakshi/core/wire';
@@ -20,6 +21,8 @@ export interface ControlOpts {
   cellUrl: string; relayUrl: string; now?: () => number;
   /** Stage 3: the demo cell's enrolled seat keys (`${cand}/${keyEpoch}` → pub), each already checked against that cell's certificate. */
   seatKeys?: () => Promise<Record<string, string>>;
+  /** Addendum C.1: every cell's key certificate, for proofs. */
+  cells?: CellCert[];
 }
 
 class HttpError extends Error {
@@ -73,7 +76,7 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
   async function proof(cand: string): Promise<Proof> {
     const rec = readRec();
     const sheet = (await cellExport()).sheets.find((s) => s.ctx.cand === cand);
-    const p = rec && sheet ? proofFor(rec, sheet) : undefined;
+    const p = rec && sheet ? proofFor(rec, sheet, o.cells) : undefined;
     if (!p) throw new HttpError(404, `${cand} is not in the sealed register yet — seal the shift first`);
     return p;
   }

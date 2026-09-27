@@ -13,6 +13,7 @@ const api: SeatApi = {
   start: () => ipcRenderer.invoke('exam:start'),
   act: (a: Action) => ipcRenderer.invoke('exam:act', a),
   submit: () => ipcRenderer.invoke('exam:submit'),
+  handover: (pin: string) => ipcRenderer.invoke('exam:handover', pin),
   onSync: (cb) => on<SyncView>('sync', cb),
   onBoot: (cb) => on<ExamBoot>('boot', cb),
 };

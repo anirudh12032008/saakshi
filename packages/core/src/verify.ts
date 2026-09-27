@@ -1,6 +1,8 @@
 // The one verifier: the audit (server) and /verify (browser) both call it. Browser-safe: noble by default.
 import { crockford80, decodeCrockford80, hexToBytes, toHex } from './bytes.ts';
 import { canon, type Canon } from './canon.ts';
+import { checkWireBind, type Bind } from './enrol.ts';
+import { checkCellCert, epochAt, type CellCert, type Epoch } from './handover.ts';
 import { parseSignedLine, verifyChainKeyed, type ChainFault } from './journal.ts';
 import { leafHashHex, receiptMessage, responsesOf, sthMessage, type Leaf } from './log.ts';
 import { verifyInclusion } from './merkle.ts';
@@ -46,27 +48,64 @@ export function mismatchText(m: Mismatch): string {
   return `${where}: record says ${say(m.recorded)} — ${m.committed ? `the seat committed ${say(m.committed)}` : 'what the seat committed cannot be recovered'}`;
 }
 
-export function verifySheet(sheet: ResponseSheet, forms: Forms, trust: Trust, mkVerify: MkVerify = nobleVerifier): SheetReport {
+/** Addendum C.1: the pinned DEV cells, plus every cell whose key certificate the pinned authority signed. */
+export function certifiedCells(exam: string, cells: CellCert[] | undefined, trust: Trust, mkVerify: MkVerify = nobleVerifier): Map<string, Uint8Array> {
+  const out = new Map<string, Uint8Array>(Object.entries(trust.cells).map(([id, pub]) => [id, hexToBytes(pub)]));
+  const authority = mkVerify(hexToBytes(trust.authority));
+  for (const c of cells ?? []) { try { out.set(c.id, checkCellCert(c, exam, authority)); } catch { /* not certified: not trusted */ } }
+  return out;
+}
+
+export function verifySheet(sheet: ResponseSheet, forms: Forms, trust: Trust, mkVerify: MkVerify = nobleVerifier, cells?: CellCert[]): SheetReport {
   const { ctx } = sheet;
   const checks: Check[] = [];
   const mismatches: Mismatch[] = [];
   const check = (name: CheckName, ok: boolean, detail: string) => { checks.push({ name, ok, detail }); };
   const form = forms[sheet.form];
 
-  // 1. Keys: each key the sheet names must be the pinned key for (cand, keyEpoch).
-  const keyed = new Map<number, Verify>();
-  const badKeys: number[] = [];
-  for (const k of sheet.keys) {
-    if (trust.seats[`${ctx.cand}/${k.keyEpoch}`] === k.pub) keyed.set(k.keyEpoch, mkVerify(hexToBytes(k.pub)));
-    else badKeys.push(k.keyEpoch);
+  // 1. Keys: a bind certificate from a certified cell (C.1), or — DEV records only — a pinned key.
+  const cellPubs = certifiedCells(ctx.exam, cells, trust, mkVerify);
+  const certified = new Map<number, Bind>();
+  const problems: string[] = [];
+  for (const wb of sheet.binds ?? []) {
+    const pub = cellPubs.get(wb.cell);
+    if (!pub) { problems.push(`a bind certificate names ${wb.cell}, whose key the exam authority has not certified`); continue; }
+    try {
+      const b = checkWireBind(wb, pub, mkVerify);
+      if (b.exam !== ctx.exam || b.shift !== ctx.shift || b.attempt !== ctx.attempt || b.cand !== ctx.cand) problems.push(`a bind certificate is for ${b.cand} (${b.exam} ${b.shift}), not ${ctx.cand}`);
+      else certified.set(b.keyEpoch, b);
+    } catch (e) { problems.push(`a bind certificate: ${(e as Error).message}`); }
   }
-  check('keys', badKeys.length === 0 && keyed.size > 0,
-    badKeys.length ? `keyEpoch ${badKeys.join(', ')}: not the pinned seat key for ${ctx.cand}` : keyed.size ? `${keyed.size} key epoch(s), each the pinned key for ${ctx.cand}` : 'no seat keys in the record');
+  const keyed = new Map<number, Verify>();
+  const epochs: Epoch[] = [];
+  let pinned = 0;
+  for (const k of sheet.keys) {
+    const b = certified.get(k.keyEpoch);
+    if (b && b.pub === k.pub) { keyed.set(k.keyEpoch, mkVerify(hexToBytes(k.pub))); epochs.push({ keyEpoch: b.keyEpoch, fromSeq: b.fromSeq }); }
+    else if (trust.seats[`${ctx.cand}/${k.keyEpoch}`] === k.pub) { keyed.set(k.keyEpoch, mkVerify(hexToBytes(k.pub))); pinned++; }
+    else problems.push(`keyEpoch ${k.keyEpoch}: not a key certified for ${ctx.cand}`);
+  }
+  epochs.sort((a, b) => a.keyEpoch - b.keyEpoch);
+  if (epochs.length && !epochs.every((e, i) => e.keyEpoch === i + 1 && (i === 0 ? e.fromSeq === 0 : e.fromSeq > epochs[i - 1].fromSeq)))
+    problems.push('the certified key epochs are not 1, 2, … with increasing fromSeq');
+  const by = [...new Set((sheet.binds ?? []).map((b) => b.cell))].join(', ');
+  check('keys', problems.length === 0 && keyed.size > 0, problems.length ? problems.join('; ') : !keyed.size ? 'no seat keys in the record'
+    : `${keyed.size} key epoch(s) for ${ctx.cand}: ${[epochs.length ? `certified by ${by}, whose key the exam authority certified` : '', pinned ? 'pinned DEV keys' : ''].filter(Boolean).join('; ')}`);
 
-  // 2. Chain, one verifier per key epoch.
+  // 2. Chain, one verifier per key epoch; with certified epochs, each seq must be signed by its own epoch (C.4).
   const chain = verifyChainKeyed(ctx, sheet.entries.map((e) => e.line), (e) => keyed.get(e));
-  const fault = chain.ok ? undefined : { seq: chain.index + 1, fault: chain.fault, detail: chain.detail };
-  check('chain', chain.ok, fault ? `entry ${fault.seq}: ${fault.fault} — ${fault.detail}` : `${sheet.entries.length} entries: signatures, sequence and links verify`);
+  let fault = chain.ok ? undefined : { seq: chain.index + 1, fault: chain.fault, detail: chain.detail };
+  if (!fault && epochs.length) {
+    for (const e of sheet.entries) {
+      const p = parseSignedLine(e.line);
+      const want = p.ok ? epochAt(epochs, p.header.seq) : undefined;
+      if (p.ok && want !== p.header.keyEpoch) {
+        fault = { seq: p.header.seq, fault: 'sig', detail: `signed at keyEpoch ${p.header.keyEpoch}, but seq ${p.header.seq} belongs to keyEpoch ${want ?? 'none'} (Addendum C.4)` };
+        break;
+      }
+    }
+  }
+  check('chain', !fault, fault ? `entry ${fault.seq}: ${fault.fault} — ${fault.detail}` : `${sheet.entries.length} entries: signatures, sequence and links verify`);
 
   // 3. Every recorded body against its signed commitment; option search where they differ.
   const committed: (Body | null)[] = [];
@@ -122,8 +161,8 @@ export function verifySheet(sheet: ResponseSheet, forms: Forms, trust: Trust, mk
     const r = sheet.receipt;
     if (!r) check('receipt', true, `receipt ${receipt.code}; this record carries no cell countersignature yet`);
     else {
-      const pub = trust.cells[r.cell];
-      const ok = !!pub && r.seq === B.seq && r.h === B.h && r.code === receipt.code && mkVerify(hexToBytes(pub))(receiptMessage(B), hexToBytes(r.sig));
+      const pub = cellPubs.get(r.cell);
+      const ok = !!pub && r.seq === B.seq && r.h === B.h && r.code === receipt.code && mkVerify(pub)(receiptMessage(B), hexToBytes(r.sig));
       check('receipt', ok, ok ? `receipt ${receipt.code}, countersigned by ${r.cell}` : `the cell's receipt (${r.code}) does not match this record, or its countersignature fails`);
     }
   } else check('receipt', false, 'no receipt without a verified submit');
@@ -133,7 +172,7 @@ export function verifySheet(sheet: ResponseSheet, forms: Forms, trust: Trust, mk
 
 /** verifySheet plus the slip code as typed, the STH signature and the leaf's inclusion. */
 export function verifyProof(p: Proof, forms: Forms, trust: Trust, typedCode?: string, mkVerify: MkVerify = nobleVerifier): SheetReport {
-  const r = verifySheet(p.sheet, forms, trust, mkVerify);
+  const r = verifySheet(p.sheet, forms, trust, mkVerify, p.cells);
   const add = (name: CheckName, ok: boolean, detail: string) => { r.checks.push({ name, ok, detail }); };
   if (typedCode !== undefined && typedCode.trim() !== '') {
     let typed: string | undefined;
@@ -163,16 +202,21 @@ function need(ok: boolean, what: string): asserts ok { if (!ok) throw new Error(
 /** Validate an untrusted proof file before anything reads it. */
 export function parseProof(x: unknown): Proof {
   need(obj(x) && x.v === 1, 'not a Saakshi proof (v 1)');
-  const { sheet, sth, index, inclusion } = x as O;
+  const { sheet, sth, index, inclusion, cells } = x as O;
   need(obj(sheet) && obj(sheet.ctx), 'sheet.ctx is missing');
   const c = sheet.ctx as O;
   need(str(c.exam) && str(c.shift) && nat(c.attempt) && str(c.cand), 'sheet.ctx must be {exam, shift, attempt, cand}');
   need(str(sheet.form) && str(sheet.pseud, 128), 'sheet.form and sheet.pseud');
   need(Array.isArray(sheet.keys) && sheet.keys.length <= 16 && sheet.keys.every((k) => obj(k) && nat(k.keyEpoch) && is(PUB)(k.pub)), 'sheet.keys must be [{keyEpoch, pub}]');
   need(Array.isArray(sheet.entries) && sheet.entries.length <= 10_000
-    && sheet.entries.every((e) => obj(e) && str(e.line, 4096) && is(SALT)(e.salt) && Array.isArray(e.body) && tagged(e.body)), 'sheet.entries must be [{line, salt, body}]');
+    && sheet.entries.every((e) => obj(e) && str(e.line, 4096) && is(SALT)(e.salt) && Array.isArray(e.body) && tagged(e.body)
+      && (e.rx === undefined || (Array.isArray(e.rx) && e.rx.length === 2 && e.rx.every(nat)))), 'sheet.entries must be [{line, salt, body, rx?}]');
   const r = sheet.receipt;
   need(r === undefined || (obj(r) && str(r.cell) && nat(r.seq) && is(HEX64)(r.h) && str(r.code, 32) && is(SIG)(r.sig)), 'sheet.receipt');
+  const wb = (b: unknown) => obj(b) && str(b.cert, 4096) && is(SIG)(b.sig) && str(b.cell) && typeof b.pinBox === 'string' && b.pinBox.length <= 2048 && /^[0-9a-f]*$/.test(b.pinBox);
+  need(sheet.binds === undefined || (Array.isArray(sheet.binds) && sheet.binds.length <= 16 && sheet.binds.every(wb)), 'sheet.binds must be [{cert, sig, cell, pinBox}]');
+  need(cells === undefined || (Array.isArray(cells) && cells.length <= 16
+    && cells.every((c) => obj(c) && str(c.id) && is(/^[0-9a-f]{16}$/)(c.keyId) && is(PUB)(c.pub) && is(SIG)(c.cert))), 'cells must be [{id, keyId, pub, cert}]');
   need(obj(sth) && obj(sth.sth) && is(SIG)(sth.sig), 'sth must be {sth, sig}');
   const t = sth.sth as O;
   need(str(t.exam) && str(t.shift) && nat(t.size) && is(HEX64)(t.root) && is(HEX64)(t.prevSTH) && nat(t.ts), 'sth fields');

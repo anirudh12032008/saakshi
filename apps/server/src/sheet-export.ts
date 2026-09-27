@@ -2,6 +2,7 @@
 import type { Database } from 'bun:sqlite';
 import { toHex } from '@saakshi/core/bytes';
 import type { Canon } from '@saakshi/core/canon';
+import type { WireBind } from '@saakshi/core/enrol';
 import { bodyArray, type State } from '@saakshi/core/protocol';
 import type { ResponseSheet, ShiftExport } from '@saakshi/core/sheet';
 
@@ -10,6 +11,8 @@ export interface ExportOpts {
   formOf: (cand: string) => string | undefined;
   pseud: (cand: string) => string;
   seatKey: (cand: string, keyEpoch: number) => Uint8Array | undefined;
+  /** Addendum C.1 (EXAM mode): the candidate's bind certificates. Exported without the sealed PIN record. */
+  binds?: (cand: string) => WireBind[];
 }
 interface J { attempt: number; cand: string; seq: number; key_epoch: number; line: string; item: string | null; state: string | null; answer: string | null; meta: string | null; salt: Uint8Array | null }
 interface R { attempt: number; cand: string; seq: number; h: string; code: string; cell: string; sig: string }
@@ -36,6 +39,8 @@ export function shiftExport(db: Database, o: ExportOpts): ShiftExport {
   }
   for (const [k, { sheet, epochs }] of sheets) {
     sheet.keys = [...epochs].sort((a, b) => a - b).flatMap((e) => { const pub = o.seatKey(sheet.ctx.cand, e); return pub ? [{ keyEpoch: e, pub: toHex(pub) }] : []; });
+    const bs = o.binds?.(sheet.ctx.cand) ?? [];
+    if (bs.length) sheet.binds = bs.map((b) => ({ ...b, pinBox: '' }));
     const rc = receipts.get(k);
     if (rc) sheet.receipt = { cell: rc.cell, seq: rc.seq, h: rc.h, code: rc.code, sig: rc.sig };
   }

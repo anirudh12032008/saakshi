@@ -36,7 +36,7 @@ export function fleet(o: { dir: Directory; stats?: (c: CellEntry) => Promise<Cel
       const s = (g?.status === 'fulfilled' && g.value.centres[centre]) || empty(centre);
       return { centre, cell, ...s, tone: tone(s, g?.status !== 'fulfilled') };
     });
-    const sum = (k: keyof CentreStats) => centres.reduce((n, x) => n + x[k], 0);
+    const sum = (k: Exclude<keyof CentreStats, 'lastSeen'>) => centres.reduce((n, x) => n + x[k], 0);
     const entries = cells.reduce((n, x) => n + x.entries, 0);
     const entriesPerSec = prev && at > prev.at ? Math.max(0, Math.round(((entries - prev.entries) * 1000) / (at - prev.at))) : 0;
     prev = { at, entries };
