@@ -25,9 +25,9 @@ function bunStack() {
 }
 
 // When Playwright can't attach, run the exe the way it does and show why it exited (CI has no other window into it).
-function launchDiag(args: string[]): Promise<string> {
+function launchDiag(args: string[], exe = EXE): Promise<string> {
   return new Promise((res) => {
-    const p = spawn(EXE, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1', ELECTRON_ENABLE_STACK_DUMPING: '1' } });
+    const p = spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1', ELECTRON_ENABLE_STACK_DUMPING: '1' } });
     let out = '';
     p.stdout!.on('data', (d) => { out += d; }); p.stderr!.on('data', (d) => { out += d; });
     const t = setTimeout(() => { p.kill(); res(`launch diag [${args.slice(0, 3).join(' ')}]: still running after 15 s\n${out}`); }, 15_000);
@@ -48,6 +48,8 @@ test('enrol → unlock → answer offline → sync → submit → /verify green 
     catch (e) {
       console.error(await launchDiag(['--inspect=0', '--remote-debugging-port=0', '--enable-logging=stderr', ...args]));
       console.error(await launchDiag(['--enable-logging=stderr', ...args]));
+      console.error(await launchDiag(['--probe-selftest', '--out', join(data, 'p.json')]));
+      if (process.platform === 'win32') console.error(await launchDiag(['--enable-logging=stderr', ...args], join(HERE, '../release/win-unpacked/Saakshi.exe')));
       throw e;
     }
     const w = await app.firstWindow();
