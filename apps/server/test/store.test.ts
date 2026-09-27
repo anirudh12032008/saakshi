@@ -20,8 +20,10 @@ test('durability pragmas apply: WAL, synchronous=FULL, fullfsync on macOS', () =
 });
 
 test('openDb reports a fresh file once', () => {
-  expect(openDb(join(dir, 'new.db')).fresh).toBe(true);
-  expect(openDb(join(dir, 'new.db')).fresh).toBe(false);
+  const a = openDb(join(dir, 'new.db')); a.db.close();
+  const b = openDb(join(dir, 'new.db')); b.db.close(); // close both: Windows can't delete a dir holding open DBs
+  expect(a.fresh).toBe(true);
+  expect(b.fresh).toBe(false);
 });
 
 test('rows are invisible to other readers until the group commits; the promise resolves only after COMMIT', async () => {
