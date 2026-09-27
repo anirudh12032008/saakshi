@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, safeStorage, session, systemPreferences } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, powerMonitor, protocol, safeStorage, session, systemPreferences } from 'electron';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { hexToBytes } from '@saakshi/core/bytes';
@@ -55,6 +55,7 @@ function start(): void {
   ipcMain.handle('exam:start', () => guard(() => seat!.start()));
   ipcMain.handle('exam:act', (_e, a: Action) => guard(() => seat!.act(a)));
   ipcMain.handle('exam:submit', () => guard(() => seat!.submit()));
+  ipcMain.handle('exam:handover', (_e, pin: string) => seat!.handover(String(pin)));
 
   app.whenReady().then(async () => {
     let wrap: Wrapper;
@@ -64,6 +65,11 @@ function start(): void {
     seat = new Seat({ dir: join(app.getPath('userData'), 'journal'), relayUrl, ctx: { ...DEV_EXAM, cand }, seatId, authorityPub, wrap, camera, testMode: test,
       onBoot: (b) => win?.webContents.send('boot', b), onSync: (v) => win?.webContents.send('sync', v) });
     await seat.open();
+    // plan §3.6: suspend and screen lock pause the timer and become gap entries on resume (powerMonitor only after whenReady).
+    powerMonitor.on('suspend', () => seat?.pause('suspend'));
+    powerMonitor.on('lock-screen', () => seat?.pause('lock-screen'));
+    powerMonitor.on('resume', () => seat?.resume());
+    powerMonitor.on('unlock-screen', () => seat?.resume());
 
     protocol.handle('app', async (req) => {
       const p = resolveAppPath(RENDERER, new URL(req.url).pathname);

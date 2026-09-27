@@ -39,6 +39,8 @@ export class SeatSync {
   #cell = 0;
   #online = false;
   #error = '';
+  #moved = false;
+  #probe = false;
   #busy = false;
   #again = false;
   #timer: ReturnType<typeof setInterval> | undefined;
@@ -48,7 +50,7 @@ export class SeatSync {
   }
 
   view(): SyncView {
-    const v: SyncView = { local: this.#src.head(), relay: this.#relay, cell: this.#cell, online: this.#online, error: this.#error };
+    const v: SyncView = { local: this.#src.head(), relay: this.#relay, cell: this.#cell, online: this.#online, error: this.#error, ...(this.#moved ? { moved: true } : {}) };
     return this.#bind ? { ...v, provisional: !this.#bind() } : v;
   }
 
@@ -56,19 +58,22 @@ export class SeatSync {
     const bind = this.#bind?.();
     if (this.#bind && !bind) { this.#onView(this.view()); return; }              // provisional: ✓ only until the cell ratifies the seat
     const s = this.#src;
-    const entries = this.#cursor < 0 ? [] : s.entriesAfter(this.#cursor, BATCH);
+    // With no agreed cursor, a seat whose chain the relay disagrees with sends its own last entry as a probe, so the relay can
+    // say why (after a move: ORPHANED). The binding travels on first contact AND whenever the relay knows nothing of us (a spare).
+    const entries = this.#cursor >= 0 ? s.entriesAfter(this.#cursor, BATCH) : this.#probe && s.head() > 0 ? s.entriesAfter(s.head() - 1, 1) : [];
     const req: SyncReq = { entries, streams: [{ ...s.ctx, head: s.head() }] };
-    if (bind && this.#cursor < 0) req.binds = [bind];
+    if (bind && this.#cursor <= 0) req.binds = [bind];
     let res: SyncRes;
     try { res = await this.#send(req); }
     catch (e) { this.#online = false; this.#error = (e as Error).message; this.#onView(this.view()); return; }
     this.#online = true;
     this.#error = res.rejected.map((r) => `${r.code}: ${r.reason}`).join('; ');
+    if (res.rejected.some((r) => r.code === 'ORPHANED')) this.#moved = true;
     const st = res.streams.find((x) => streamKey(x) === streamKey(s.ctx));
     if (st) {
       const mine = st.head === 0 ? '' : st.head <= s.head() ? s.hashAt(st.head) : undefined;
-      if (st.headH === mine) { this.#cursor = st.head; this.#relay = Math.max(this.#relay, st.head); }
-      else this.#error ||= `relay disagrees with this seat at seq ${st.head}`;
+      if (st.headH === mine) { this.#cursor = st.head; this.#relay = Math.max(this.#relay, st.head); this.#probe = false; }
+      else { this.#error ||= `relay disagrees with this seat at seq ${st.head}`; this.#probe = true; }
       const a = st.ack;
       if (a && a.seq >= 1 && a.seq <= s.head() && a.h === s.hashAt(a.seq) && SIG_HEX.test(a.sig)
         && this.#cellVerify(ackMessage({ ...s.ctx, keyEpoch: a.keyEpoch, seq: a.seq, h: a.h }), hexToBytes(a.sig))) {

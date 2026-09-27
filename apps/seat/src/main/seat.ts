@@ -4,10 +4,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hexToBytes } from '@saakshi/core/bytes';
 import { verifier } from '@saakshi/core/node';
+import type { CentreStatus } from '@saakshi/core/ops';
 import type { ReleaseMsg } from '@saakshi/core/paper';
 import { kcf, type Ctx } from '@saakshi/core/protocol';
 import type { Action, ActResult, EnrolInput, EnrolResult, ExamBoot, Paper, Phase, SubmitResult, SyncView } from '../shared/ipc.ts';
-import { ExamSession } from './exam.ts';
+import { ExamSession, type PauseCause } from './exam.ts';
 import { httpPost, SeatIdentity } from './identity.ts';
 import { writeDurable, type Wrapper } from './journal-store.ts';
 import { loadPackage, type SeatPackage } from './pkg.ts';
@@ -33,6 +34,7 @@ export class Seat {
   #sync?: SeatSync;
   #watch?: ReleaseWatcher;
   #notice = '';
+  #status?: CentreStatus;
   #timer?: ReturnType<typeof setInterval>;
   #busy = false;
   #closed = false;
@@ -59,16 +61,31 @@ export class Seat {
       bind: this.#id?.state ?? 'none', notice: this.#notice || this.#id?.error || '',
       commitment: this.#pkg?.manifest.forms.find((f) => f.form === me?.form)?.kcf,
       release: this.#unlocked && { via: this.#unlocked.via },
+      moveable: this.#id?.moveable ?? false, moveKey: this.#id?.state === 'moving' ? this.#id.moveKey : undefined,
+      credited: this.#id?.credit, status: this.#status, paused: e?.paused ?? false,
     };
   }
 
   async enrol(x: EnrolInput): Promise<EnrolResult> {
     if (!this.#id) return { ok: false, error: 'Waiting for the centre server.' };
     const r = await this.#id.enrol(x.pin, { operatorId: x.operatorId, method: x.method });
+    this.#dropUnbound();
     this.#openExam();
     this.#emit();
     return r;
   }
+
+  /** Move the candidate to this seat (Addendum C.3): waits for the invigilator, then continues from the grant. */
+  async handover(pin: string): Promise<EnrolResult> {
+    if (!this.#id) return { ok: false, error: 'Waiting for the centre server.' };
+    const r = await this.#id.handover(pin);
+    this.#openExam();
+    this.#emit();
+    return r;
+  }
+  /** The OS suspended or locked the screen (plan §3.6): the timer stops; resume journals a gap. */
+  pause(cause: PauseCause): void { this.#exam?.pause(cause); this.#emit(); }
+  resume(): void { if (this.#exam?.resume() !== undefined) this.#sync?.kick(); this.#emit(); }
 
   start(): ActResult {
     if (!this.#exam || !this.#unlocked) return { ok: false, error: 'The paper is locked until T0.' };
@@ -79,6 +96,7 @@ export class Seat {
   }
 
   act(a: Action): ActResult {
+    if (this.#sync?.view().moved) return { ok: false, error: 'This candidate has moved to another seat. Please call the invigilator.' };
     if (!this.#exam) return { ok: false, error: 'exam not started' };
     const r = this.#exam.act(a);
     if (r.ok) this.#sync?.kick();
@@ -105,7 +123,9 @@ export class Seat {
 
   #phase(): Phase {
     if (!this.#pkg) return 'connecting';
-    if (!this.#id?.key) return 'enrol';
+    if (this.#id?.state === 'moving') return 'moving';
+    if (!this.#id?.key || (this.#id.state === 'refused' && this.#id.moveable)) return 'enrol';
+    if (this.#sync?.view().moved) return 'moved';
     if (!this.#exam) return 'locked';
     if (this.#exam.submitted) return 'submitted';
     return this.#exam.started ? 'exam' : 'ready';
@@ -117,6 +137,8 @@ export class Seat {
     try {
       if (!this.#pkg) await this.#tryPackage();
       else if (this.#id?.state === 'provisional') { await this.#id.retry(); if (this.#id.state !== 'provisional') this.#emit(); }
+      else if (this.#id?.state === 'moving') { await this.#id.poll(); if (this.#id.state !== 'moving') { this.#openExam(); this.#emit(); } }
+      if (this.#pkg) await this.#pollStatus();
       this.#exam?.tick();
     } finally { this.#busy = false; }
   }
@@ -156,13 +178,36 @@ export class Seat {
     this.#emit();
   }
 
-  #openExam(): void {
-    if (this.#exam || !this.#pkg || !this.#paper || !this.#id?.key) return;
-    const p = this.#pkg.policy, me = p.roster[this.#o.ctx.cand], cellPub = hexToBytes(p.cell.pub), id = this.#id;
+  /** The relay's view of its link and the exam server: the in-exam banner (plan §3.10). */
+  async #pollStatus(): Promise<void> {
     try {
-      this.#exam = new ExamSession({ dir: this.#o.dir, ctx: this.#o.ctx, keyEpoch: 1, seat: id.key!, cellPub, wrap: this.#o.wrap,
-        durationMs: p.durationMs + me.extraMs, items: this.#paper.items.map((i) => i.id), form: me.form, pseud: me.pseud, clock: this.#o.clock, testMode: this.#o.testMode });
+      const r = await (this.#o.fetch ?? fetch)(new URL('/v1/status', this.#o.relayUrl), { signal: AbortSignal.timeout(2_000) });
+      if (!r.ok) return;
+      const s = (await r.json()) as CentreStatus, o = this.#status;
+      this.#status = s;
+      if (s.link !== o?.link || s.cell !== o?.cell || s.etaMs !== o?.etaMs) this.#emit();
+    } catch { /* keep the last status */ }
+  }
+
+  /** The key arrived while the check-in was in flight, then the cell refused it (bound elsewhere): an unstarted exam here must not
+   *  start a chain of its own — the move continues the candidate's chain from the grant instead. */
+  #dropUnbound(): void {
+    const st = this.#id?.state;
+    if (!this.#exam || this.#exam.started || (st !== 'refused' && st !== 'moving')) return;
+    this.#sync?.stop(); this.#exam.close();
+    this.#sync = undefined; this.#exam = undefined;
+  }
+
+  #openExam(): void {
+    const id = this.#id;
+    if (this.#exam || !this.#pkg || !this.#paper || !id?.key) return;
+    if (id.state !== 'bound' && id.state !== 'provisional') return;       // a refused or moving seat must not start a chain of its own
+    const p = this.#pkg.policy, me = p.roster[this.#o.ctx.cand], cellPub = hexToBytes(p.cell.pub);
+    try {
+      this.#exam = new ExamSession({ dir: this.#o.dir, ctx: this.#o.ctx, keyEpoch: id.keyEpoch, seat: id.key!, cellPub, wrap: this.#o.wrap, restore: id.restore,
+        durationMs: p.durationMs + me.extraMs, items: this.#paper.items.map((i) => i.id), form: me.form, pseud: me.pseud, clock: this.#o.clock, wall: this.#o.now, testMode: this.#o.testMode });
     } catch (e) { this.#notice = `Journal problem — please call the invigilator: ${(e as Error).message}`; return; }
+    if (this.#exam.resumed) this.#exam.restartGap();                     // the app restarted mid-exam: journal the gap (plan §2)
     this.#sync = new SeatSync(this.#exam, httpSend(this.#o.relayUrl, 5000, this.#o.fetch), verifier(cellPub), (v) => this.#o.onSync?.(v), { bind: () => id.bind });
     this.#sync.start(1000);
   }

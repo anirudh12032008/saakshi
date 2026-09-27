@@ -87,7 +87,7 @@ test('a relay that disagrees about our chain does not advance ✓✓', async () 
   await sync.round(); await sync.round();
   assert.equal(sync.view().relay, 0);
   assert.match(sync.view().error, /disagrees/);
-  assert.equal(relay.seen[1].entries.length, 0);                  // still unsure of the relay's head: only hellos
+  assert.equal(relay.seen[1].entries.length, 1);                  // still unsure of the relay's head: only our last entry, as a probe (Stage 4)
 });
 
 test('a fresh (spare) relay gets the whole journal again; ✓✓ already shown stays', async () => {
@@ -126,5 +126,5 @@ test('Stage 3 provisional: nothing leaves the seat until the binding exists; the
   assert.deepEqual(seen[0].binds, [bind]);
   assert.equal(sync.view().provisional, false);
   await sync.round();
-  assert.equal(seen[1].binds, undefined);                                           // the relay knows us now
+  assert.deepEqual(seen[1].binds, [bind]);                                          // Stage 4: the relay still reports head 0 (a spare), so it gets the binding again
 });
