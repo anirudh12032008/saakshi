@@ -1,3 +1,6 @@
+import type { WireBind } from '@saakshi/core/enrol';
+import type { ReleaseMsg } from '@saakshi/core/paper';
+import type { Ctx } from '@saakshi/core/protocol';
 import { streamKey, type Hello, type StreamView, type SyncReq, type SyncRes } from '@saakshi/core/wire';
 import type { Ingest } from './ingest.ts';
 
@@ -16,6 +19,14 @@ export function httpCellSend(base: string, timeoutMs = 5000): CellSend {
 
 const hello = (v: StreamView): Hello => ({ exam: v.exam, shift: v.shift, attempt: v.attempt, cand: v.cand, head: v.head });
 
+export interface ForwardOpts {
+  batch?: number; heartbeatMs?: number;
+  /** Stage 3: where releases from the cell go, and how many signed ones this relay already holds. */
+  releases?: { count(): number; accept(r: ReleaseMsg): unknown };
+  /** Stage 3: the binding to replay for a stream while the cell is REBUILDING. */
+  bindFor?: (c: Ctx) => WireBind | undefined;
+}
+
 /**
  * Relay → cell store-and-forward. Per stream it sends committed entries from cellHead+1 (a hello when the cell's
  * head is unknown), learns the cell's head and ack from the reply, and on 503 replays everything from genesis.
@@ -31,12 +42,16 @@ export class Forwarder {
   #replaying = false;
   #stopped = true;
   #loop: Promise<void> | undefined;
+  #releases?: ForwardOpts['releases'];
+  #bindFor?: ForwardOpts['bindFor'];
 
-  constructor(relay: Ingest, send: CellSend, opts: { batch?: number; heartbeatMs?: number } = {}) {
+  constructor(relay: Ingest, send: CellSend, opts: ForwardOpts = {}) {
     this.#relay = relay;
     this.#send = send;
     this.#batch = opts.batch ?? 500;
     this.#heartbeatMs = opts.heartbeatMs ?? 2000;
+    this.#releases = opts.releases;
+    this.#bindFor = opts.bindFor;
   }
 
   get replaying(): boolean { return this.#replaying; }
@@ -54,6 +69,11 @@ export class Forwarder {
         before.set(streamKey(v), v.cellHead);
         if (v.cellHead >= 0) req.entries.push(...this.#relay.entriesAfter(v, v.cellHead, this.#batch - req.entries.length));
       }
+      // Stage 3: while the cell rebuilds, each stream's binding travels with its entries (the cell processes binds first).
+      if (this.#replaying && this.#bindFor) {
+        const binds = req.streams.flatMap((h): WireBind[] => { const b = this.#bindFor!(h); return b ? [b] : []; });
+        if (binds.length) req.binds = binds;
+      }
       let heartbeat = false;
       if (!req.streams.length) {
         if (this.#replaying) {
@@ -63,9 +83,10 @@ export class Forwarder {
         }
         if (Date.now() - this.#lastContact < this.#heartbeatMs) return 'idle';
         req.streams = this.#relay.views().slice(0, 5000).map(hello);
-        if (!req.streams.length) return 'idle';
+        if (!req.streams.length && !this.#releases) return 'idle';                  // with releases to learn, an empty heartbeat still asks
         heartbeat = true;
       }
+      if (this.#releases) req.have = this.#releases.count();
       const res = await this.#send(req);
       this.#lastContact = Date.now();
       if (res === 'REBUILDING') {
@@ -77,6 +98,7 @@ export class Forwarder {
         if (before.get(streamKey(st)) !== st.head) progress = true;
         this.#relay.setCellStatus(st);
       }
+      for (const r of res.releases ?? []) this.#releases?.accept(r);
       return heartbeat ? 'idle' : progress ? 'busy' : 'error';
     } catch {
       return 'error';

@@ -1,5 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { ackMessage } from '@saakshi/core/ack';
+import type { WireBind } from '@saakshi/core/enrol';
+import type { ReleaseMsg } from '@saakshi/core/paper';
 import { hexToBytes, toHex } from '@saakshi/core/bytes';
 import { parseSignedLine } from '@saakshi/core/journal';
 import { openBody, signer, verifier } from '@saakshi/core/node';
@@ -38,6 +40,10 @@ export interface IngestOpts {
   pseud?: (cand: string) => string;
   /** cell: the id stamped on countersigned receipts. Default 'cell-1'. */
   cellId?: string;
+  /** Stage 3: store the cell-signed bindings a request carries, before its entries are checked. One error (or undefined) per bind. */
+  acceptBinds?: (binds: WireBind[]) => (string | undefined)[];
+  /** Stage 3, cell: the releases it holds; sent in the response when the relay has fewer (SyncReq.have). */
+  releases?: () => ReleaseMsg[];
 }
 
 export interface Ingest {
@@ -55,7 +61,7 @@ export interface Ingest {
 }
 
 /** bodies[seq-1] = the opened body (cell only); submitSeq = seq of the submit, 0 while the chain is open. */
-interface Stream { ctx: Ctx; hs: string[]; durable: number; epoch: number; ack?: WireAck; cellHead: number; senderHead: number; seenAt: number; bodies: Body[]; submitSeq: number }
+interface Stream { ctx: Ctx; hs: string[]; durable: number; epoch: number; ack?: WireAck; cellHead: number; senderHead: number; seenAt: number; bodies: Body[]; submitSeq: number; active: number; activeEpoch: number }
 
 const ENV_MIN = 65 + 24 + 16 + 16;
 const SIG_HEX = /^[0-9a-f]{128}$/;
@@ -82,7 +88,7 @@ export function createIngest(o: IngestOpts): Ingest {
   const get = (c: Ctx): Stream => {
     const k = streamKey(c);
     let s = streams.get(k);
-    if (!s) streams.set(k, (s = { ctx: ctxOf(c), hs: [], durable: 0, epoch: 0, cellHead: mode === 'cell' ? 0 : -1, senderHead: -1, seenAt: 0, bodies: [], submitSeq: 0 }));
+    if (!s) streams.set(k, (s = { ctx: ctxOf(c), hs: [], durable: 0, epoch: 0, cellHead: mode === 'cell' ? 0 : -1, senderHead: -1, seenAt: 0, bodies: [], submitSeq: 0, active: 0, activeEpoch: 0 }));
     return s;
   };
   const view = (s: Stream): StreamView => ({ ...s.ctx, head: s.durable, cellHead: mode === 'cell' ? s.durable : s.cellHead, senderHead: s.senderHead, seenAt: s.seenAt });
@@ -104,7 +110,7 @@ export function createIngest(o: IngestOpts): Ingest {
   for (const s of streams.values()) {
     const row = s.durable ? (lineAt.get(s.ctx.exam, s.ctx.shift, s.ctx.attempt, s.ctx.cand, s.durable) as { line: string } | null) : null;
     const p = row ? parseSignedLine(row.line) : undefined;
-    if (p?.ok && p.header.kind === 'submit') s.submitSeq = s.durable;
+    if (p?.ok) { s.active = p.header.activeMs; s.activeEpoch = p.header.keyEpoch; if (p.header.kind === 'submit') s.submitSeq = s.durable; }
   }
   const cellId = o.cellId ?? 'cell-1';
 
@@ -170,6 +176,11 @@ export function createIngest(o: IngestOpts): Ingest {
       touched.set(s, touched.get(s) ?? false);
     }
 
+    // Stage 3: bindings first, so the entries below are checked against the keys they certify. A bad bind is evidence, not an error.
+    if (req.binds?.length && o.acceptBinds) {
+      o.acceptBinds(req.binds).forEach((err, i) => { if (err) evidence.push(['BAD_SUBMISSION', '', 0, `bind: ${err}`, req.binds![i].cert]); });
+    }
+
     // Synchronous from here to commit.add: no other request interleaves with this validation.
     req.entries.forEach((e, index) => {
       const reject = (code: RejectCode, reason: string, key = '', seq = 0) => { rejected.push({ index, code, reason }); evidence.push([code, key, seq, reason, e.line]); };
@@ -191,6 +202,8 @@ export function createIngest(o: IngestOpts): Ingest {
       if (hd.prev !== (hd.seq === 1 ? genesisPrev(hd) : s.hs[hd.seq - 2])) return reject('FORK', `seq ${hd.seq}: prev does not match the stored chain`, key, hd.seq);
       // 3. fork or duplicate
       if (hd.seq <= head) return s.hs[hd.seq - 1] === h ? undefined : reject('FORK', `seq ${hd.seq} already holds a different signed entry`, key, hd.seq);
+      // Addendum B.8: active time never runs backwards within a key epoch (plan §3.6).
+      if (hd.keyEpoch === s.activeEpoch && hd.activeMs < s.active) return bad(`activeMs went backwards (${s.active} → ${hd.activeMs}) within keyEpoch ${hd.keyEpoch}`);
       let env: Uint8Array;
       try { env = fromB64(e.env); } catch { return bad('envelope is not base64'); }
       if (env.length < ENV_MIN) return bad('envelope too short');
@@ -208,6 +221,7 @@ export function createIngest(o: IngestOpts): Ingest {
         rec = { item: body.item, state: body.state, answer: body.answer, meta: JSON.stringify(body.meta), salt: opened.salt };
       }
       s.hs.push(h);
+      s.active = hd.activeMs; s.activeEpoch = hd.keyEpoch;
       if (body) s.bodies[hd.seq - 1] = body;
       if (hd.kind === 'submit') s.submitSeq = hd.seq;
       rows.push({ ...ctxOf(hd), seq: hd.seq, keyEpoch: hd.keyEpoch, h, line: e.line, env, body: rec, receipt });
@@ -220,9 +234,11 @@ export function createIngest(o: IngestOpts): Ingest {
       setMeta.run('state', 'LIVE');
       o.onState?.(state);
     }
+    const rel = o.releases?.() ?? [];
     return {
       streams: [...touched].map(([s, need]) => ({ ...s.ctx, head: s.durable, headH: s.durable ? s.hs[s.durable - 1] : '', need, ack: ackOf(s) })),
       rejected,
+      ...(rel.length > (req.have ?? 0) ? { releases: rel } : {}),
     };
   }
 

@@ -12,6 +12,11 @@ import { Forwarder } from '../src/forward.ts';
 import { createIngest, type Ingest, type Mode } from '../src/ingest.ts';
 import { openDb } from '../src/store.ts';
 import { SimSeat } from '../../../tools/sim-seat.ts';
+import { newKeyPair } from '@saakshi/core/node';
+import type { ReleaseMsg } from '@saakshi/core/paper';
+import type { SyncReq } from '@saakshi/core/wire';
+import { Bindings } from '../src/bindings.ts';
+import { simBindReq, simCustody } from '../../../tools/sim-custody.ts';
 
 const keys = JSON.parse(readFileSync(new URL('../../../fixtures/keys.json', import.meta.url), 'utf8')) as KeysFile;
 const cell = cellKey(keys, 'cell-1');
@@ -125,4 +130,48 @@ test('a cell that rejects everything makes the forwarder back off instead of spi
   const f = new Forwarder(relay, (req) => c.sync(req));
   expect(await f.round()).toBe('busy');                           // hello: cellHead −1 → 0
   expect(await f.round()).toBe('error');                          // 3 entries rejected, no progress
+});
+
+function bound(name: string, mode: Mode, fresh = false) {
+  const { db } = openDb(join(dir, `${name}.db`));
+  const b = new Bindings(db, { exam: 'DEMO-2026', shift: 'S1', cell: mode === 'cell' ? cell : { id: 'cell-1', pub: cell.pub } });
+  const n = createIngest({ mode, db, fresh, seatKey: b.seatKey, acceptBinds: (x) => b.acceptAll(x), cell: mode === 'cell' ? cell : { pub: cell.pub } });
+  opened.push(n);
+  return { n, b };
+}
+
+test('Review Focus #5: after the cell loses its DB, the replay carries the binds before the entries and the rebuilt cell accepts every entry', async () => {
+  const relay = bound('relay', 'relay'), c1 = bound('cell1', 'cell');
+  const seat = newKeyPair();
+  const e = c1.b.enrol(simBindReq('C0001', seat, cell.pub), true);
+  if (!e.ok) throw new Error(e.error);
+  expect(relay.b.accept(e.bind)).toBeUndefined();
+  const s = new SimSeat(keys, 'C0001', cell.pub, 1, seat);
+  s.add(25);
+  await seatPush(relay.n, s);
+  await drain(new Forwarder(relay.n, (req) => c1.n.sync(req), { bindFor: (x) => relay.b.get(x.cand, 1) }));
+  expect(c1.n.views()[0].head).toBe(25);
+
+  const c2 = bound('cell2', 'cell', true);                                         // the disk died: a fresh DB that knows no binding
+  expect([c2.n.state(), c2.b.seatKey('C0001', 1)]).toEqual(['REBUILDING', undefined]);
+  const sent: SyncReq[] = [];
+  await drain(new Forwarder(relay.n, (req) => { sent.push(req); return c2.n.sync(req); }, { bindFor: (x) => relay.b.get(x.cand, 1) }));
+  expect(c2.n.state()).toBe('LIVE');
+  expect(sent.find((r) => r.entries.length)!.binds).toEqual([e.bind]);
+  expect(c2.n.views()[0].head).toBe(25);
+  expect(evidence('cell2')).toEqual([]);
+});
+
+test('Stage 3: a relay with no seats still asks for releases on its heartbeat, and keeps what the cell sends', async () => {
+  const cust = simCustody(keys);
+  const { db } = openDb(join(dir, 'cellr.db'));
+  const c = createIngest({ mode: 'cell', db, fresh: false, seatKey: devSeatKey(keys), cell, releases: () => [cust.release('F1'), cust.release('F2')] });
+  opened.push(c);
+  const relay = mk('relay', 'relay'), got: ReleaseMsg[] = [];
+  const f = new Forwarder(relay, (req) => c.sync(req), { heartbeatMs: 0, releases: { count: () => got.length, accept: (r) => got.push(r) } });
+  expect(relay.views()).toEqual([]);
+  await f.round();
+  expect(got.map((r) => r.form)).toEqual(['F1', 'F2']);
+  await f.round();
+  expect(got.length).toBe(2);                                                      // have = 2: nothing resent
 });

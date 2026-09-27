@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hexToBytes } from '@saakshi/core/bytes';
+import { hexToBytes, randomBytes } from '@saakshi/core/bytes';
 import { ackMessage } from '@saakshi/core/ack';
 import { cellKey, devSeat, devSeatKey, type KeysFile } from '@saakshi/core/dev';
 import { signedLine } from '@saakshi/core/journal';
@@ -14,6 +14,9 @@ import { toB64, type SyncRes } from '@saakshi/core/wire';
 import { createIngest, type Ingest, type IngestOpts, type Mode } from '../src/ingest.ts';
 import { openDb } from '../src/store.ts';
 import { SimSeat } from '../../../tools/sim-seat.ts';
+import { newKeyPair } from '@saakshi/core/node';
+import { Bindings } from '../src/bindings.ts';
+import { simBindReq, simCustody } from '../../../tools/sim-custody.ts';
 
 const keys = JSON.parse(readFileSync(new URL('../../../fixtures/keys.json', import.meta.url), 'utf8')) as KeysFile;
 const cell = cellKey(keys, 'cell-1');
@@ -200,4 +203,43 @@ test('a response is sent only after its rows are committed (visible to another c
   await push(n, s);
   expect(rows('relay').length).toBe(50);
   expect(n.entriesAfter(s.ctx, 45, 10).map((e) => e.line)).toEqual(s.entries.slice(45).map((e) => e.line));
+});
+
+test('Stage 3: a seat key is trusted only through a cell-signed bind carried with the entries; a bad bind is evidence, not a crash', async () => {
+  const { db } = openDb(join(dir, 'relay3.db'));
+  const relayB = new Bindings(db, { exam: 'DEMO-2026', shift: 'S1', cell: { id: 'cell-1', pub: cell.pub } });
+  const n = createIngest({ mode: 'relay', db, fresh: false, seatKey: relayB.seatKey, acceptBinds: (b) => relayB.acceptAll(b), cell: { pub: cell.pub } });
+  opened.push(n);
+  const seat = newKeyPair(), s = new SimSeat(keys, 'C0001', cell.pub, 1, seat);
+  s.add(3);
+  const r0 = (await n.sync({ entries: s.entries, streams: [{ ...s.ctx, head: s.head }] })) as SyncRes;
+  expect(r0.rejected.map((x) => x.reason)).toEqual(Array(3).fill('no seat key for C0001 at keyEpoch 1'));
+  const cellDb = openDb(join(dir, 'cell3.db')).db;
+  const e = new Bindings(cellDb, { exam: 'DEMO-2026', shift: 'S1', cell }).enrol(simBindReq('C0001', seat, cell.pub), true);
+  cellDb.close();
+  if (!e.ok) throw new Error(e.error);
+  const r1 = (await n.sync({ entries: s.entries, streams: [{ ...s.ctx, head: s.head }], binds: [{ ...e.bind, sig: '0'.repeat(128) }, e.bind] })) as SyncRes;
+  expect(r1.rejected).toEqual([]);
+  expect(r1.streams[0].head).toBe(3);
+  expect(db.query("SELECT count(*) AS n FROM evidence WHERE reason LIKE 'bind:%'").get()).toEqual({ n: 1 });
+});
+
+test('Stage 3 (B.8): activeMs that runs backwards within a key epoch is BAD_SUBMISSION, never FORK', async () => {
+  const n = node('cell');
+  const s = new SimSeat(keys, 'C0001', cell.pub);
+  s.add(2);                                                                        // activeMs 1000, 2000
+  const body = { item: 'I02', state: 'A' as const, answer: 'B', meta: [1, []] };
+  const { envelope, bodyCommit } = sealBody(cell.pub, { ...s.ctx, seq: 3 }, randomBytes(16), body);
+  const h: Header = { ...s.ctx, keyEpoch: 1, seq: 3, prev: s.hs[1], kind: 'answer', tMonoMs: 3000, activeMs: 1500, bodyCommit };
+  const r = (await n.sync({ entries: [...s.entries, { line: signedLine(h, signer(devSeat(keys, 'C0001')!)), env: toB64(envelope) }], streams: [] })) as SyncRes;
+  expect(r.rejected).toEqual([{ index: 2, code: 'BAD_SUBMISSION', reason: 'activeMs went backwards (2000 → 1500) within keyEpoch 1' }]);
+});
+
+test('Stage 3: the cell hands its releases to a relay that has fewer, and not otherwise', async () => {
+  const cust = simCustody(keys), rel = [cust.release('F1'), cust.release('F2')];
+  const n = node('cell', { releases: () => rel });
+  const ask = async (have?: number) => ((await n.sync({ entries: [], streams: [], ...(have === undefined ? {} : { have }) })) as SyncRes).releases;
+  expect(await ask()).toEqual(rel);
+  expect(await ask(1)).toEqual(rel);
+  expect(await ask(2)).toBeUndefined();
 });
