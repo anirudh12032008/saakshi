@@ -30,7 +30,7 @@ function launchDiag(args: string[], exe = EXE): Promise<string> {
     const p = spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1', ELECTRON_ENABLE_STACK_DUMPING: '1', SAAKSHI_TRACE: '1' } });
     let out = '';
     p.stdout!.on('data', (d) => { out += d; }); p.stderr!.on('data', (d) => { out += d; });
-    const t = setTimeout(() => { p.kill(); res(`launch diag [${args.slice(0, 3).join(' ')}]: still running after 15 s\n${out}`); }, 15_000);
+    const t = setTimeout(() => { p.kill(); res(`launch diag [${args.slice(0, 3).join(' ')}]: still running after 15 s\n${out}`); }, 6_000);
     p.on('exit', (code, sig) => { clearTimeout(t); res(`launch diag [${args.slice(0, 3).join(' ')}]: exit ${code} ${sig ?? ''}\n${out}`); });
     p.on('error', (e) => { clearTimeout(t); res(`launch diag: spawn error ${e.message}`); });
   });
@@ -48,8 +48,9 @@ test('enrol → unlock → answer offline → sync → submit → /verify green 
     catch (e) {
       console.error(await launchDiag(['--inspect=0', '--remote-debugging-port=0', '--enable-logging=stderr', ...args]));
       console.error(await launchDiag(['--enable-logging=stderr', ...args]));
-      console.error(await launchDiag(['--probe-selftest', '--out', join(data, 'p.json')]));
-      if (process.platform === 'win32') console.error(await launchDiag(['--enable-logging=stderr', ...args], join(HERE, '../release/win-unpacked/Saakshi.exe')));
+      for (const v of [[], ['--test-mode'], [`--user-data-dir=${data}`], ['--no-camera'], ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+        ['--relay', relayUrl], ['--cand', 'C0001', '--seat', 'CEN042-S01'], ['--inspect=0'], ['--remote-debugging-port=0']])
+        console.error(await launchDiag([...v, '--test-mode']));
       throw e;
     }
     const w = await app.firstWindow();
