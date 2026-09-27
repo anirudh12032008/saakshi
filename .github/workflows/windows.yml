@@ -3,9 +3,9 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-    paths: ['apps/seat/**', 'packages/**', 'fixtures/**', 'tools/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/windows.yml']
+    paths: ['apps/seat/**', 'apps/server/**', 'packages/**', 'fixtures/**', 'tools/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/windows.yml']
   pull_request:
-    paths: ['apps/seat/**', 'packages/**', 'fixtures/**', 'tools/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/windows.yml']
+    paths: ['apps/seat/**', 'apps/server/**', 'packages/**', 'fixtures/**', 'tools/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/windows.yml']
   workflow_dispatch:
 concurrency:
   group: windows-${{ github.ref }}
