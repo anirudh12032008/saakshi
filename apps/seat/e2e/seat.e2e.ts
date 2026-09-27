@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import { _electron as electron, type ElectronApplication } from 'playwright-core';
 
 const HERE = import.meta.dirname;
-const EXE = process.platform === 'win32' ? join(HERE, '../release-e2e/win-unpacked/Saakshi-E2E.exe')
+const EXE = process.platform === 'win32' ? join(HERE, '../release-e2e/win-unpacked/Saakshi.exe')   // win.executableName comes from the parent config
   : join(HERE, `../release-e2e/mac-${process.arch}/Saakshi-E2E.app/Contents/MacOS/Saakshi-E2E`);
 
 function bunStack() {
