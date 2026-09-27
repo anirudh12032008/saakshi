@@ -1,0 +1,5 @@
+✓ original: 40 entries verify, head 6c921bbbb1357c7a…
+flipped byte 1234 (line 4): "a" → "`"
+✗ tampered: entry seq 4 (line 4) — shape: not ["signed",header,sigHex]
+located exactly: line 4
+files: /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-journal.jsonl  (edit by hand, then: node tools/tamper-lab.ts verify /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-journal.jsonl)

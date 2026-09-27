@@ -1,0 +1,28 @@
+{
+  "app": "saakshi-seat",
+  "platform": "win32",
+  "arch": "x64",
+  "electron": "44.4.5",
+  "ok": true,
+  "ms": 245,
+  "probes": {
+    "remoteSession": {
+      "status": "ok",
+      "value": false
+    },
+    "captureExcluded": {
+      "status": "ok",
+      "value": {
+        "visibleWindows": 15,
+        "excluded": []
+      }
+    },
+    "processes": {
+      "status": "ok",
+      "value": {
+        "count": 146,
+        "blocklistHits": []
+      }
+    }
+  }
+}
