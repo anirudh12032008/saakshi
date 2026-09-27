@@ -40,8 +40,8 @@ Everything below follows from that. The seat signature and the cell's countersig
 
 **Detects:**
 - Radar signal 1 catches pre-knowledge (speed-accuracy); signal 2 catches same-room copying rings; signal 3 (CUSUM) catches item leaks by centre and shift. **Built on synthetic data:** `analytics/src/saakshi_analytics/radar.py`.
-- The integrity gate and in-exam monitor are **Stage 5**; the probes exist today only as a self-test (see the detection matrix).
-- Face presence: the face count runs on the device (**Built**, `FaceChip.tsx`); face flags are **Stage 5**.
+- The integrity gate and in-exam monitor. **Built**: blocks before start by name (Windows CI, `act1.ts`); in-exam probes journal findings and raise `INTEGRITY_CRITICAL` for critical codes (see the detection matrix). Detection is proven against a renamed copy of another binary and the seat's own overlay-sim, not a genuine remote-access tool on real hardware (Stage 7).
+- Face presence: the face count runs on the device (**Built**, `FaceChip.tsx`); face flags and the review queue are **Built**, scripted end to end in `act1.ts` with synthetic samples; live with the camera is Stage 7.
 - Suspend and clock tricks: `rxWall` stamps and gap entries are **Stage 4**.
 
 **Recovers:**
@@ -93,10 +93,10 @@ Everything below follows from that. The seat signature and the cell's countersig
 
 **Prevents:**
 - The release build flips Electron fuses: no RunAsNode, no NODE_OPTIONS, no inspect arguments, ASAR integrity, load only from ASAR. It also sets `contextIsolation`, `sandbox`, a CSP, and a privileged `app://` scheme. **Built:** `apps/seat/electron-builder.yml`, `apps/seat/src/main/index.ts`.
-- The smoke test of the fused build, the single-instance lock and the devtools block are **Stage 5**.
+- The smoke test of the fused build, the single-instance lock and the devtools block. **Proven**: the fused build refuses `--inspect`/`--remote-debugging-port` (exit 3), `ELECTRON_RUN_AS_NODE` is ignored, a second instance exits 0 — on the Mac fused build and on Windows CI ([`evidence/stage5-fuse.txt`](evidence/stage5-fuse.txt)).
 
 **Detects:**
-- The blocklist, remote-session and capture-exclusion probes. **Built as a self-test**; the gate is **Stage 5**.
+- The blocklist, remote-session and capture-exclusion probes, wired into the gate. **Proven (name matching)**: the Windows CI gate self-test blocks a renamed `AnyDesk.exe` plus `overlay-sim`, naming both ([`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json)).
 - Per-centre, per-shift offline codes whose use control logs. **Built:** `packages/core/src/custody.ts`; the release flow, the relay's phoned-code route and the custody log entry (`bun tools/act2.ts`, step 11: `grep -E '"action":"(release|keys-zeroised|offline-code-revealed|chaos-wan)"'`).
 
 **Recovers:**
@@ -215,26 +215,28 @@ The cases in [research.md](research.md#research-landscape):
 **Detects:**
 - Blocklisted processes, among them AnyDesk, TeamViewer, RustDesk, Parsec, VNC, OBS and Cluely. **Built as a self-test.**
 - Windows `SM_REMOTESESSION` and macOS `screensharingd`. **Built as a self-test.**
-- The blocking gate, in-exam probes every 10 s, pointer-path provenance (S5) and the egress allowlist are **Stage 5**.
+- The blocking gate, in-exam probes every 10 s, pointer-path provenance (S5) and the egress allowlist. **Built.** The gate self-test on Windows CI blocks a renamed `notepad.exe` (as `AnyDesk.exe`) plus `overlay-sim`, naming both ([`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json)); egress is **review only**, not blocking (a VM-score-2 runner and out-of-allowlist connections are flagged, not refused). Pointer provenance (D.5) travels inside the sealed body; **analysis is Stage 6**.
 - The radar's speed-accuracy signal. **Built on synthetic data.**
 
 **Residual risk:**
-- Process-name matching is a heuristic, so a renamed binary evades it. Stage 5's CI test uses a renamed `AnyDesk.exe` to show matching by name.
+- Process-name matching is a heuristic, so a renamed binary evades it. The Windows CI test uses a renamed `AnyDesk.exe` to show matching by name — and the same renaming would evade it if the label were also changed.
 - A hardware KVM or HDMI capture device is invisible to software.
 - RemoteFX can hide RDP from `SM_REMOTESESSION`.
+- The VM score is a heuristic (2+ signal classes among hypervisor flag, VM model, BIOS/ioreg strings, VM MAC prefix, guest-tools process); GitHub's own `windows-latest` runner scores 2 (model, bios), so CI can only assert names, not a clean verdict, on that runner.
+- The relay appends readiness reports and face flags to `faces.jsonl` / its store without an fsync barrier on every write; the durable record of a finding is the seat's own `integrity` journal entry (with `thumbHash` for a face flag), which is chained and signed.
 
 ### 8. Overlay tools (capture-excluded AI overlays)
 
 **Capability:** a window that hides itself from screen capture, such as Cluely, reads the question and suggests answers ([research.md](research.md#research-landscape)).
 
 **Detects:**
-- Windows: `EnumWindows` + `GetWindowDisplayAffinity` finds other processes' windows that are excluded from capture. **Built as a self-test**; the CI artifact on a clean runner shows `excluded: []`.
-- macOS: `kCGWindowSharingState == 0` is **Stage 5**.
+- Windows: `EnumWindows` + `GetWindowDisplayAffinity` finds other processes' windows that are excluded from capture. **Built as a self-test**; the CI artifact on a clean runner shows `excluded: []`; on a runner with `overlay-sim` and a renamed `AnyDesk.exe` running, the gate self-test names both and blocks ([`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json)).
+- macOS: `kCGWindowSharingState == 0`. **Built.** On macOS 27.0, a `setContentProtection` + `alwaysOnTop` window (`overlay-sim`) reports `kCGWindowSharingState=0` on window layer 3, not layer 0; the probe was fixed to count app layers 0–19, not only layer 0 ([`evidence/stage5-mac-capture.txt`](evidence/stage5-mac-capture.txt)). `overlay-sim` **was seen** excluded on this macOS version.
 - "Cluely" is on the blocklist. **Built.**
 
 **Residual risk:**
 - An overlay on a second device is invisible.
-- On macOS 15+ there is no public API to block or detect capture, so `setContentProtection` is claimed for Windows only (Stage 5).
+- On macOS 15+ Apple may change or restrict what CoreGraphics reports for `kCGWindowSharingState`; this probe's continued accuracy depends on that API's future behaviour, which is outside our control. `setContentProtection` (the *prevention* half, not just detection) is Windows only.
 
 ### Also in scope: the exam authority (control)
 
@@ -254,20 +256,21 @@ The cases in [research.md](research.md#research-landscape):
 
 ## Detection matrix (current)
 
-The full matrix, filled in on both laptops (AnyDesk, TeamViewer, overlay-sim, second display, RDP / Screen Sharing, a VM, NVDA, a scribe seat), is **Stage 7**. Today:
+The full matrix, filled in on both laptops (AnyDesk, TeamViewer, overlay-sim, second display, RDP / Screen Sharing, a VM, NVDA, a scribe seat), is **Stage 7** — Stage 5 proved detection and blocking by name in CI and in `act1.ts`, not on real physical laptops side by side. Today:
 
 | Check | macOS | Windows | Where |
 |---|---|---|---|
-| Blocklisted process | `ps` probe, self-test (Apple's `/System` daemons excluded) | `tasklist` probe, self-test in CI on the packaged exe | `probes.ts`, `probe-parse.ts` |
-| Capture-excluded window | Stage 5 | `GetWindowDisplayAffinity` via koffi, self-test in CI | `probes-win.ts` |
+| Blocklisted process | `ps` probe, self-test (Apple's `/System` daemons excluded) | `tasklist` probe; CI gate self-test blocks a renamed `AnyDesk.exe` by name ([`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json)) | `probes.ts`, `probe-parse.ts` |
+| Capture-excluded window | `kCGWindowSharingState`, self-test; `overlay-sim` observed excluded on macOS 27.0 ([`evidence/stage5-mac-capture.txt`](evidence/stage5-mac-capture.txt)) | `GetWindowDisplayAffinity` via koffi; CI gate self-test blocks `overlay-sim` by name | `probes-win.ts`, `probes-mac.ts` |
 | Remote session | `screensharingd` present, self-test | `SM_REMOTESESSION`, self-test in CI | `probes.ts`, `probes-win.ts` |
-| VM | `kern.hv_vmm_present` (one signal of the planned score) | Stage 5 | `probes.ts` |
-| Second display, egress allowlist, pointer provenance | Stage 5 | Stage 5 | — |
-| Face presence | Live count on the device in the packaged app (MediaPipe on CPU; [evidence](evidence/stage0-seat-faces-1.png)); flags are Stage 5 | Stage 7 (laptop) | `FaceChip.tsx` |
-| Assistive tech allowlist (NVDA, VoiceOver), scribe seat expects 2 faces | Stage 5 | Stage 5 | — |
-| Blocks before start / flags during the exam | Stage 5 (never auto-submits; move the candidate to another seat instead) | Stage 5 | — |
+| VM | `kern.hv_vmm_present` (one signal of the score) | Score ≥ 2 blocks, 1 is review; CI's own `windows-latest` runner scores 2 (model, bios) ([`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json)) | `probes.ts`, `integrity.ts` |
+| Egress allowlist | Review only (never blocks); flags connections outside `Policy.integrity.egress` | Same, review only; CI's runner shows Azure infra IPs flagged | `gate.ts` |
+| Pointer provenance | Recorded in the sealed `answer`/`mark`/`clear` body (D.5); **not checked, not yet analysed** (Stage 6) | Same | `act1.ts`, protocol Addendum D.5 |
+| Face presence | Live count on the device in the packaged app (MediaPipe on CPU; [evidence](evidence/stage0-seat-faces-1.png)); flags and the review queue scripted in `act1.ts` with synthetic samples (no camera); live with the camera is Stage 7 by hand | Stage 7 (laptop) | `FaceChip.tsx`, `face.ts` |
+| Assistive tech allowlist (NVDA, VoiceOver), scribe seat expects 2 faces | NVDA/VoiceOver allowed as an `info` finding, scribe accommodation (2 faces) scripted in `act1.ts` | Same | `integrity.ts` |
+| Blocks before start / flags during the exam | **Built**: `block` refuses `start()`; during the exam nothing blocks — new findings are journaled and critical codes raise `INTEGRITY_CRITICAL` (candidate never auto-submitted, never locked out) | Same | `gate.ts`, cell events |
 
-No probe has yet been exercised against a real AnyDesk, TeamViewer or overlay. The Windows CI artifact ([`evidence/stage0-windows-probe.json`](evidence/stage0-windows-probe.json)) shows that the probes run in the packaged exe; it does not show that they detect those tools.
+No probe has yet been exercised against a *real* AnyDesk, TeamViewer or overlay on physical hardware — CI and `act1.ts` prove name matching against a renamed copy of another binary and the seat's own overlay-sim, not the genuine tool. The Windows CI artifact ([`evidence/stage0-windows-probe.json`](evidence/stage0-windows-probe.json)) shows the probes run in the packaged exe; [`evidence/stage5-gate-selftest.json`](evidence/stage5-gate-selftest.json) shows they now also detect and block by name in that same CI run. In the agents' own Seatbelt sandbox, the process/window/VM probes return `unknown` rather than a false clean verdict — handled explicitly as `probe-unknown`, not silently treated as clean.
 
 ## Stage 4 honest limits
 

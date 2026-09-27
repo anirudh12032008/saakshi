@@ -1,4 +1,4 @@
-Stage 5 — macOS capture-excluded probe, 27.0, 2026-09-27T14:49:02Z
+Stage 5 — macOS capture-excluded probe, macOS 27.0, 2026-09-27T14:49:02Z
 overlay-sim (setContentProtection, alwaysOnTop) reports kCGWindowSharingState=0 on layer 3.
 Fix: probe counts app layers 0–19, not only layer 0.
 --gate-selftest --expect anydesk,overlay-sim with both running:
@@ -25,4 +25,6 @@ Fix: probe counts app layers 0–19, not only layer 0.
   ],
   "missing": []
 }
-…with both stopped: exit 1 (missing both). --inspect / --remote-debugging-port: exit 3. ELECTRON_RUN_AS_NODE: ignored. Second instance: exits 0.
+Re-run 2026-09-27 (Task 19 exit check, sandbox disabled, camera off):
+`node --test test/probes-mac.test.ts` (apps/seat) — PASS: "macOS: lists on-screen windows and returns excluded owners with pids (darwin only)".
+Honest limit: this depends on CoreGraphics continuing to report kCGWindowSharingState; Apple may change or restrict this on future macOS versions (see docs/threat-model.md).

@@ -1,0 +1,25 @@
+Stage 5 — Mac fused-build checks (Task 15 Step 4 / Task 19 exit check), macOS 27.0, 2026-09-27
+Build: pnpm --filter @saakshi/seat pack:mac; open -n apps/seat/release/mac-arm64/Saakshi.app --args --overlay-sim (then pkill -f 'Saakshi.app/Contents/MacOS/Saakshi').
+
+--gate-selftest --expect anydesk,overlay-sim with both running: block, names both:
+{
+  "ok": true,
+  "verdict": "block",
+  "findings": [
+    { "code": "blocklisted", "level": "block", "detail": "AnyDesk (pid 21692)", "names": ["AnyDesk"] },
+    { "code": "capture-excluded", "level": "block", "detail": "hidden from screen capture: overlay-sim", "names": ["overlay-sim"] }
+  ],
+  "missing": []
+}
+…with both stopped: exit 1 (missing both).
+--inspect / --remote-debugging-port on the fused build: exit 3 (refused).
+ELECTRON_RUN_AS_NODE=1: ignored (RunAsNode fuse off).
+Second instance launched while the first is running: exits 0 (single-instance lock hands off to the first).
+
+Windows CI, same checks (see docs/evidence/stage5-gate-selftest.json, run 36330823424, commit 18e0b1f, 2026-09-27, green):
+- gate.json: both AnyDesk (renamed notepad.exe) and overlay-sim running → verdict block, names both ("AnyDesk", "overlay-sim"); also vm block (score 2: model, bios — the runner is itself a VM) and egress review (Azure/runner infra IPs outside the allowlist).
+- gate-clean.json: neither running → block on vm alone (score 2), missing: ["anydesk","overlay-sim"].
+- fuse.json: { "execArgv": [], "inspectorUrl": null, "runAsNode": false, "e2e": false } — no inspector attached, RunAsNode off, this is the fused (non-e2e) build.
+- Playwright e2e (packaged win-unpacked/Saakshi.exe, --test-mode --no-camera --use-fake-device-for-media-stream): passing on this run.
+
+Honest limits: the Windows CI runner is itself a VM, so its own e2e/gate-selftest run provisions with VM signals emptied for the blocking-by-name assertions — blocking is proven by --gate-selftest naming the tools, not by a clean VM score on that runner. Process-name matching is a heuristic: a renamed binary with a different name evades it.
