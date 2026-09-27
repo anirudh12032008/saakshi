@@ -5,6 +5,8 @@ export const ROOT = resolve(import.meta.dir, '..');
 export const MAIN = join(ROOT, 'apps/server/src/main.ts');
 export const freePort = (): number => { const s = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response() }); const p = s.port!; s.stop(true); return p; };
 export interface Proc { proc: ReturnType<typeof Bun.spawn>; out: string[] }
+/** Still running. Bun leaves exitCode null for a process killed by a signal (SIGKILL sets signalCode), so check both. */
+export const alive = (p: Proc): boolean => p.proc.exitCode === null && p.proc.signalCode === null;
 
 /** Spawn (default: the server with DEV=1) and wait for a line starting with `ready` (default "READY "). */
 export async function spawnNode(o: { env: Record<string, string>; cwd: string; cmd?: string[]; ready?: string; timeoutMs?: number; echo?: (line: string) => void }): Promise<Proc> {
@@ -20,7 +22,7 @@ export async function spawnNode(o: { env: Record<string, string>; cwd: string; c
   })();
   const ready = o.ready ?? 'READY ', deadline = Date.now() + (o.timeoutMs ?? 20_000), what = o.env.MODE ?? o.cmd?.join(' ') ?? 'process';
   while (!out.some((l) => l.startsWith(ready))) {
-    if (proc.exitCode !== null) throw new Error(`${what} exited before ${ready.trim()}:\n${out.join('\n')}`);
+    if (proc.exitCode !== null || proc.signalCode !== null) throw new Error(`${what} exited before ${ready.trim()}:\n${out.join('\n')}`);
     if (Date.now() > deadline) { proc.kill(); throw new Error(`${what} did not print ${ready.trim()}`); }
     await Bun.sleep(20);
   }

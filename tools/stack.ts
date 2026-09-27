@@ -3,7 +3,7 @@
 //   bun tools/stack.ts --exam data/exam [--data data] [--cohort data/g1/cohort.jsonl] [--speed 20] [--port 7099]
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { ROOT, spawnNode, type Proc } from './procs.ts';
+import { alive, ROOT, spawnNode, type Proc } from './procs.ts';
 
 export interface NodeSpec { name: string; env: Record<string, string>; db?: string; cmd?: string[]; ready?: string }
 
@@ -24,7 +24,7 @@ export class Stack {
     const s = this.#specs.get(name);
     if (!s) throw new Error(`no node ${name}`);
     const cur = this.#procs.get(name);
-    if (cur && cur.proc.exitCode === null) return { node: name, pid: cur.proc.pid };
+    if (cur && alive(cur)) return { node: name, pid: cur.proc.pid };
     const p = await spawnNode({ env: s.env, cwd: this.#cwd, cmd: s.cmd, ready: s.ready, echo: (l) => this.#log(name, l) });
     this.#procs.set(name, p);
     this.#restarts.set(name, (this.#restarts.get(name) ?? -1) + 1);
@@ -37,7 +37,7 @@ export class Stack {
     if (!s) throw new Error(`no node ${name}`);
     const p = this.#procs.get(name);
     let killed = false;
-    if (p && p.proc.exitCode === null) { p.proc.kill('SIGKILL'); await p.proc.exited; killed = true; }
+    if (p && alive(p)) { p.proc.kill('SIGKILL'); await p.proc.exited; killed = true; }
     const wiped: string[] = [];
     if (wipe && s.db) for (const f of [s.db, `${s.db}-wal`, `${s.db}-shm`]) if (existsSync(f)) { rmSync(f); wiped.push(f); }
     this.#log(name, `PLUG PULLED (SIGKILL)${wiped.length ? `; deleted ${wiped.join(', ')}` : ''}`);
@@ -47,7 +47,7 @@ export class Stack {
   nodes(): { node: string; pid: number | null; up: boolean; restarts: number }[] {
     return [...this.#specs.keys()].map((node) => {
       const p = this.#procs.get(node);
-      return { node, pid: p?.proc.pid ?? null, up: !!p && p.proc.exitCode === null, restarts: Math.max(0, this.#restarts.get(node) ?? 0) };
+      return { node, pid: p?.proc.pid ?? null, up: !!p && alive(p), restarts: Math.max(0, this.#restarts.get(node) ?? 0) };
     });
   }
 
@@ -66,7 +66,7 @@ export class Stack {
   }
 
   async stopAll(): Promise<void> {
-    for (const p of this.#procs.values()) if (p.proc.exitCode === null) p.proc.kill();
+    for (const p of this.#procs.values()) if (alive(p)) p.proc.kill();
     await Promise.all([...this.#procs.values()].map((p) => p.proc.exited));
   }
 }

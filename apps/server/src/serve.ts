@@ -27,7 +27,7 @@ export function serve(api: Api, hub: Hub, o: ServeOpts) {
     hostname: o.hostname ?? '127.0.0.1',
     idleTimeout: o.idleTimeout ?? 10,
     maxRequestBodySize: 16 * 1024 * 1024,           // 500 × (4 KB line + 16 KB envelope) fits
-    routes: { ...o.routes,
+    routes: {
       '/v1/sync': {
         POST: async (req) => {
           let body: SyncReq;
@@ -39,6 +39,8 @@ export function serve(api: Api, hub: Hub, o: ServeOpts) {
       '/v1/heads': { GET: () => json(heads(api)) },
       '/v1/events': { GET: (req, server) => hub.response(req, server) },
       '/console': o.consoleHtml ?? notFound,
+      // Mode routes last: the cell's JSON `/v1/events` (evidence, Addendum C) replaces the SSE feed, which only the relay's console reads.
+      ...o.routes,
     },
     fetch: notFound,
   });

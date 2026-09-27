@@ -177,7 +177,7 @@ if (mode === 'control') {
       ...relayHandover({ ...exam, cellUrl, bindings, head: (c) => { const s = ingest.snapshot(c); return s ? { seq: s.head, h: s.headH } : { seq: 0, h: genesisPrev(c) }; } }),
       ...purgeRoute({ ...exam, authority: X.authority, db }),
     } : {}),
-    ...relayOps({ centre, link: link!, wan, dev: true }),
+    ...relayOps({ centre, link: link!, wan, dev: true, events: (after, limit) => ingest.events(after, limit) }),
   };
   const server = serve(ingest, hub, {
     port: Number(env.PORT ?? (mode === 'relay' ? 7070 : 7080)),

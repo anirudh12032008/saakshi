@@ -12,7 +12,7 @@ concurrency:
 jobs:
   macos:
     runs-on: macos-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -33,3 +33,7 @@ jobs:
         run: bun tools/act4.ts
       - name: Act 2 end to end (custodians release → simulated centres green → phoned code → kc_f checks)
         run: bun tools/act2.ts
+      - name: Chaos (three runs, one per scenario; the 20-run exit check is logged locally)
+        run: bun tools/chaos.ts --runs 3
+      - name: Act 3 end to end (degrade → SYNC_LAG → cut → pull the plug → rebuild → move by PIN → archive → CERT-In)
+        run: bun tools/act3.ts
