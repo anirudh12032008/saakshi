@@ -1,3 +1,4 @@
+import type { CentreStatus } from '@saakshi/core/ops';
 import type { HeadsRes, NodeState, StreamView } from '@saakshi/core/wire';
 import type { ReleaseMsg } from '@saakshi/core/paper';
 
@@ -33,4 +34,23 @@ export function paperStatus(releases: ReleaseMsg[]): { text: string; tone: 'lock
   const how = releases.some((r) => r.sig) ? 'released by control at T0' : 'unlocked here with the phoned code';
   const at = new Date(Math.max(...releases.map((r) => r.ts))).toISOString().slice(11, 19);
   return { text: `Paper ${how} (${releases.map((r) => r.form).join(', ')}) at ${at} UTC. Every seat checks the key against the published commitment.`, tone: 'released' };
+}
+
+export interface PendingMove { cand: string; seatId: string; key: string; at: number; error: string }
+export const fmtMs = (ms: number): string => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+export function moveRow(m: PendingMove, now: number): { text: string; aria: string } {
+  const age = Math.max(0, Math.round((now - m.at) / 1000));
+  return { text: `${m.cand} → ${m.seatId} · key ${m.key.replace(/(.{4})(?=.)/g, '$1 ')} · waiting ${age} s${m.error ? ` · ${m.error}` : ''}`,
+    aria: `Move ${m.cand} to seat ${m.seatId}, waiting ${age} seconds` };
+}
+export function approveText(status: number, b: { keyEpoch?: number; fromSeq?: number; creditedMs?: number; error?: string }): { text: string; tone: 'good' | 'bad' } {
+  if (status === 200) return { text: `Moved: the new seat continues from entry ${b.fromSeq} (key epoch ${b.keyEpoch}). +${fmtMs(b.creditedMs ?? 0)} credited, approved by you.`, tone: 'good' };
+  if (status === 202) return { text: `Waiting for the exam server: ${b.error || 'no answer yet'}. Approve again in a moment.`, tone: 'bad' };
+  return { text: b.error ?? `HTTP ${status}`, tone: 'bad' };
+}
+export function linkText(s: CentreStatus): { text: string; tone: 'good' | 'bad' } {
+  const head = `Link to the exam server: ${s.link}.`;
+  if (s.link === 'down') return { text: `${head} Seats keep working; answers wait here (✓✓).`, tone: 'bad' };
+  if (s.cell === 'REBUILDING') return { text: `${head} The exam server is rebuilding from the relays${s.etaMs !== undefined ? ` (about ${fmtMs(s.etaMs)} left)` : ''}.`, tone: 'bad' };
+  return { text: s.link === 'degraded' ? `${head} Slow: a failure is likely; the offline code can be pre-staged.` : head, tone: s.link === 'up' ? 'good' : 'bad' };
 }

@@ -25,6 +25,8 @@
       button.primary { background: #1565c0; color: #fff; border-color: #1565c0; }
       button.chaos { background: #b3261e; color: #fff; border-color: #b3261e; }
       .out { font-size: var(--s-1); } .good { color: #1e6b25; } .bad { color: #b3261e; font-weight: 700; }
+      #moves { list-style: none; padding: 0; display: grid; gap: .5rem; } #moves li { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; border: 1px solid #dadce0; border-radius: .5rem; padding: .5rem .75rem; }
+      #link.good { color: #1e6b25; } #link.bad { color: #b3261e; font-weight: 700; }
       :focus-visible { outline: 3px solid #1565c0; outline-offset: 2px; }
       @media (forced-colors: active) { .tile { border-color: CanvasText; } }
     </style>
@@ -43,6 +45,13 @@
     </form>
     <p class="note">Only when control has phoned this centre's code for this shift. Each seat checks the key against the published commitment before it opens the paper.</p>
     <p id="offline-out" class="out" role="status"></p>
+
+    <h2>Moves between seats</h2>
+    <p id="link" role="status">…</p>
+    <form id="inv-form"><label>Your invigilator ID <input id="inv" autocomplete="off" required size="12" /></label></form>
+    <ul id="moves" aria-label="Moves waiting for approval"></ul>
+    <p class="note">Check the candidate's admit card before approving. The PIN they typed goes sealed to the exam server; this console never sees it. Compare the key with the one on the new seat's screen.</p>
+    <p id="moves-out" class="out" role="status"></p>
 
     <h2>DEV chaos</h2>
     <button id="forge" class="chaos">Push a forged key to the seats</button>

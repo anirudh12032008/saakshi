@@ -1,6 +1,7 @@
 import type { StreamView } from '@saakshi/core/wire';
 import type { ReleaseMsg } from '@saakshi/core/paper';
-import { applyEvent, paperStatus, tile, type Tone } from './console-view.ts';
+import type { CentreStatus } from '@saakshi/core/ops';
+import { applyEvent, approveText, linkText, moveRow, paperStatus, tile, type PendingMove, type Tone } from './console-view.ts';
 
 const views = new Map<string, StreamView>();
 const grid = document.getElementById('grid') as HTMLUListElement;
@@ -64,3 +65,43 @@ document.getElementById('forge')!.addEventListener('click', async () => {
 
 void paperTick();
 setInterval(paperTick, 2000);
+
+const inv = document.getElementById('inv') as HTMLInputElement;
+document.getElementById('inv-form')!.addEventListener('submit', (ev) => ev.preventDefault());   // Enter must not reload the console
+async function decide(m: PendingMove, action: 'approve' | 'refuse'): Promise<void> {
+  if (action === 'approve' && !inv.value.trim()) { say('moves-out', 'Enter your invigilator ID first.', 'bad'); inv.focus(); return; }
+  const r = await fetch(`/v1/handover/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cand: m.cand, key: m.key, invigilator: inv.value }) });
+  const j = (await r.json().catch(() => ({}))) as { keyEpoch?: number; fromSeq?: number; creditedMs?: number; error?: string };
+  const out = action === 'refuse' ? { text: r.ok ? `Refused the move of ${m.cand}.` : (j.error ?? `HTTP ${r.status}`), tone: r.ok ? 'good' as const : 'bad' as const } : approveText(r.status, j);
+  say('moves-out', out.text, out.tone);
+  void movesTick();
+}
+async function movesTick(): Promise<void> {
+  try {
+    const r = await fetch('/v1/handover/pending');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const { pending } = (await r.json()) as { pending: PendingMove[] };
+    const now = Date.now();
+    (document.getElementById('moves') as HTMLUListElement).replaceChildren(...pending.map((m) => {
+      const row = moveRow(m, now), li = document.createElement('li'), span = document.createElement('span');
+      li.setAttribute('aria-label', row.aria);
+      span.textContent = row.text;
+      const ok = document.createElement('button'), no = document.createElement('button');
+      ok.className = 'primary'; ok.textContent = `Approve the move of ${m.cand}`; ok.addEventListener('click', () => void decide(m, 'approve'));
+      no.textContent = 'Refuse'; no.addEventListener('click', () => void decide(m, 'refuse'));
+      li.append(span, ok, no);
+      return li;
+    }));
+  } catch { /* a relay without EXAM has no moves */ }
+}
+async function linkTick(): Promise<void> {
+  const el = document.getElementById('link') as HTMLParagraphElement;
+  try {
+    const r = await fetch('/v1/status');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const s = linkText((await r.json()) as CentreStatus);
+    el.textContent = s.text; el.className = s.tone;
+  } catch { el.textContent = 'Link status unavailable.'; el.className = 'bad'; }
+}
+void movesTick(); void linkTick();
+setInterval(movesTick, 2000); setInterval(linkTick, 2000);
