@@ -1,0 +1,20 @@
+{
+  "name": "@saakshi/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\" && bun test ./test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "shamir-secret-sharing": "^0.0.4"
+  }
+}

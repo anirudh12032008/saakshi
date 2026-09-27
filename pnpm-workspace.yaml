@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+nodeLinker: hoisted
+allowBuilds:
+  electron: true
+  esbuild: true
+  koffi: true
+  electron-winstaller: false
