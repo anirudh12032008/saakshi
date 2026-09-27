@@ -173,3 +173,20 @@ test('EXAM, Stage 4: control serves /status, the incidents with their timers, an
     expect((await (await fetch(`${base}/v1/status/public`)).json()) as { summary: { en: string } }).toMatchObject({ summary: { en: expect.stringContaining('centres running normally') } });
   } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('EXAM, Stage 5: relay serves readiness/faces, control polls it into the readiness board and review queue', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-main5-'));
+  const exam = await examDir(dir);
+  const r = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'relay', DEV: '1', PORT: '0', HOST: '127.0.0.1', DB: join(dir, 'r.db'), EXAM: exam, CENTRE: 'CEN042' } });
+  const rr = await ready(r.stdout);
+  const relayUrl = `http://127.0.0.1:${rr.port}`;
+  const c = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'control', DEV: '1', PORT: '0', DIR: join(dir, 'control'), EXAM: exam, RELAY_URL: relayUrl } });
+  try {
+    const cr = await ready(c.stdout);
+    const controlUrl = `http://127.0.0.1:${cr.port}`;
+    expect(await (await fetch(`${relayUrl}/v1/readiness`)).json()).toMatchObject({ seats: [] });
+    const board = (await (await fetch(`${controlUrl}/v1/readiness`)).json()) as { centres: { centre: string }[] };
+    expect(board.centres[0].centre).toBe('CEN042');
+    expect(await (await fetch(`${controlUrl}/v1/review`)).json()).toEqual({ items: [] });
+  } finally { r.kill(); c.kill(); await Promise.all([r.exited, c.exited]); rmSync(dir, { recursive: true, force: true }); }
+});

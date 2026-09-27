@@ -1,14 +1,16 @@
 // Saakshi server: MODE=relay|cell|control, DEV=1 only. With EXAM=<dir> (Stage 3) keys, roster, policy and paper come from the
 // provisioned and packaged exam directory, and seats are trusted only through cell-signed bindings. Without EXAM, every mode
 // behaves exactly as in Stage 2 (fixture seat keys, DEV roster): the Stage 1–2 tests and tools rely on that.
-import { appendFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { hexToBytes } from '@saakshi/core/bytes';
 import { cellKey, DEV_CENTRE, DEV_EXAM, devForm, devPseud, devRoster, devSeat, devSeatKey, trustFromKeys, type KeysFile } from '@saakshi/core/dev';
-import { rosterOf } from '@saakshi/core/directory';
+import { FILES, rosterOf } from '@saakshi/core/directory';
 import { checkWireBind, type WireBind } from '@saakshi/core/enrol';
+import { INTEGRITY_DEFAULT } from '@saakshi/core/integrity';
 import { verifier } from '@saakshi/core/node';
 import { opsOf } from '@saakshi/core/ops';
+import type { Policy } from '@saakshi/core/policy';
 import { genesisPrev } from '@saakshi/core/protocol';
 import { formsOf } from '@saakshi/core/sheet';
 import { purgeRoute } from './archive.ts';
@@ -23,10 +25,12 @@ import { fleet } from './fleet.ts';
 import { Forwarder, httpCellSend } from './forward.ts';
 import { cellHandover } from './handover.ts';
 import { createIngest } from './ingest.ts';
+import { integrityRoutes } from './integrity-routes.ts';
 import { LinkMonitor } from './link.ts';
 import { opsMonitor } from './ops-monitor.ts';
 import { opsRoutes } from './ops-routes.ts';
 import { relayHandover } from './relay-handover.ts';
+import { relayIntegrity } from './relay-integrity.ts';
 import { relayOps } from './relay-ops.ts';
 import { relayRoutes, Wan } from './relay-routes.ts';
 import { releaseControl } from './release-control.ts';
@@ -84,6 +88,11 @@ if (mode === 'control') {
   const custody = (action: string, detail: Record<string, unknown>) =>
     appendFileSync(join(dir, 'custody.jsonl'), JSON.stringify({ at: new Date().toISOString(), actor: 'control (DEV)', action, ...exam, ...detail }) + '\n');
   const mon = X && fl ? opsMonitor({ dir: X.dir, ops, controlDir: dir, fleet: () => fl.view(), relayUrl, release: rc ? () => rc.status() : undefined }) : undefined;
+  const rkPath = X && join(X.root, FILES.reviewKey);
+  const integ = rkPath && existsSync(rkPath)
+    ? integrityRoutes({ relayUrl, dir: X!.dir, centre: demo, controlDir: dir, reviewPriv: hexToBytes((JSON.parse(readFileSync(rkPath, 'utf8')) as { priv: string }).priv), retentionMs: INTEGRITY_DEFAULT.retentionMs })
+    : undefined;
+  if (rkPath && !integ) console.log(`review key missing: re-run tools/provision.ts (${rkPath})`);
   const server = Bun.serve({
     port: Number(env.PORT ?? 7090),
     hostname: env.HOST ?? '127.0.0.1',
@@ -103,12 +112,14 @@ if (mode === 'control') {
           roster: rosterOf(X.dir, demo), recPath: join(dir, `sth-${exam.exam}-${exam.shift}.json`),
           stores: [env.ARCHIVE_A ?? join(dir, 'worm-a'), env.ARCHIVE_B ?? join(dir, 'worm-b')], custody }) : {}),
       ...((X ? { '/status': statusHtml } : {}) as Record<string, typeof statusHtml>),
+      ...integ?.routes,
     },
     fetch: () => json({ error: 'not found' }, 404),
   });
   mon?.start();
+  integ?.start();
   console.log(`READY ${JSON.stringify({ mode, port: server.port, state: 'LIVE', exam: X?.root ?? null, ops: ops.demo ? 'demo' : 'default' })}`);
-  const stop = () => { mon?.stop(); fl?.stop(); rc?.close(); server.stop(true); process.exit(0); };
+  const stop = () => { mon?.stop(); integ?.stop(); fl?.stop(); rc?.close(); server.stop(true); process.exit(0); };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
 } else {
@@ -176,6 +187,7 @@ if (mode === 'control') {
       ...relayRoutes({ ...exam, centre, policy: rf.policy, manifest: X.manifest, papers: rf.papers, wrap: rf.wrap, cellUrl, bindings, releases, hub: releaseHub, wan, dev: true }),
       ...relayHandover({ ...exam, cellUrl, bindings, head: (c) => { const s = ingest.snapshot(c); return s ? { seq: s.head, h: s.headH } : { seq: 0, h: genesisPrev(c) }; } }),
       ...purgeRoute({ ...exam, authority: X.authority, db }),
+      ...relayIntegrity({ ...exam, dir: join(dirname(dbPath), 'integrity'), bindings, cellPub: hexToBytes((JSON.parse(rf.policy.text) as Policy).cell.pub) }),
     } : {}),
     ...relayOps({ centre, link: link!, wan, dev: true, events: (after, limit) => ingest.events(after, limit) }),
   };
