@@ -1,0 +1,29 @@
+appId: in.saakshi.seat
+productName: Saakshi
+# electron-builder cannot read the version from the hoisted root node_modules; keep in sync with package.json.
+electronVersion: 44.4.5
+# koffi ships prebuilt per-platform binaries (@koromix/koffi-*); a rebuild would run a package install.
+npmRebuild: false
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/node_modules/koffi/**"
+  - "**/node_modules/@koromix/**"
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+mac:
+  target: dir
+  identity: null
+  hardenedRuntime: false
+  extendInfo:
+    NSCameraUsageDescription: Saakshi checks that the registered candidate is present during the exam. No video is recorded or stored.
+win:
+  target: dir
+  executableName: Saakshi
