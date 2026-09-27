@@ -342,8 +342,8 @@ def render(r):
         f"SAAKSHI DECISION REPORT: {r['incident']}",
         f"policy {r['policy']}: {r['policyLabel']}",
         "",
-        f"Compensated {s['compensated']} · Re-tested {s['retested']} · Re-conducted {s['reconductedCentres']} centres"
-        f" · Spared {s['spared']} · ₹ avoided {inr(s['inrAvoided'])}",
+        f"Compensated {inr(s['compensated'])} · Re-tested {inr(s['retested'])} · Re-conducted {s['reconductedCentres']} centres"
+        f" · Spared {inr(s['spared'])} · ₹ avoided {inr(s['inrAvoided'])}",
         "",
         "Tier 1, the NEET-UG 2024 Supreme Court test (full re-conduct only if (a) systemic AND NOT (b) separable):",
         *(f"  {x}" for x in t["reasons"]),

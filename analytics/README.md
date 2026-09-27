@@ -246,7 +246,7 @@ It is labelled **ILLUSTRATIVE**: every threshold is a committee parameter. The r
 | Case | Incident | Result |
 |---|---|---|
 | `cuet-2026` | 2-hour outage (40–160 min) at 3 centre-shifts (189 candidates). 21 left, 4 never resumed, 4 resumed after 45 min, 7 had two gaps, and the rest resumed on spare seats after 8–30 min. One unrelated 15-min seat gap elsewhere | Compensated 161 · Re-tested 29 · Re-conducted 0 centres · Spared 160 · ₹ avoided 2,40,000. 7 go to review |
-| `neet-2024-separable` | Leak with a declared perimeter: CEN005, CEN009, CEN010 and CEN008/S2 (the G1 leak and mid-exam leak); not declared systemic. Radar flags supplied | (a) no: 10/30 rooms. (b) yes: 0/29 leak flags outside. No full re-conduct; 10 centre-shifts (682 candidates) are re-conducted. Spared 1318 · ₹ avoided 19,77,000 |
+| `neet-2024-separable` | Leak with a declared perimeter: CEN005, CEN009, CEN010 and CEN008/S2 (the G1 leak and mid-exam leak); not declared systemic. Radar flags supplied | (a) no: 10/30 rooms. (b) yes: 0/29 leak flags outside. No full re-conduct; 10 centre-shifts (682 candidates) are re-conducted. Spared 1,318 · ₹ avoided 19,77,000 |
 | `systemic` | Paper on a public channel (declared systemic); the FIR names only CEN005. Radar flags supplied | (a) yes. (b) no: 20/29 leak flags fall outside. **Full re-conduct**, all 10 centres. Spared 0 |
 
 Sample output (`cuet-2026`, lists trimmed):
