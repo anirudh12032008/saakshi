@@ -12,7 +12,9 @@ import { verifier } from '@saakshi/core/node';
 import { opsOf } from '@saakshi/core/ops';
 import type { Policy } from '@saakshi/core/policy';
 import { genesisPrev } from '@saakshi/core/protocol';
+import type { ShiftExport } from '@saakshi/core/sheet';
 import { formsOf } from '@saakshi/core/sheet';
+import { analyticsRoutes, bunRunUv } from './analytics-routes.ts';
 import { purgeRoute } from './archive.ts';
 import { Bindings } from './bindings.ts';
 import { cellRoutes } from './cell-routes.ts';
@@ -27,6 +29,7 @@ import { cellHandover } from './handover.ts';
 import { createIngest } from './ingest.ts';
 import { integrityRoutes } from './integrity-routes.ts';
 import { LinkMonitor } from './link.ts';
+import { providerFromEnv } from './llm.ts';
 import { opsMonitor } from './ops-monitor.ts';
 import { opsRoutes } from './ops-routes.ts';
 import { relayHandover } from './relay-handover.ts';
@@ -35,11 +38,13 @@ import { relayOps } from './relay-ops.ts';
 import { relayRoutes, Wan } from './relay-routes.ts';
 import { releaseControl } from './release-control.ts';
 import { ReleaseStore } from './release-store.ts';
+import { reportRoutes } from './report-routes.ts';
 import { heads, serve, type Routes } from './serve.ts';
 import { rogueEdit, type RogueIn, shiftExport } from './sheet-export.ts';
 import { Hub } from './sse.ts';
 import statusHtml from './status.html';
 import { openDb, pragmas } from './store.ts';
+import { timeAudit } from './time-audit.ts';
 
 const env = process.env;
 const mode = env.MODE;
@@ -93,6 +98,33 @@ if (mode === 'control') {
     ? integrityRoutes({ relayUrl, dir: X!.dir, centre: demo, controlDir: dir, reviewPriv: hexToBytes((JSON.parse(readFileSync(rkPath, 'utf8')) as { priv: string }).priv), retentionMs: INTEGRITY_DEFAULT.retentionMs })
     : undefined;
   if (rkPath && !integ) console.log(`review key missing: re-run tools/provision.ts (${rkPath})`);
+  const analyticsDir = resolve(env.ANALYTICS_DIR ?? join(import.meta.dir, '../../../analytics'));
+  const paperDir = env.PAPER ?? `${fixtures}/paper`;
+  const provider = X && mon ? providerFromEnv(env, X.dir, dir) : undefined;
+  const decisionKeyPath = X && join(X.root, FILES.decisionKey);
+  const decisionKey = decisionKeyPath && existsSync(decisionKeyPath)
+    ? (() => { const k = JSON.parse(readFileSync(decisionKeyPath, 'utf8')) as { priv: string; pub: string }; return { priv: hexToBytes(k.priv), pub: hexToBytes(k.pub) }; })()
+    : undefined;
+  if (decisionKeyPath && !decisionKey) console.log(`decision key missing: re-run tools/provision.ts (${decisionKeyPath})`);
+  const timeRows = X && mon ? async () => {
+    const r = await fetch(`${cellUrl}/v1/shift?exam=${encodeURIComponent(exam.exam)}&shift=${encodeURIComponent(exam.shift)}`, { signal: AbortSignal.timeout(30_000) });
+    const exp = (await r.json()) as ShiftExport;
+    const roster = rosterOf(X.dir, demo);
+    return exp.sheets.filter((s) => roster.includes(s.ctx.cand)).map((s) => timeAudit(s, forms[s.form] ?? [], mon.approvals(), ops));
+  } : undefined;
+  // Confirmed face flags (the other half of the `escalate` evidence): replayed straight from the review queue's own
+  // append-only log rather than duplicating ReviewQueue's state here.
+  const reviewLog = integ && join(dir, 'review', 'review.jsonl');
+  const confirmedFaces = reviewLog ? () => {
+    if (!existsSync(reviewLog)) return [] as string[];
+    const cand: Record<string, string> = {}, confirmed = new Set<string>();
+    for (const line of readFileSync(reviewLog, 'utf8').split('\n').filter(Boolean)) {
+      const r = JSON.parse(line) as { t: 'flag'; item?: { id: string; cand: string } } | { t: 'decide'; id: string; decision: 'cleared' | 'confirmed' };
+      if (r.t === 'flag' && r.item) cand[r.item.id] = r.item.cand;
+      else if (r.t === 'decide' && r.decision === 'confirmed' && cand[r.id]) confirmed.add(cand[r.id]);
+    }
+    return [...confirmed];
+  } : undefined;
   const server = Bun.serve({
     port: Number(env.PORT ?? 7090),
     hostname: env.HOST ?? '127.0.0.1',
@@ -113,12 +145,23 @@ if (mode === 'control') {
           stores: [env.ARCHIVE_A ?? join(dir, 'worm-a'), env.ARCHIVE_B ?? join(dir, 'worm-b')], custody }) : {}),
       ...((X ? { '/status': statusHtml } : {}) as Record<string, typeof statusHtml>),
       ...integ?.routes,
+      ...(X && mon && provider && decisionKey && timeRows ? analyticsRoutes({
+        dir: X.dir, forms, controlDir: dir, analyticsDir,
+        decisionKey, startMs: rc?.status().released?.at ?? Date.now(),
+        policyPath: join(analyticsDir, 'policy.illustrative.json'), keyPath: env.KEY ?? join(paperDir, 'key.json'),
+        registryPath: env.REGISTRY, drillPath: env.DRILL ?? join(analyticsDir, 'drill.mock.json'),
+        incidents: () => mon.incidents.all(), timeRows, confirmedFaces,
+        runUv: bunRunUv({ uv: env.UV, cwd: analyticsDir, timeoutMs: Number(env.ANALYTICS_TIMEOUT_MS ?? 600_000) }),
+        custody,
+      }) : {}),
+      ...(X && mon && provider ? reportRoutes({ monitor: mon, dir: X.dir, provider, controlDir: dir }) : {}),
     },
     fetch: () => json({ error: 'not found' }, 404),
   });
   mon?.start();
   integ?.start();
   console.log(`READY ${JSON.stringify({ mode, port: server.port, state: 'LIVE', exam: X?.root ?? null, ops: ops.demo ? 'demo' : 'default' })}`);
+  if (provider && decisionKey && mon && X) console.log(`analytics: provider=${provider.name}, uv=${env.UV ?? 'uv'}`);
   const stop = () => { mon?.stop(); integ?.stop(); fl?.stop(); rc?.close(); server.stop(true); process.exit(0); };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);

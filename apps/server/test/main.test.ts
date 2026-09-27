@@ -174,6 +174,17 @@ test('EXAM, Stage 4: control serves /status, the incidents with their timers, an
   } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('EXAM, Stage 6: control serves the analytics and invigilator-report routes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-main6-'));
+  const exam = await examDir(dir);
+  const p = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'control', DEV: '1', PORT: '0', DIR: join(dir, 'control'), EXAM: exam, RELAY_URL: 'http://127.0.0.1:9', CELL_URL: 'http://127.0.0.1:9' } });
+  try {
+    const base = `http://127.0.0.1:${(await ready(p.stdout)).port}`;
+    expect(await (await fetch(`${base}/v1/analytics`)).json()).toEqual({ running: false });
+    expect(await (await fetch(`${base}/v1/reports`)).json()).toEqual({ items: [] });
+  } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('EXAM, Stage 5: relay serves readiness/faces, control polls it into the readiness board and review queue', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'saakshi-main5-'));
   const exam = await examDir(dir);
