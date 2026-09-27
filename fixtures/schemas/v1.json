@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "cohort": {
+    "cand": "string", "centre": "string", "shift": "string",
+    "form": ["F1", "F2"], "lang": ["en", "hi", "ta"], "pwd": [0, 1],
+    "item": "string", "state": ["NV", "NA", "A", "MR", "AMR"], "answer": ["", "A", "B", "C", "D"],
+    "dwellMs": "int", "visits": "int", "changes": "int", "tFirstMs": "int"
+  },
+  "export": { "seq": "int", "rxWall": "int", "h": "hex64" },
+  "notes": {
+    "row": "one row per candidate × item",
+    "item": "bank id (I01…), not the display number",
+    "tFirstMs": "ms from unlock to the first answer on this item; -1 if never answered",
+    "export": "a cell export row = every cohort field + every export field (last entry touching this item)"
+  }
+}

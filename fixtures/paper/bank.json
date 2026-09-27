@@ -1,0 +1,25 @@
+{
+  "exam": "DEMO-2026",
+  "items": [
+    { "id": "I01", "subject": "physics", "en": { "q": "What is the SI unit of force?", "o": ["Joule", "Watt", "Pascal", "Newton"] }, "hi": { "q": "बल का SI मात्रक क्या है?", "o": ["जूल", "वाट", "पास्कल", "न्यूटन"] } },
+    { "id": "I02", "subject": "physics", "en": { "q": "The speed of light in vacuum is approximately:", "o": ["3 × 10⁵ m/s", "3 × 10⁸ m/s", "3 × 10¹⁰ m/s", "3 × 10⁶ m/s"] }, "hi": { "q": "निर्वात में प्रकाश की चाल लगभग कितनी है?", "o": ["3 × 10⁵ m/s", "3 × 10⁸ m/s", "3 × 10¹⁰ m/s", "3 × 10⁶ m/s"] } },
+    { "id": "I03", "subject": "physics", "en": { "q": "Which of these is a vector quantity?", "o": ["Mass", "Temperature", "Velocity", "Energy"] }, "hi": { "q": "इनमें से कौन-सी राशि सदिश है?", "o": ["द्रव्यमान", "ताप", "वेग", "ऊर्जा"] } },
+    { "id": "I04", "subject": "physics", "en": { "q": "Ohm's law is expressed as:", "o": ["V = IR", "P = VI", "F = ma", "E = mc²"] }, "hi": { "q": "ओम का नियम किस रूप में व्यक्त किया जाता है?", "o": ["V = IR", "P = VI", "F = ma", "E = mc²"] } },
+    { "id": "I05", "subject": "physics", "en": { "q": "Acceleration due to gravity at the Earth's surface is about:", "o": ["1.6 m/s²", "6.67 m/s²", "98 m/s²", "9.8 m/s²"] }, "hi": { "q": "पृथ्वी की सतह पर गुरुत्वीय त्वरण लगभग कितना है?", "o": ["1.6 m/s²", "6.67 m/s²", "98 m/s²", "9.8 m/s²"] } },
+    { "id": "I06", "subject": "chemistry", "en": { "q": "What is the atomic number of carbon?", "o": ["4", "6", "8", "12"] }, "hi": { "q": "कार्बन का परमाणु क्रमांक क्या है?", "o": ["4", "6", "8", "12"] } },
+    { "id": "I07", "subject": "chemistry", "en": { "q": "The pH of pure water at 25 °C is:", "o": ["7", "0", "1", "14"] }, "hi": { "q": "25 °C पर शुद्ध जल का pH कितना होता है?", "o": ["7", "0", "1", "14"] } },
+    { "id": "I08", "subject": "chemistry", "en": { "q": "The chemical formula of common salt is:", "o": ["KCl", "NaOH", "NaCl", "CaCO₃"] }, "hi": { "q": "साधारण नमक का रासायनिक सूत्र क्या है?", "o": ["KCl", "NaOH", "NaCl", "CaCO₃"] } },
+    { "id": "I09", "subject": "chemistry", "en": { "q": "Which gas is most abundant in the Earth's atmosphere?", "o": ["Oxygen", "Carbon dioxide", "Nitrogen", "Argon"] }, "hi": { "q": "पृथ्वी के वायुमंडल में सबसे अधिक मात्रा में कौन-सी गैस है?", "o": ["ऑक्सीजन", "कार्बन डाइऑक्साइड", "नाइट्रोजन", "आर्गन"] } },
+    { "id": "I10", "subject": "chemistry", "en": { "q": "Avogadro's number is approximately:", "o": ["6.022 × 10²³", "3.0 × 10⁸", "1.6 × 10⁻¹⁹", "9.1 × 10⁻³¹"] }, "hi": { "q": "आवोगाद्रो संख्या का मान लगभग कितना है?", "o": ["6.022 × 10²³", "3.0 × 10⁸", "1.6 × 10⁻¹⁹", "9.1 × 10⁻³¹"] } },
+    { "id": "I11", "subject": "biology", "en": { "q": "Which organelle is called the powerhouse of the cell?", "o": ["Nucleus", "Ribosome", "Golgi body", "Mitochondrion"] }, "hi": { "q": "कोशिका का ऊर्जा-घर किस कोशिकांग को कहा जाता है?", "o": ["केंद्रक", "राइबोसोम", "गॉल्जी काय", "माइटोकॉन्ड्रिया"] } },
+    { "id": "I12", "subject": "biology", "en": { "q": "Which blood components help in clotting?", "o": ["Red blood cells", "White blood cells", "Platelets", "Plasma cells"] }, "hi": { "q": "रक्त का थक्का बनाने में कौन-से घटक सहायक हैं?", "o": ["लाल रक्त कोशिकाएँ", "श्वेत रक्त कोशिकाएँ", "बिम्बाणु (प्लेटलेट्स)", "प्लाज़्मा कोशिकाएँ"] } },
+    { "id": "I13", "subject": "biology", "en": { "q": "Photosynthesis mainly takes place in:", "o": ["Mitochondria", "Chloroplasts", "Vacuoles", "Nucleus"] }, "hi": { "q": "प्रकाश-संश्लेषण मुख्यतः कहाँ होता है?", "o": ["माइटोकॉन्ड्रिया", "हरितलवक (क्लोरोप्लास्ट)", "रिक्तिका", "केंद्रक"] } },
+    { "id": "I14", "subject": "biology", "en": { "q": "How many chromosomes are in a normal human somatic cell?", "o": ["23", "44", "48", "46"] }, "hi": { "q": "सामान्य मानव कायिक कोशिका में कितने गुणसूत्र होते हैं?", "o": ["23", "44", "48", "46"] } },
+    { "id": "I15", "subject": "mathematics", "en": { "q": "The value of sin 30° is:", "o": ["0", "1/2", "√3/2", "1"] }, "hi": { "q": "sin 30° का मान क्या है?", "o": ["0", "1/2", "√3/2", "1"] } },
+    { "id": "I16", "subject": "mathematics", "en": { "q": "The derivative of x² with respect to x is:", "o": ["2x", "x", "x²/2", "2"] }, "hi": { "q": "x² का x के सापेक्ष अवकलज क्या है?", "o": ["2x", "x", "x²/2", "2"] } },
+    { "id": "I17", "subject": "mathematics", "en": { "q": "The sum of the interior angles of a triangle is:", "o": ["90°", "180°", "270°", "360°"] }, "hi": { "q": "किसी त्रिभुज के अंतःकोणों का योग कितना होता है?", "o": ["90°", "180°", "270°", "360°"] } },
+    { "id": "I18", "subject": "mathematics", "en": { "q": "log₁₀ 1000 equals:", "o": ["2", "10", "100", "3"] }, "hi": { "q": "log₁₀ 1000 का मान क्या है?", "o": ["2", "10", "100", "3"] } },
+    { "id": "I19", "subject": "mathematics", "en": { "q": "In how many ways can 3 different books be arranged in a row?", "o": ["6", "3", "9", "27"] }, "hi": { "q": "3 भिन्न पुस्तकों को एक पंक्ति में कितने प्रकार से रखा जा सकता है?", "o": ["6", "3", "9", "27"] } },
+    { "id": "I20", "subject": "mathematics", "en": { "q": "If 2x + 3 = 11, then x equals:", "o": ["3", "5", "4", "7"] }, "hi": { "q": "यदि 2x + 3 = 11 है, तो x का मान क्या है?", "o": ["3", "5", "4", "7"] } }
+  ]
+}

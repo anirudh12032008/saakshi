@@ -1,0 +1,11 @@
+[project]
+name = "saakshi-analytics"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = ["numpy", "scipy", "networkx"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
