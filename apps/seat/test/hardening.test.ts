@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { E2E, launchRefusal, windowMode } from '../src/main/hardening.ts';
+import { E2E, launchRefusal, windowMode, argValue } from '../src/main/hardening.ts';
 
 test('the release build refuses debugging switches; the e2e build allows them', () => {
   for (const a of ['--remote-debugging-port=9222', '--remote-debugging-port', '--inspect', '--inspect=9229', '--inspect-brk=0', '--remote-debugging-pipe'])
@@ -14,4 +14,11 @@ test('window mode: exam seats are kiosk + fullscreen + on top; content protectio
   assert.equal(windowMode({ test: false, e2e: false, platform: 'darwin' }).contentProtection, false);
   assert.deepEqual(windowMode({ test: true, e2e: true, platform: 'darwin' }), { kiosk: false, fullscreen: false, alwaysOnTop: false, contentProtection: false, devtools: true });
   assert.equal(E2E, false);
+});
+
+test('argValue reads --flag value and --flag=value (Windows needs the = form for URLs)', () => {
+  const argv = ['exe', '--relay=http://127.0.0.1:7070', '--cand', 'C0001'];
+  assert.equal(argValue(argv, '--relay'), 'http://127.0.0.1:7070');
+  assert.equal(argValue(argv, '--cand'), 'C0001');
+  assert.equal(argValue(argv, '--seat'), undefined);
 });

@@ -10,12 +10,12 @@ import { resolveAppPath } from './app-path.ts';
 import { cameraEnabled } from './camera.ts';
 import type { Wrapper } from './journal-store.ts';
 import { pickWrapper, testMode } from './keystore.ts';
-import { E2E, launchRefusal, windowMode } from './hardening.ts';
+import { argValue as argOf, E2E, launchRefusal, windowMode } from './hardening.ts';
 import { collect, type HostInputs } from './probe-host.ts';
 import { runGateSelftest, runSelftest } from './probes.ts';
 import { Seat } from './seat.ts';
 
-const argValue = (flag: string): string | undefined => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : undefined; };
+const argValue = (flag: string): string | undefined => argOf(process.argv, flag);
 const setting = (flag: string, envName: string, dflt: string): string => argValue(flag) ?? process.env[envName] ?? dflt;
 
 // A crash in main must say why, not exit silently (Windows CI saw a bare exit -1). SAAKSHI_TRACE=1 also logs start-up steps.

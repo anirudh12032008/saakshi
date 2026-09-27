@@ -16,3 +16,12 @@ export function windowMode(o: { test: boolean; e2e: boolean; platform: string })
   // setContentProtection: WDA_EXCLUDEFROMCAPTURE on Windows; on macOS 15+ capture tools may ignore it, so we claim nothing there.
   return { kiosk: exam, fullscreen: exam, alwaysOnTop: exam, contentProtection: exam && o.platform === 'win32', devtools: o.e2e };
 }
+
+/** `--flag value` or `--flag=value`. On Windows, Electron refuses to start (exit -1, before any app code) when a URL-looking
+ *  argument is followed by more switches, so a URL must be passed as `--relay=http://…`. */
+export function argValue(argv: readonly string[], flag: string): string | undefined {
+  const eq = argv.find((a) => a.startsWith(flag + '='));
+  if (eq) return eq.slice(flag.length + 1);
+  const i = argv.indexOf(flag);
+  return i > 0 ? argv[i + 1] : undefined;
+}

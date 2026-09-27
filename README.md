@@ -139,7 +139,7 @@ DEV=1 MODE=control bun apps/server/src/main.ts   # :7090, loopback only; http://
 ```sh
 (cd apps/seat && SAAKSHI_NO_CAMERA=1 pnpm dev)                   # dev mode
 (cd apps/seat && pnpm pack:mac)                                  # packaged macOS app: fuses on, ad-hoc signed
-open apps/seat/release/mac-arm64/Saakshi.app --args --relay http://127.0.0.1:7070 --cand C0001 --no-camera
+open apps/seat/release/mac-arm64/Saakshi.app --args --relay=http://127.0.0.1:7070 --cand C0001 --no-camera
 apps/seat/release/mac-arm64/Saakshi.app/Contents/MacOS/Saakshi --probe-selftest   # probe JSON, then exit
 (cd apps/seat && pnpm pack:win)                                  # Windows: release\win-unpacked\Saakshi.exe (built in CI)
 ```
@@ -148,7 +148,7 @@ apps/seat/release/mac-arm64/Saakshi.app/Contents/MacOS/Saakshi --probe-selftest 
 
 | Flag | Environment variable | Meaning |
 |---|---|---|
-| `--relay URL` | `SAAKSHI_RELAY` | The relay to sync with |
+| `--relay=URL` | `SAAKSHI_RELAY` | The relay to sync with |
 | `--cand C0001…C0008` | `SAAKSHI_CAND` | The DEV candidate |
 | `--no-camera` | `SAAKSHI_NO_CAMERA=1` | Webcam off; nothing touches getUserMedia or MediaPipe |
 | `--probe-selftest [--out f.json]` | — | Run the probes and print JSON |
