@@ -1,0 +1,59 @@
+@font-face { font-family: 'Noto Sans Devanagari'; src: url('/fonts/NotoSansDevanagari.ttf') format('truetype'); font-weight: 100 900; font-display: block; }
+:root {
+  --ink: #202124; --muted: #5f6368; --line: #dadce0; --blue: #1565c0;
+  --nv-bg: #e8eaed; --na: #c62828; --a: #2e7d32; --mr: #6a1b9a;
+  font-family: system-ui, 'Noto Sans Devanagari', sans-serif; color: var(--ink); background: #fff;
+}
+:lang(hi) { font-family: 'Noto Sans Devanagari', system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.5; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.exam { display: grid; grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem); grid-template-rows: auto 1fr; min-height: 100vh; }
+.bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; padding: .5rem 1rem; border-bottom: 1px solid var(--line); }
+.question { padding: 1rem 1.5rem; min-width: 0; }
+.palette { padding: 1rem; border-left: 1px solid var(--line); }
+/* 200% zoom on a 1200 px window is a 600 px viewport: stack the palette under the question. */
+@media (max-width: 48rem) { .exam { grid-template-columns: 1fr; } .palette { border-left: 0; border-top: 1px solid var(--line); } }
+
+.timer { font-variant-numeric: tabular-nums; font-size: 1.25rem; font-weight: 700; }
+.timer.low { color: var(--na); }
+.sync { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.sync .cell { color: var(--blue); }
+.offline { color: var(--na); font-weight: 700; }
+.chip { display: inline-flex; align-items: center; gap: .5rem; font-size: .875rem; border: 1px solid var(--line); border-radius: 999px; padding: .125rem .75rem .125rem .125rem; }
+.chip.warn { border-color: var(--na); }
+.chip video { width: 48px; height: 36px; border-radius: 999px; object-fit: cover; background: #111; }
+.lang { display: inline-flex; gap: .25rem; }
+.lang button[aria-pressed='true'] { background: var(--ink); color: #fff; }
+
+h2 { font-size: 1.25rem; margin: 0 0 .75rem; }
+.tick { font-size: .9em; color: var(--muted); margin-left: .5rem; }
+.tick.cell { color: var(--blue); }
+fieldset { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; }
+fieldset:disabled { opacity: .6; }
+legend.q-text { font-size: 1.125rem; margin-bottom: .75rem; padding: 0; }
+.opt { display: flex; gap: .5rem; align-items: center; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: .375rem; margin: .375rem 0; cursor: pointer; }
+.opt:has(input:checked) { border-color: var(--blue); background: #e8f0fe; }
+.letter { font-weight: 700; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+button { font: inherit; padding: .5rem 1rem; border-radius: .375rem; border: 1px solid var(--muted); background: #fff; color: var(--ink); cursor: pointer; min-height: 2.75rem; }
+button.primary { background: var(--a); color: #fff; border-color: var(--a); }
+button.mark { background: var(--mr); color: #fff; border-color: var(--mr); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.notice { min-height: 1.5em; color: var(--muted); }
+
+.palette-title { font-size: 1rem; }
+.grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr)); gap: .375rem; }
+.pal { position: relative; min-width: 2.75rem; min-height: 2.75rem; padding: 0; font-weight: 700; border: 1px solid transparent; border-radius: .375rem; }
+.pal.NV { background: var(--nv-bg); color: var(--ink); border-color: #9aa0a6; }
+.pal.NA { background: var(--na); color: #fff; }
+.pal.A { background: var(--a); color: #fff; }
+.pal.MR, .pal.AMR { background: var(--mr); color: #fff; border-radius: 50%; }
+.pal.AMR::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: .75rem; height: .75rem; border-radius: 50%; background: var(--a); border: 2px solid #fff; }
+.pal.current { outline: 3px solid var(--ink); outline-offset: 2px; }
+.legend { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .375rem; font-size: .875rem; }
+.legend .mini { display: inline-grid; place-items: center; min-width: 2rem; min-height: 2rem; margin-right: .5rem; }
+.start { max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+@media (forced-colors: active) { .pal { border: 2px solid CanvasText; } .pal.AMR::after { background: CanvasText; } }
