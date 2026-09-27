@@ -1,0 +1,264 @@
+{
+  "reviewKey": {
+    "priv": "c33a60b9afef8e2c4e38ab022254b33d58f600928d4b2cbd90b858322db356c6",
+    "pub": "04169cd7697bab6ae7e4b7c4ede031f2603fb36e048d9833b5dda344f06df49318031ded21b2d5fd873538b8cb20e498a68dd43772ce027085497e72544eb2cc85"
+  },
+  "readiness": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "attempt": 1,
+      "cand": "C0001",
+      "seatId": "CEN042-S01",
+      "keyEpoch": 1,
+      "at": 1790000000000,
+      "verdict": "block",
+      "findings": [
+        {
+          "code": "blocklisted",
+          "level": "block",
+          "detail": "AnyDesk (pid 4242)",
+          "names": [
+            "AnyDesk"
+          ]
+        },
+        {
+          "code": "capture-excluded",
+          "level": "block",
+          "detail": "a window of overlay-sim is hidden from screen capture",
+          "names": [
+            "overlay-sim"
+          ]
+        },
+        {
+          "code": "battery",
+          "level": "amber",
+          "detail": "running on battery",
+          "names": []
+        }
+      ]
+    },
+    "text": "[\"readiness\",\"DEMO-2026\",\"S1\",1,\"C0001\",\"CEN042-S01\",1,1790000000000,\"block\",\"5103ea3e5e47041a3e913d5ab1b81425f1e9ed3747c0c6edefed6013bd100b8c\"]",
+    "findingsHash": "5103ea3e5e47041a3e913d5ab1b81425f1e9ed3747c0c6edefed6013bd100b8c",
+    "sig": "6532c7df20e0ac6132e4d33bf24e71c96eb5699e1557b7f671c419465c06c3966c963bff64885e17f43a7c5096fac3fa9d8492bc40429ba344222ff3b2f4b32a"
+  },
+  "face": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "attempt": 1,
+      "cand": "C0001",
+      "seatId": "CEN042-S01",
+      "at": 1790000060000,
+      "code": "face-none",
+      "faces": 0,
+      "expected": 1,
+      "thumb": "04ef53b2f8d983226f7ed00e70e710df3861f82f63c75cc8a2418c894d28982130300b55e920095e917c74e69a2f048df854019d9a791626c15a8be2c4b281a246d0c2833bfb76e708bc5eed7e6e7e9890291e49eaa1add7f40e5612c12ba847f0afbafcc78ba0ea521c2294ff4cfd2a5d6622",
+      "thumbHash": "0d543623357bbdd05778daa3d80848ea752788a34e98d0281e0acac547586f23"
+    },
+    "text": "[\"face\",\"DEMO-2026\",\"S1\",1,\"C0001\",\"CEN042-S01\",1790000060000,\"face-none\",0,1,\"0d543623357bbdd05778daa3d80848ea752788a34e98d0281e0acac547586f23\"]",
+    "jpeg": "ffd8ffe001020304ffd9",
+    "sig": "99a3be8cbcf022aa4a001680b379e0e8fe31128b6bad1ef17efce4fd48bea833243a97f81347a2dcc8d5a7197c28b6d3a236881de4affbe6dfccc94f04788d42"
+  },
+  "policy": {
+    "in": {
+      "v": 1,
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "centre": "CEN042",
+      "cell": {
+        "id": "cell-1",
+        "keyId": "0000000000000000",
+        "pub": "040f7d0e310a30f2ef4c8d29db9812c6b2efb8aa1883dd44255ce8435f629cdf9df66e4ec545568ec3f9e3a903863d1f02c7aa318f8dc32179b0e8855ec999056d"
+      },
+      "durationMs": 1800000,
+      "issuedAt": 1790000000000,
+      "roster": {
+        "C0001": {
+          "form": "F1",
+          "extraMs": 0,
+          "pseud": "7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "C0002": {
+          "form": "F2",
+          "extraMs": 600000,
+          "pseud": "8888888888888888888888888888888888888888888888888888888888888888",
+          "acc": {
+            "faces": 2,
+            "assistive": [
+              "NVDA",
+              "VoiceOver"
+            ]
+          }
+        }
+      },
+      "integrity": {
+        "v": 1,
+        "blocklist": [
+          {
+            "name": "AnyDesk",
+            "procs": [
+              "anydesk"
+            ],
+            "bundleIds": [
+              "com.philandro.anydesk"
+            ]
+          },
+          {
+            "name": "TeamViewer",
+            "procs": [
+              "teamviewer",
+              "teamviewer_service"
+            ],
+            "bundleIds": [
+              "com.teamviewer.TeamViewer"
+            ]
+          },
+          {
+            "name": "RustDesk",
+            "procs": [
+              "rustdesk"
+            ],
+            "bundleIds": [
+              "com.carriez.rustdesk"
+            ]
+          },
+          {
+            "name": "Parsec",
+            "procs": [
+              "parsecd"
+            ],
+            "bundleIds": [
+              "tv.parsec.www"
+            ]
+          },
+          {
+            "name": "Chrome Remote Desktop",
+            "procs": [
+              "remoting_host"
+            ],
+            "bundleIds": [
+              "com.google.chrome.remote_desktop"
+            ]
+          },
+          {
+            "name": "VNC server",
+            "procs": [
+              "vncserver",
+              "tvnserver",
+              "winvnc"
+            ],
+            "bundleIds": []
+          },
+          {
+            "name": "OBS Studio",
+            "procs": [
+              "obs",
+              "obs64",
+              "obs studio"
+            ],
+            "bundleIds": [
+              "com.obsproject.obs-studio"
+            ]
+          },
+          {
+            "name": "Cluely",
+            "procs": [
+              "cluely"
+            ],
+            "bundleIds": [
+              "com.cluely.app"
+            ]
+          }
+        ],
+        "assistive": [
+          {
+            "name": "NVDA",
+            "procs": [
+              "nvda"
+            ],
+            "bundleIds": []
+          },
+          {
+            "name": "JAWS",
+            "procs": [
+              "jfw"
+            ],
+            "bundleIds": []
+          },
+          {
+            "name": "Narrator",
+            "procs": [
+              "narrator"
+            ],
+            "bundleIds": []
+          },
+          {
+            "name": "Magnifier",
+            "procs": [
+              "magnify"
+            ],
+            "bundleIds": []
+          },
+          {
+            "name": "VoiceOver",
+            "procs": [
+              "voiceover"
+            ],
+            "bundleIds": [
+              "com.apple.VoiceOver"
+            ]
+          }
+        ],
+        "guestTools": [
+          "vmtoolsd",
+          "vboxservice",
+          "vboxtray",
+          "prl_tools_service",
+          "prl_client_app",
+          "qemu-ga",
+          "spice-vdagent",
+          "vmware-tools-daemon"
+        ],
+        "vmMacPrefixes": [
+          "00:05:69",
+          "00:0c:29",
+          "00:1c:14",
+          "00:50:56",
+          "08:00:27",
+          "00:1c:42",
+          "52:54:00",
+          "00:16:3e"
+        ],
+        "vmStrings": [
+          "vmware",
+          "virtualbox",
+          "vbox",
+          "parallels",
+          "qemu",
+          "virtual machine",
+          "apple virtual",
+          "xen",
+          "kvm",
+          "bochs"
+        ],
+        "probeMs": 10000,
+        "blurMs": 3000,
+        "face": {
+          "noFaceMs": 10000,
+          "window": 5,
+          "over": 3
+        },
+        "amber": {
+          "minFreeBytes": 1073741824,
+          "maxSkewMs": 120000
+        },
+        "retentionMs": 2592000000,
+        "egress": [
+          "192.168.1.10:7070"
+        ],
+        "reviewPub": "04169cd7697bab6ae7e4b7c4ede031f2603fb36e048d9833b5dda344f06df49318031ded21b2d5fd873538b8cb20e498a68dd43772ce027085497e72544eb2cc85"
+      }
+    }
+  }
+}

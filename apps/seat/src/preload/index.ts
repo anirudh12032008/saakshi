@@ -14,6 +14,9 @@ const api: SeatApi = {
   act: (a: Action) => ipcRenderer.invoke('exam:act', a),
   submit: () => ipcRenderer.invoke('exam:submit'),
   handover: (pin: string) => ipcRenderer.invoke('exam:handover', pin),
+  recheck: () => ipcRenderer.invoke('gate:recheck'),
+  faceSample: (s) => ipcRenderer.send('face:sample', s),
+  blur: (ms) => ipcRenderer.send('gate:blur', ms),
   onSync: (cb) => on<SyncView>('sync', cb),
   onBoot: (cb) => on<ExamBoot>('boot', cb),
 };

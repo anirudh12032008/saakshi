@@ -19,6 +19,8 @@ export const FILES = {
   cellKey: (id: string) => `cells/${id}.key.json`,
   policy: (centre: string) => `policies/${centre}.json`,
   pseudKey: 'control/pseud.key',
+  /** Stage 5 (Addendum D.4): control's review key; face thumbnails are sealed to its public half. */
+  reviewKey: 'control/review.key.json',
   manifest: 'package/manifest.json',
   paper: (form: string) => `package/paper-${form}.bin`,
   wraps: 'package/wraps.json',

@@ -3,6 +3,7 @@ import type { State } from '@saakshi/core/protocol';
 export type { GateMethod } from '@saakshi/core/enrol';
 import type { GateMethod } from '@saakshi/core/enrol';
 import type { CentreStatus } from '@saakshi/core/ops';
+import type { IntegrityFinding, ProvSummary, Verdict } from '@saakshi/core/integrity';
 
 export type Lang = 'en' | 'hi';
 /** The latest journaled state of one item; seq is the entry that set it (drives the tick). */
@@ -52,11 +53,15 @@ export interface ExamBoot {
   paused?: boolean;
   /** 16 hex of this seat's key, shown while a move waits so the invigilator can compare it with the console. */
   moveKey?: string;
+  // Stage 5 (optional)
+  gate?: GateView;
+  /** Faces expected in frame (the signed accommodation; 1 by default, 2 for a scribe seat). */
+  faces?: number;
 }
 export interface EnrolInput { pin: string; operatorId: string; method: GateMethod }
 export type EnrolResult = { ok: true; bind: BindState } | { ok: false; error: string };
 /** answer → A + option; mark → MR with '' or AMR + option; clear → NA with '' (also a first visit, Addendum A.6). */
-export interface Action { kind: 'answer' | 'mark' | 'clear'; item: string; state: State; answer: string; dwellMs: number }
+export interface Action { kind: 'answer' | 'mark' | 'clear'; item: string; state: State; answer: string; dwellMs: number; /** Stage 5 (Addendum D.5) */ prov?: ProvSummary }
 export type ActResult = { ok: true; seq: number; activeMs: number } | { ok: false; error: string };
 export type SubmitResult = { ok: true; receipt: Receipt } | { ok: false; error: string };
 export interface SeatApi {
@@ -68,6 +73,15 @@ export interface SeatApi {
   submit(): Promise<SubmitResult>;
   /** Stage 4: move the candidate to this seat with their PIN (Addendum C.3). */
   handover(pin: string): Promise<EnrolResult>;
+  /** Stage 5: run the integrity gate again (after the candidate closes a blocked tool). */
+  recheck(): Promise<GateView>;
+  faceSample(s: FaceSample): void;
+  /** The exam window lost focus for this long (ms). */
+  blur(ms: number): void;
   onSync(cb: (v: SyncView) => void): () => void;
   onBoot(cb: (b: ExamBoot) => void): () => void;
 }
+/** Stage 5: the integrity gate's latest verdict on this seat (Addendum D). checkedAt 0 = not yet checked. */
+export interface GateView { verdict: Verdict; findings: IntegrityFinding[]; checkedAt: number }
+/** One face-count sample from the renderer (2 per second). thumb: base64 160×120 JPEG, sent only when faces !== expected. */
+export interface FaceSample { faces: number; at: number; thumb?: string }

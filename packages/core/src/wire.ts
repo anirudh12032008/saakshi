@@ -3,6 +3,7 @@ import type { Ctx } from './protocol.ts';
 import type { BindReq, WireBind } from './enrol.ts';
 import type { HandoverProof, HandoverReq } from './handover.ts';
 import type { ReleaseMsg } from './paper.ts';
+import { FINDING_CODES, LEVELS, VERDICTS, thumbHashOf, type SignedFace, type SignedReadiness } from './integrity.ts';
 
 /** One journal entry on the wire: the §11 signed line, the §8 envelope (padded base64), and — relay → cell only — the relay's rxWall (C.7). */
 export interface WireEntry { line: string; env: string; rx?: number }
@@ -32,7 +33,7 @@ export interface StreamView extends Ctx {
 export type NodeState = 'LIVE' | 'REBUILDING';
 export interface HeadsRes { mode: 'cell' | 'relay'; state: NodeState; streams: StreamView[] }
 
-export const LIMITS = { entries: 500, streams: 5000, line: 4096, env: 16384, field: 64, pinBox: 2048 } as const;
+export const LIMITS = { entries: 500, streams: 5000, line: 4096, env: 16384, field: 64, pinBox: 2048, thumb: 40_000 } as const;
 export const streamKey = (c: Ctx): string => JSON.stringify([c.exam, c.shift, c.attempt, c.cand]);
 
 const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -108,4 +109,25 @@ export function parseHandoverReq(x: unknown): HandoverReq {
     p = { via: 'key', keyEpoch: proof.keyEpoch, fromSeq: proof.fromSeq, fromHead: proof.fromHead, sig: proof.sig };
   else throw new Error('handover: proof must be {via:"pin", pin} or {via:"key", keyEpoch, fromSeq, fromHead, sig}');
   return { exam, shift, attempt, cand, seatId, pub, attestHash, pinBox, proof: p };
+}
+
+// Addendum D.3 / D.4 (Stage 5): readiness reports and face flags posted to the relay.
+const str = (x: unknown, max: number = LIMITS.field): x is string => typeof x === 'string' && x.length <= max;
+const ctxOk = (c: any) => str(c?.exam) && str(c?.shift) && Number.isSafeInteger(c?.attempt) && str(c?.cand);
+export function parseSignedReadiness(x: unknown): SignedReadiness {
+  const s = x as SignedReadiness, r = s?.r;
+  if (!ctxOk(r) || !str(r.seatId) || !nat(r.keyEpoch) || !nat(r.at) || !(VERDICTS as readonly string[]).includes(r.verdict)
+    || !Array.isArray(r.findings) || r.findings.length > 64 || !/^[0-9a-f]{128}$/.test(s.sig ?? '')) throw new Error('bad readiness report');
+  for (const f of r.findings) if (!(FINDING_CODES as readonly string[]).includes(f?.code) || !(LEVELS as readonly string[]).includes(f?.level)
+    || !str(f.detail, 512) || !Array.isArray(f.names) || f.names.length > 16 || !f.names.every((n) => str(n))) throw new Error('bad finding');
+  return { r: { exam: r.exam, shift: r.shift, attempt: r.attempt, cand: r.cand, seatId: r.seatId, keyEpoch: r.keyEpoch, at: r.at, verdict: r.verdict,
+    findings: r.findings.map((f) => ({ code: f.code, level: f.level, detail: f.detail, names: [...f.names] })) }, sig: s.sig };
+}
+export function parseSignedFace(x: unknown): SignedFace {
+  const s = x as SignedFace, f = s?.f;
+  if (!ctxOk(f) || !str(f.seatId) || !nat(f.at) || (f.code !== 'face-none' && f.code !== 'face-extra') || !nat(f.faces) || !nat(f.expected)
+    || !str(f.thumb, LIMITS.thumb) || !/^([0-9a-f]{2})*$/.test(f.thumb) || !/^[0-9a-f]{128}$/.test(s.sig ?? '')) throw new Error('bad face flag');
+  if (f.thumbHash !== thumbHashOf(f.thumb)) throw new Error('face flag: thumbHash does not match the thumbnail');
+  return { f: { exam: f.exam, shift: f.shift, attempt: f.attempt, cand: f.cand, seatId: f.seatId, at: f.at, code: f.code, faces: f.faces,
+    expected: f.expected, thumb: f.thumb, thumbHash: f.thumbHash }, sig: s.sig };
 }

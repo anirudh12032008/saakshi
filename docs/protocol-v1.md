@@ -524,3 +524,18 @@ The restore box is a B.4 box to `newPub` with `info = ["saakshi-restore",1,exam,
 **C.9 Gaps (convention, not checked).** A `gap` body is `["body","","","",[cause,pausedMs]]`, `cause ∈ {suspend, lock-screen, restart}`, `pausedMs` the seat's own measure (0 if unknown). Credit for a `gap` or `handover` entry g after entry p is measured as `max(0, (rx_g − rx_p) − Δactive)`, with `Δactive = 0` across epochs.
 
 **C.10 Purge order.** `["purge",exam,shift,sthId,ts]`, signed as in A.1 by the exam authority. A relay deletes a shift's entries only on a valid order.
+
+## 17. Addendum D (Stage 5, 2026-09-27)
+
+This addendum is additive only. No byte defined in §1–§16 changes, so `V` stays 1.
+
+- Vectors: `fixtures/vectors/protocol-v1-addendum-d.json`, produced by `tools/gen-vectors-addendum-d.ts`, checked by `packages/core/test/addendum-d.test.ts`.
+- Code: `integrity.ts`, `policy.ts` (D.1), `wire.ts` (`LIMITS.thumb`, `parseSignedReadiness`, `parseSignedFace`).
+
+| # | Addendum | Why |
+|---|---|---|
+| D.1 | `Policy.integrity` (optional, inside the signed text): `{v:1, blocklist: ToolRule[], assistive: ToolRule[], guestTools, vmMacPrefixes, vmStrings, egress: string[] ("host:port"), probeMs, blurMs, face: {noFaceMs, window, over}, amber: {minFreeBytes, maxSkewMs}, reviewPub (130 hex), retentionMs}`, `ToolRule = {name, procs: string[], bundleIds: string[]}`. `RosterEntry.acc` (optional): `{faces?: number, assistive?: string[]}` (names of `assistive` rules) | Plan §3.4 "signed; the client rejects unsigned policy"; accommodations |
+| D.2 | Finding convention (not checked): an `integrity` body is `["body","","","",[code,level,detail,names]]`, `level ∈ {block, review, amber, info}`, `names` an array of strings. `test-mode` (B.9) keeps its two-element meta | The cell, audit and incidents can name the tool |
+| D.3 | Readiness report `["readiness",exam,shift,attempt,cand,seatId,keyEpoch,at,verdict,findingsHash]`, signed (A.1 style) by the seat key of `keyEpoch`; `findingsHash = hex(SHA-256(UTF-8(canon(["findings",[meta…]]))))` over the D.2 metas in report order | The board cannot be forged by the LAN |
+| D.4 | Face flag `["face",exam,shift,attempt,cand,seatId,at,code,faces,expected,thumbHash]`, signed by the seat key; `code ∈ {face-none, face-extra}`; thumb = a B.4 box to `reviewPub`, `info = ["saakshi-face",1,exam,shift,attempt,cand,at]`, `pt` a JPEG ≤ 160×120; `thumbHash = hex(SHA-256(box))`, or `""` with no box | Plan §3.5 "one thumbnail, encrypted to control" |
+| D.5 | Provenance (not checked): the second meta slot of `answer` / `mark` / `clear` bodies (already `[]`) may be `["prov",moves,pathPx,clicks,keys,untrusted,lastMoveMs]` (non-negative integers) | S5 pointer-path provenance, inside the sealed body |
