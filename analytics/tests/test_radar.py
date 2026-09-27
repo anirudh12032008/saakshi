@@ -39,20 +39,22 @@ def test_every_flag_explains_itself(small):
     flags = radar.run(cohort)
     assert flags
     for f in flags:
-        assert f["level"] == {1: "watch", 2: "review"}[len(f["signals"])]
+        assert f["level"] == radar.level(len(f["signals"]))
         for s in f["signals"]:
             assert set(s) >= {"signal", "reason", "observed", "expected", "p"} and s["reason"]
             assert s["observed"] > s["expected"]
-            assert 0 <= s["p"] <= {"speed-accuracy": radar.ALPHA_SPEED, "same-room": radar.ALPHA_ROOM}[s["signal"]]
+            assert 0 <= s["p"] <= {"speed-accuracy": radar.ALPHA_SPEED, "same-room": radar.ALPHA_ROOM, "cusum": radar.ALPHA_CUSUM_CAND}[s["signal"]]
     rings = [f for f in flags if any(s["signal"] == "same-room" for s in f["signals"])]
     assert all(len(s["ring"]) >= 2 for f in rings for s in f["signals"] if s["signal"] == "same-room")
 
 
 def test_cli_report(small, capsys):
     out, _, _ = small
-    radar.main([str(out / "cohort.jsonl"), "--key", str(out / "key.json"), "--truth", str(out / "truth.json")])
+    radar.main([str(out / "cohort.jsonl"), "--key", str(out / "key.json"), "--truth", str(out / "truth.json"),
+                "--registry", str(out / "registry.json")])
     text = capsys.readouterr().out
-    for word in ["watch", "precision", "recall", "FPR", "hindi", "pwd", "rapid", "improvers", "auto-penalised"]:
+    for word in ["watch", "precision", "recall", "FPR", "hindi", "pwd", "rapid", "improvers", "auto-penalised",
+                 "cusum", "history:", "annotation only"]:
         assert word in text
 
 
@@ -67,7 +69,19 @@ def test_radar_reads_cell_export_rows(small, tmp_path):
 
 
 @pytest.mark.full
-def test_mvp_full_20k(tmp_path):
-    cohort, key, truth = generate.generate(n=20000, n_centres=100, seed=7)
-    m = check_mvp(radar.run(cohort), truth, cohort)
-    assert m["signals"]["speed-accuracy"]["recall_mid"] >= 0.5
+def test_full_20k_calibrate_g1_evaluate_g2():
+    """The one full-size test: A1's MVP on G1, the CUSUM gain on the mid-exam leak, and G2 out of sample."""
+    from saakshi_analytics import evaluate
+
+    r = evaluate.run(20000, 100, 7, 2026)
+    g1, g2, mid = r["g1"], r["g2"], r["mid_recall"]
+    assert g1["signals"]["speed-accuracy"]["recall_leak"] >= 0.8 and g1["signals"]["same-room"]["recall"] >= 0.8
+    a1 = mid["G1, A1 thresholds"]
+    assert a1["before (signal 1)"] >= 0.5 and a1["after (signal 1 or 3)"] >= a1["before (signal 1)"] + 0.3
+    assert mid["G2, calibrated"]["after (signal 1 or 3)"] >= mid["G2, calibrated"]["before (signal 1)"] + 0.3
+    for m in (g1, g2):
+        assert m["honest_fpr"] <= 0.005
+        assert all(g["p_vs_baseline"] > 0.01 for g in m["lookalikes"].values())
+    assert g2["signals"]["leak (1 or 3)"]["recall"] >= 0.8 and g2["signals"]["same-room"]["recall"] >= 0.6
+    for dim in ("lang", "pwd"):
+        assert all(g["honest_rate"] <= 0.005 for g in r["fairness"][dim].values())

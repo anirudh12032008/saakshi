@@ -1,6 +1,7 @@
-"""Thin radar (M11): signal 1 speed-accuracy, signal 2 same-room identical wrong answers.
+"""Radar (M11 + S1): signal 1 speed-accuracy, signal 2 same-room identical wrong answers,
+signal 3 CUSUM per item x centre x shift over tFirstMs (Benjamini-Hochberg across cells).
 
-python -m saakshi_analytics.radar COHORT.jsonl --key key.json [--truth truth.json] [--json flags.json]
+python -m saakshi_analytics.radar COHORT.jsonl --key key.json [--truth truth.json] [--registry registry.json] [--json flags.json]
 Flags are for human review only: each carries its reasons, observed vs expected and a p-value.
 """
 
@@ -19,6 +20,13 @@ HARD_P = 0.8  # "hard" = expected P(correct | item, ability decile) <= 0.8
 ALPHA_SPEED = 1e-5  # signal 1: Poisson-binomial tail, per candidate
 ALPHA_ROOM = 0.01  # signal 2: family-wise over every same-room pair in the cohort (Bonferroni)
 SCREEN = 1e-3  # signal 2: Poisson pre-screen before the exact Poisson-binomial
+P1_CUSUM = 0.5  # signal 3 design point: rate of "fast and correct" once a leak has landed in a room
+P0_FLOOR = 1e-3  # signal 3: floor on the in-control rate, so one lucky response is never infinite evidence
+Q_CUSUM = 0.01  # signal 3: BH false-discovery rate over every item x centre x shift cell
+ALPHA_CUSUM_CAND = 1e-3  # signal 3: per candidate, counted only inside BH-significant cells (committee parameter)
+DEFAULTS = {"speed": ALPHA_SPEED, "room": ALPHA_ROOM, "cusum_q": Q_CUSUM}
+CAPS = {"speed": 1e-3, "room": 0.05, "cusum_q": 0.05}  # calibration never loosens past these
+MARGIN = 10  # calibrated threshold sits >= 10x below the most extreme honest calibration value
 
 
 def load(path, key):
@@ -116,21 +124,112 @@ def same_room(c, fast, dec, wrong, q_wrong):
     return [(i, j, o, e, min(1.0, p * n_pairs)) for i, j, o, e, p in hits], n_pairs
 
 
-def run(c):
+def page(inc):
+    """Page's CUSUM down each column: S_t = max(0, S_{t-1} + inc_t). Returns, per column, the rows
+    [start, end) of the segment that ends at max S (start = the estimated change point)."""
+    C = np.vstack([np.zeros((1, inc.shape[1])), np.cumsum(inc, 0)])
+    end = (C - np.minimum.accumulate(C, 0)).argmax(0)
+    k = np.arange(len(C))[:, None]
+    start = np.where(k <= end, C, np.inf).argmin(0)
+    return start, end
+
+
+def cusum(c, answered, correct, fast, dec):
+    """Signal 3. For each item x room, order the answers by tFirstMs and run a Bernoulli CUSUM on
+    "fast and correct" (in control: this form x ability decile x item's cohort rate; out of control: P1_CUSUM).
+    The CUSUM segment [change point, peak] is tested with an exact Poisson-binomial tail, Bonferroni over
+    the n(n+1)/2 segments the scan could have picked; then Benjamini-Hochberg across all cells."""
+    n, m = answered.shape
+    y = fast & correct
+    fi = np.unique(c["form"], return_inverse=True)[1]
+    g = fi * 10 + dec
+    num, den = np.zeros((g.max() + 1, m)), np.zeros((g.max() + 1, m))
+    np.add.at(num, g, y)
+    np.add.at(den, g, answered)
+    p0 = np.clip(np.divide(num, den, out=np.zeros_like(num), where=den > 0)[g], P0_FLOOR, P1_CUSUM / 2)
+    inc = np.where(answered, np.where(y, np.log(P1_CUSUM / p0), np.log((1 - P1_CUSUM) / (1 - p0))), 0)
+    t = np.where(answered, c["tfirst"], -1)  # unanswered sort first and add nothing
+    room = np.char.add(np.char.add(c["centre"], "/"), c["shift"])
+    cells = {k: [] for k in ("room", "item", "obs", "exp", "p", "changeMs")}
+    seg_of = []  # candidate indices in each cell's segment
+    for r in np.unique(room):
+        idx = np.flatnonzero(room == r)
+        o = np.argsort(t[idx], 0, kind="stable")
+        start, end = page(np.take_along_axis(inc[idx], o, 0))
+        k = np.arange(len(idx))[:, None]
+        seg = (k >= start) & (k < end) & np.take_along_axis(answered[idx], o, 0)
+        Y = np.take_along_axis(y[idx], o, 0) & seg
+        P = np.where(seg, np.take_along_axis(p0[idx], o, 0), 0)
+        n_ans = answered[idx].sum(0)
+        p = np.minimum(1, pb_sf(P.T, Y.sum(0)) * n_ans * (n_ans + 1) / 2)
+        ts = np.take_along_axis(t[idx], o, 0)
+        rows = idx[o]
+        for j in range(m):
+            for key, v in (("room", r), ("item", j), ("obs", Y[:, j].sum()), ("exp", P[:, j].sum()), ("p", p[j]),
+                           ("changeMs", ts[min(start[j], len(idx) - 1), j])):
+                cells[key].append(v)
+            seg_of.append(rows[seg[:, j], j])
+    cells = {k: np.array(v) for k, v in cells.items()}
+    cells["q"] = stats.false_discovery_control(cells["p"])
+    return cells, seg_of, y, p0
+
+
+def scores(c):
+    """Every signal's statistics before any threshold (what calibration looks at)."""
     answered, correct, fast, dec, p_cor, wrong, q_wrong = features(c)
-    obs, exp, n_used, p1 = speed_accuracy(correct, fast, dec, p_cor)
+    pairs, n_pairs = same_room(c, fast, dec, wrong, q_wrong)
+    cells, seg_of, y, p0 = cusum(c, answered, correct, fast, dec)
+    return {"dec": dec, "speed": speed_accuracy(correct, fast, dec, p_cor), "pairs": pairs, "n_pairs": n_pairs,
+            "cells": cells, "seg_of": seg_of, "y": y, "p0": p0}
+
+
+def subset(c, rows):
+    """The cohort restricted to some candidates (boolean mask or indices)."""
+    per_cand = {k for k, v in c.items() if k not in ("items", "key") and len(v) == len(c["cand"])}
+    return {k: (v[rows] if k in per_cand else v) for k, v in c.items()}
+
+
+def calibrate(c, truth=None):
+    """Thresholds from an HONEST cohort only: each is the loosest power of ten that sits at least MARGIN x
+    below the most extreme honest value (signal 1: p per candidate; 2: Bonferroni p per pair; 3: BH q per cell),
+    capped at CAPS. Pass `truth` to have it refuse a cohort that still holds planted candidates."""
+    if truth is not None:
+        planted = set(truth["leak"]["cands"]) | set(truth["midLeak"]["cands"]) | {x for r in truth["rings"] for x in r["members"]}
+        if planted & set(c["cand"].tolist()):
+            raise ValueError("calibrate on honest candidates only (drop the planted ones first)")
+    s = scores(c)
+    worst = {"speed": s["speed"][3].min(), "room": min((p for *_, p in s["pairs"]), default=1.0),
+             "cusum_q": s["cells"]["q"].min()}
+    return {k: float(min(CAPS[k], 10 ** np.floor(np.log10(max(w, 1e-300) / MARGIN)))) for k, w in worst.items()}
+
+
+def level(n_signals, device_camera_evidence=False):
+    """Escalation ladder. 1 signal -> watch, 2+ -> review, 2+ with device or camera evidence -> escalate.
+    `device_camera_evidence` is the named input for that evidence; nothing produces it yet."""
+    if n_signals >= 2:
+        return "escalate" if device_camera_evidence else "review"
+    return "watch"
+
+
+def run(c, th=None, device_camera_evidence=frozenset(), s=None):
+    """Flags for human review. th: thresholds (DEFAULTS, or calibrate()'s output). device_camera_evidence:
+    candidate ids with device/camera evidence (not built yet). s: precomputed scores(c)."""
+    th = DEFAULTS | (th or {})
+    s = s or scores(c)
+    dec = s["dec"]
+    obs, exp, n_used, p1 = s["speed"]
     sig = {}
-    for i in np.flatnonzero((p1 <= ALPHA_SPEED) & (obs > exp)):
+    for i in np.flatnonzero((p1 <= th["speed"]) & (obs > exp)):
         sig.setdefault(i, []).append({
             "signal": "speed-accuracy",
             "reason": f"correct on {obs[i]} of {n_used[i]} hard items answered unusually fast "
                       f"(ability decile {dec[i] + 1}; expected {exp[i]:.1f})",
             "observed": int(obs[i]), "expected": round(float(exp[i]), 2), "p": float(p1[i]),
         })
-    pairs, n_pairs = same_room(c, fast, dec, wrong, q_wrong)
+    pairs, n_pairs = s["pairs"], s["n_pairs"]
     g = nx.Graph()
     for i, j, o, e, p in pairs:
-        if p <= ALPHA_ROOM and o > e:
+        if p <= th["room"] and o > e:
             g.add_edge(i, j, obs=int(o), exp=float(e), p=p)
     for ring in nx.connected_components(g):
         names = sorted(c["cand"][list(ring)].tolist())
@@ -142,27 +241,52 @@ def run(c):
                           f"(expected {e['exp']:.1f} for their ability deciles; Bonferroni over {n_pairs} pairs)",
                 "observed": e["obs"], "expected": round(e["exp"], 2), "p": e["p"], "ring": names,
             })
+    cells, y, p0 = s["cells"], s["y"], s["p0"]
+    hot = np.flatnonzero(cells["q"] <= th["cusum_q"])
+    if len(hot):
+        P, first = np.zeros(y.shape), np.full(y.shape, np.inf)
+        for h in hot:
+            rows, j = s["seg_of"][h], cells["item"][h]
+            P[rows, j] = p0[rows, j]
+            first[rows, j] = cells["changeMs"][h]
+        Y = y & (P > 0)
+        o3, e3 = Y.sum(1), P.sum(1)
+        p3 = pb_sf(P, o3)
+        for i in np.flatnonzero((p3 <= ALPHA_CUSUM_CAND) & (o3 > e3)):
+            n_cells = int((P[i] > 0).sum())
+            t0 = float(first[i][Y[i]].min()) / 60000
+            q = float(cells["q"][hot][np.isin(cells["item"][hot], np.flatnonzero(Y[i]))
+                                      & (cells["room"][hot] == f"{c['centre'][i]}/{c['shift'][i]}")].max())
+            sig.setdefault(i, []).append({
+                "signal": "cusum",
+                "reason": f"fast and correct on {o3[i]} of {n_cells} items whose answer streams in "
+                          f"{c['centre'][i]}/{c['shift'][i]} shift after a change point (earliest ~{t0:.0f} min); "
+                          f"CUSUM per item x room, BH q <= {q:.1e} across {len(cells['q'])} cells",
+                "observed": int(o3[i]), "expected": round(float(e3[i]), 2), "p": float(p3[i]),
+                "room": f"{c['centre'][i]}/{c['shift'][i]}", "changeMin": round(t0, 1),
+            })
     return [
         {"cand": str(c["cand"][i]), "centre": str(c["centre"][i]), "shift": str(c["shift"][i]),
-         "level": "review" if len(s) >= 2 else "watch", "signals": s}
-        for i, s in sorted(sig.items(), key=lambda kv: min(x["p"] for x in kv[1]))
+         "level": level(len(v), str(c["cand"][i]) in device_camera_evidence), "signals": v}
+        for i, v in sorted(sig.items(), key=lambda kv: min(x["p"] for x in kv[1]))
     ]
 
 
 def evaluate(flags, truth, c):
     by = {name: {f["cand"] for f in flags if any(s["signal"] == name for s in f["signals"])}
-          for name in ("speed-accuracy", "same-room")}
+          for name in ("speed-accuracy", "same-room", "cusum")}
     anyf = {f["cand"] for f in flags}
     leak, mid = set(truth["leak"]["cands"]), set(truth["midLeak"]["cands"])
     ring = {x for r in truth["rings"] for x in r["members"]}
     honest = set(c["cand"].tolist()) - leak - mid - ring
     sig = {}
-    for name, target in [("speed-accuracy", leak | mid), ("same-room", ring)]:
+    by["leak (1 or 3)"] = by["speed-accuracy"] | by["cusum"]
+    for name, target in [("speed-accuracy", leak | mid), ("same-room", ring), ("cusum", leak | mid), ("leak (1 or 3)", leak | mid)]:
         got = by[name]
         sig[name] = {"flagged": len(got), "precision": len(got & target) / max(len(got), 1),
                      "recall": len(target & got) / len(target), "fpr": len(got & honest) / len(honest)}
-    sig["speed-accuracy"] |= {"recall_leak": len(leak & by["speed-accuracy"]) / len(leak),
-                              "recall_mid": len(mid & by["speed-accuracy"]) / len(mid)}
+    for name in ("speed-accuracy", "cusum", "leak (1 or 3)"):
+        sig[name] |= {"recall_leak": len(leak & by[name]) / len(leak), "recall_mid": len(mid & by[name]) / len(mid)}
     lk = truth["lookalikes"]
     groups = {
         "hindi": set(c["cand"][c["lang"] == "hi"].tolist()), "pwd": set(c["cand"][c["pwd"] == 1].tolist()),
@@ -181,19 +305,32 @@ def evaluate(flags, truth, c):
 
 
 def report(flags, m=None):
-    print(f"{len(flags)} flags ({sum(f['level'] == 'review' for f in flags)} review, "
+    """flags=None prints only the metrics."""
+    if flags is not None:
+        print_flags(flags)
+    if m is not None:
+        print_metrics(m)
+
+
+def print_flags(flags):
+    print(f"{len(flags)} flags ({sum(f['level'] == 'escalate' for f in flags)} escalate, "
+          f"{sum(f['level'] == 'review' for f in flags)} review, "
           f"{sum(f['level'] == 'watch' for f in flags)} watch). Flags are for human review; nothing is auto-penalised.")
     for f in flags:
         for s in f["signals"]:
             print(f"  {f['level']:6} {f['cand']} {f['centre']}/{f['shift']}  [{s['signal']}] {s['reason']}  "
                   f"obs={s['observed']} exp={s['expected']} p={s['p']:.2e}")
-    if m is None:
-        return
+        if "history" in f:
+            print(f"         history: {f['history']['note']}")
+
+
+def print_metrics(m):
     print("\nsignal          flagged  precision  recall  FPR(honest)")
     for name, s in m["signals"].items():
         print(f"{name:15} {s['flagged']:7}  {s['precision']:9.3f}  {s['recall']:6.3f}  {s['fpr']:.4%}")
-    s = m["signals"]["speed-accuracy"]
-    print(f"  speed-accuracy recall: full leak {s['recall_leak']:.3f}, mid-exam leak {s['recall_mid']:.3f}")
+    for name in ("speed-accuracy", "cusum", "leak (1 or 3)"):
+        s = m["signals"][name]
+        print(f"  {name} recall: full leak {s['recall_leak']:.3f}, mid-exam leak {s['recall_mid']:.3f}")
     print(f"any signal: FPR on {m['n_honest']} honest candidates = {m['honest_fpr']:.4%}")
     print("\nlook-alike group  n      flagged  rate     p(> baseline)")
     b = m["baseline"]
@@ -207,10 +344,14 @@ def main(argv=None):
     ap.add_argument("cohort")
     ap.add_argument("--key", required=True)
     ap.add_argument("--truth")
+    ap.add_argument("--registry", help="APAAR registry of past percentiles: annotates queued flags only")
     ap.add_argument("--json", help="also write the flags as JSON (input to the decision engine's --flags)")
     args = ap.parse_args(argv)
     c = load(args.cohort, json.loads(open(args.key).read()))
     flags = run(c)
+    if args.registry:
+        from saakshi_analytics import history
+        flags = history.annotate(flags, c, json.loads(open(args.registry).read()))
     if args.json:
         open(args.json, "w").write(json.dumps(flags, indent=1) + "\n")
     report(flags, evaluate(flags, json.loads(open(args.truth).read()), c) if args.truth else None)

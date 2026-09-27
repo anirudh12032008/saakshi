@@ -1,11 +1,14 @@
 """G1 synthetic cohort: 3PL items, lognormal response times, honest look-alikes, planted cheating.
 
-python -m saakshi_analytics.generate OUT [--n 20000] [--centres 100] [--seed 7]
-writes OUT/cohort.jsonl (frozen schema v1), OUT/key.json (answer key), OUT/truth.json (what was planted).
+python -m saakshi_analytics.generate OUT [--n 20000] [--centres 100] [--seed 7] [--profile G1|G2]
+writes OUT/cohort.jsonl (frozen schema v1), OUT/key.json (answer key), OUT/truth.json (what was planted),
+OUT/registry.json (mock APAAR-keyed registry of past percentiles, for history corroboration).
 Deterministic per seed. Ground truth never goes into the cohort rows.
+G2 is the independent evaluation cohort: different response-time distribution and different cheater pacing.
 """
 
 import argparse
+import hashlib
 import json
 import pathlib
 
@@ -30,9 +33,22 @@ COPY_FRAC = 0.9  # copiers take the source's response on 90% of items (answers r
 RAPID_TAIL = 0.35  # rapid guessers click through the last 35% of their form
 RAPID_S = 6.0  # ~6 s per rapid guess
 MISTRANSLATED = "I12"  # Hindi text of I12 points to a wrong option half the time
+HISTORY_FRAC = 0.4  # share of candidates with a prior attempt in the registry (all improvers have one)
+
+# G1 = the calibration cohort (the constants above). G2 = the independent evaluation cohort, fixed a priori:
+# gamma response times (log-sd ~0.47, heavier fast tail than G1's lognormal 0.35) with a time-pressure drift
+# (everyone speeds up through the exam), and cheaters who pace themselves: per-leaker speedup U(2.5, 4.5),
+# a mid-exam leak that lands at 60 min and reaches each recipient over the next 20 min, looser copying.
+PROFILES = {
+    "G1": {"rt": "lognormal", "drift": 0.0, "speedup": (LEAK_SPEEDUP, LEAK_SPEEDUP), "acc": LEAK_ACC,
+           "midAtS": MID_LEAK_S, "midSpreadS": 0, "copyFrac": COPY_FRAC},
+    "G2": {"rt": "gamma(k=5)", "drift": 0.25, "speedup": (2.5, 4.5), "acc": 0.9,
+           "midAtS": 60 * 60, "midSpreadS": 20 * 60, "copyFrac": 0.8},
+}
 
 
-def generate(n=N_FULL, n_centres=100, seed=7):
+def generate(n=N_FULL, n_centres=100, seed=7, profile="G1"):
+    pr = PROFILES[profile]
     rng = np.random.default_rng(seed)
     items = [f"I{j + 1:02d}" for j in range(M)]
     paper = json.loads((ROOT / "fixtures/paper/key.json").read_text())
@@ -103,32 +119,39 @@ def generate(n=N_FULL, n_centres=100, seed=7):
     state[omit] = np.where(rng.random(omit.sum()) < 0.3, 3, 1)
     state[rng.random((n, M)) < 0.005] = 0
     state[(state == 2) & (rng.random((n, M)) < 0.05)] = 4
-    logt = beta - tau[:, None] + rng.normal(0, SIGMA_T, (n, M))
-
     pos = np.where(form[:, None] == 0, np.arange(M), M - 1 - np.arange(M))  # F2 is F1 reversed
+    if pr["rt"] == "lognormal":
+        logt = beta - tau[:, None] + rng.normal(0, SIGMA_T, (n, M))
+    else:  # G2: gamma(5) multiplicative noise, and a time-pressure drift that speeds everyone up late in the form
+        logt = beta - tau[:, None] + np.log(rng.gamma(5.0, 1 / 5.0, (n, M))) - pr["drift"] * pos / M
     tail = np.isin(np.arange(n), rapid)[:, None] & (pos >= (1 - RAPID_TAIL) * M)
     logt[tail] = np.log(RAPID_S) + rng.normal(0, 0.3, tail.sum())
     answer[tail] = rng.integers(4, size=tail.sum())
     state[tail] = 2
 
+    speed = np.full(n, pr["speedup"][0])
+    if pr["speedup"][0] != pr["speedup"][1]:
+        speed[cheats] = rng.uniform(*pr["speedup"], len(cheats))
+
     def use_leak(rows, cols_mask):
         sel = np.zeros((n, M), bool)
         sel[rows] = cols_mask[rows] if cols_mask.ndim == 2 else cols_mask
         sel &= np.isin(np.arange(M), leak_items)
-        follow = rng.random(sel.sum()) < LEAK_ACC
+        follow = rng.random(sel.sum()) < pr["acc"]
         answer[sel] = np.where(follow, key[np.nonzero(sel)[1]], rng.integers(4, size=sel.sum()))
         state[sel] = 2
-        logt[sel] -= np.log(LEAK_SPEEDUP)
+        logt[sel] -= np.log(speed[np.nonzero(sel)[0]])
 
     use_leak(leak, np.ones(M, bool))
     # mid-exam leak: only items reached after the leak lands (honest pacing up to then)
     t_end = timeline(np.exp(logt), state, pos)
-    use_leak(mid, t_end - np.exp(logt) > MID_LEAK_S)
+    lands = pr["midAtS"] + (rng.uniform(0, pr["midSpreadS"], (n, 1)) if pr["midSpreadS"] else 0)
+    use_leak(mid, t_end - np.exp(logt) > lands)
 
     for _, _, members in rings:
         src = members[0]
         for cp in members[1:]:
-            take = rng.random(M) < COPY_FRAC
+            take = rng.random(M) < pr["copyFrac"]
             answer[cp, take], state[cp, take] = answer[src, take], state[src, take]
 
     # --- derived fields ---
@@ -150,11 +173,13 @@ def generate(n=N_FULL, n_centres=100, seed=7):
     room = lambda c, s: {"centre": f"CEN{c + 1:03d}", "shift": f"S{s + 1}"}
     truth = {
         "seed": seed, "n": n,
-        "effects": {"leakSpeedup": LEAK_SPEEDUP, "leakAcc": LEAK_ACC, "cheatTheta": CHEAT_THETA, "copyFrac": COPY_FRAC, "midLeakAtS": MID_LEAK_S,
+        "effects": {"profile": profile, "rt": pr["rt"], "rtDrift": pr["drift"], "leakSpeedup": list(pr["speedup"]),
+                    "leakAcc": pr["acc"], "cheatTheta": CHEAT_THETA, "copyFrac": pr["copyFrac"],
+                    "midLeakAtS": pr["midAtS"], "midLeakSpreadS": pr["midSpreadS"],
                     "rapidTail": RAPID_TAIL, "hiSlow": HI_SLOW, "pwdSlow": PWD_SLOW},
         "leak": {"items": [items[j] for j in leak_items], "centres": [f"CEN{c + 1:03d}" for c in leak_centres],
                  "cands": ids[np.sort(leak)].tolist()},
-        "midLeak": room(mid_centre, mid_shift) | {"tLeakMs": MID_LEAK_S * 1000, "cands": ids[np.sort(mid)].tolist()},
+        "midLeak": room(mid_centre, mid_shift) | {"tLeakMs": pr["midAtS"] * 1000, "cands": ids[np.sort(mid)].tolist()},
         "rings": [room(c, s) | {"source": ids[m[0]], "members": ids[m].tolist()} for c, s, m in rings],
         "lookalikes": {
             "rapid": ids[np.sort(rapid)].tolist(), "flyers": ids[np.sort(flyers)].tolist(),
@@ -162,7 +187,20 @@ def generate(n=N_FULL, n_centres=100, seed=7):
             "mistranslated": {"item": MISTRANSLATED, "lang": "hi", "option": OPTS[mt_opt]},
         },
     }
+    # --- mock history registry (drawn last, so the cohort stream above is unchanged) ---
+    prior = rng.random(n) < HISTORY_FRAC
+    prior[improvers] = False
+    past_theta = theta[prior] + rng.normal(0, 0.3, prior.sum())  # true ability then, measured with noise
+    past = dict(zip(ids[prior], (round(100 * float((theta < t).mean()), 1) for t in past_theta)))
+    past |= {ids[i]: p for i, p in zip(improvers, past_pct)}
+    truth["registry"] = {"apaar": {c: apaar(c, seed) for c in sorted(past)},
+                         "pastPct": {apaar(c, seed): p for c, p in sorted(past.items())}}
     return cohort, {i: OPTS[k] for i, k in zip(items, key)}, truth
+
+
+def apaar(cand, seed):
+    """Mock 12-digit APAAR id. The registry knows candidates only by APAAR; the admit card links the two."""
+    return str(int(hashlib.sha256(f"{seed}:{cand}".encode()).hexdigest(), 16) % 10**12).zfill(12)
 
 
 def timeline(dwell, state, pos):
@@ -193,10 +231,12 @@ def main(argv=None):
     ap.add_argument("--n", type=int, default=N_FULL)
     ap.add_argument("--centres", type=int, default=100)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--profile", choices=sorted(PROFILES), default="G1")
     args = ap.parse_args(argv)
     out = pathlib.Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    cohort, key, truth = generate(args.n, args.centres, args.seed)
+    cohort, key, truth = generate(args.n, args.centres, args.seed, args.profile)
+    (out / "registry.json").write_text(json.dumps(truth.pop("registry")))
     write_jsonl(cohort, out / "cohort.jsonl")
     (out / "key.json").write_text(json.dumps(key, indent=0))
     (out / "truth.json").write_text(json.dumps(truth, indent=1))
