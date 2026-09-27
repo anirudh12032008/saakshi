@@ -1,0 +1,39 @@
+name: windows
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths: ['apps/seat/**', 'packages/**', 'fixtures/**', 'tools/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/windows.yml']
+  pull_request:
+    paths: ['apps/seat/**', 'packages/**', 'fixtures/**', 'tools/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', '.github/workflows/windows.yml']
+  workflow_dispatch:
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: 25, cache: pnpm }
+      - uses: oven-sh/setup-bun@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r test
+      - run: pnpm --filter @saakshi/seat pack:win
+      - name: Probe self-test (packaged exe)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath apps\seat\release\win-unpacked\Saakshi.exe -ArgumentList '--probe-selftest','--out',"$PWD\probe.json" -Wait -PassThru
+          Get-Content probe.json
+          if ($p.ExitCode -ne 0) { throw "probe self-test failed with exit code $($p.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: probe-selftest, path: probe.json }
+      - if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        run: pnpm --filter @saakshi/seat dist:win
+      - if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with: { name: saakshi-setup, path: apps/seat/release/*.exe }
