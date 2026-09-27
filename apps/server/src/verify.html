@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saakshi · Verify</title>
+    <style>
+      /* Type scale, ratio 1.25: .8 · 1 · 1.25 · 1.563 · 1.953 rem. The mismatch headline is the largest text on the page. */
+      :root { font-family: system-ui, sans-serif; font-size: 100%; line-height: 1.5; color: #202124; background: #fff; }
+      body { margin: 0 auto; padding: 1rem 1.5rem 3rem; max-width: 56rem; font-size: 1rem; }
+      h1 { font-size: 1.563rem; line-height: 1.25; margin: 0 0 .25rem; }
+      .lede { color: #3c4043; margin: 0 0 1rem; }
+      .good { color: #1e6b25; } .bad { color: #a50e0e; }
+      #selftest { font-size: .8rem; font-weight: 600; margin: 0 0 1.25rem; }
+      form { display: grid; gap: .75rem; margin-bottom: 1.25rem; }
+      label { display: grid; gap: .25rem; font-weight: 600; }
+      input[type=text] { font: 1.25rem ui-monospace, Menlo, Consolas, monospace; padding: .5rem; border: 2px solid #3c4043; border-radius: .375rem; max-width: 28rem; color: #202124; background: #fff; }
+      input[type=file] { font: inherit; }
+      #verdict { border: 3px solid; border-radius: .5rem; padding: .75rem 1rem; margin: 0 0 1rem; }
+      #verdict.match { border-color: #1e6b25; background: #e6f4ea; } #verdict.altered, #verdict.invalid { border-color: #a50e0e; background: #fce8e6; }
+      #verdict h2 { margin: 0 0 .25rem; font-size: 1.25rem; line-height: 1.25; }
+      #headline { font-size: 1.953rem; line-height: 1.2; font-weight: 800; margin: 0; }
+      #more { margin: .5rem 0 0; }
+      table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: .375rem .5rem; border-bottom: 1px solid #9aa0a6; vertical-align: top; }
+      td.state { font-weight: 700; white-space: nowrap; }
+      :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
+      @media (forced-colors: active) { #verdict { border-color: CanvasText; } }
+    </style>
+  </head>
+  <body>
+    <h1>Verify a response sheet</h1>
+    <p class="lede">Works offline. Nothing you load here leaves this computer.</p>
+    <p id="selftest" role="status">Running the golden vectors…</p>
+    <form id="form">
+      <label>Proof file (proof.json from the evidence pack)<input id="file" type="file" accept=".json,application/json" /></label>
+      <label>Receipt code from the slip (optional)<input id="code" type="text" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-X" /></label>
+    </form>
+    <p id="loaded" role="status"></p>
+    <section id="verdict" hidden aria-live="polite"><h2 id="title"></h2><p id="headline"></p><ul id="more"></ul></section>
+    <table id="checks" hidden><thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Detail</th></tr></thead><tbody id="rows"></tbody></table>
+    <script type="module" src="./verify-page.ts"></script>
+  </body>
+</html>
