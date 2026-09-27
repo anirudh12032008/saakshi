@@ -1,6 +1,7 @@
 node_modules/
 out/
 release/
+release-e2e/
 dist/
 .venv/
 __pycache__/

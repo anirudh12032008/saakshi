@@ -1,0 +1,10 @@
+extends: ./electron-builder.yml
+productName: Saakshi-E2E
+directories:
+  output: release-e2e
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: true
+  enableEmbeddedAsarIntegrityValidation: false
+  onlyLoadAppFromAsar: false
