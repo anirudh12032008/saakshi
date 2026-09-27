@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Action, Credit as CreditView, ExamBoot, ItemState, Lang, Paper, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
+import type { Action, Credit as CreditView, ExamBoot, GateView, ItemState, Lang, Paper, Receipt, SeatApi, SyncView } from '../../shared/ipc.ts';
 import { bannerOf, clearResponse, fmtRemaining, GLYPH, legendCounts, markAndNext, mmss, PALETTE_STATES, saveAndNext, tickOf, visitAction } from './exam-state.ts';
 import { FaceChip } from './FaceChip.tsx';
-import { Connecting, Enrol, LangToggle, Locked, Moved, Moving, TestBanner } from './Gate.tsx';
+import { Connecting, Enrol, GatePanel, LangToggle, Locked, Moved, Moving, TestBanner } from './Gate.tsx';
 import { T, type Strings } from './i18n.ts';
 import { Palette } from './Palette.tsx';
+import { emptyProv, provClick, provKey, provMove, type ProvState, provSummary } from './provenance.ts';
 import { Slip } from './Slip.tsx';
 
 declare global { interface Window { saakshi: SeatApi } }
@@ -50,13 +51,27 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
   const [confirming, setConfirming] = useState(false);
   const [clock, setClock] = useState({ base: boot.activeMs, at: performance.now() });
   const [now, setNow] = useState(performance.now());
+  const [gate, setGate] = useState<GateView | undefined>(boot.gate);
   const shownAt = useRef(performance.now());
   const heading = useRef<HTMLHeadingElement>(null);
+  const prov = useRef<ProvState>(emptyProv());
 
   useEffect(() => window.saakshi.onSync(setSync), []);
   useEffect(() => { const id = setInterval(() => setNow(performance.now()), 250); return () => clearInterval(id); }, []);
+  useEffect(() => window.saakshi.onBoot((b) => { if (b.gate) setGate(b.gate); }), []);
   // Resume: the question on screen counts as visited (Addendum A.6).
   useEffect(() => { if (boot.started && !boot.receipt) void visit(order[0]); }, []);
+  // Provenance (Addendum D.5): pointer/keyboard activity on the current question, reset per visit.
+  useEffect(() => {
+    const move = (e: PointerEvent) => { prov.current = provMove(prov.current, e.clientX, e.clientY, performance.now(), e.isTrusted); };
+    const click = (e: MouseEvent) => { prov.current = provClick(prov.current, e.isTrusted); };
+    const key = (e: KeyboardEvent) => { prov.current = provKey(prov.current, e.isTrusted); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('mousedown', click);
+    window.addEventListener('keydown', key);
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('mousedown', click); window.removeEventListener('keydown', key); };
+  }, []);
+  async function recheck() { setGate(await window.saakshi.recheck()); }
 
   const remaining = boot.durationMs - (started ? clock.base + (now - clock.at) : 0);
   const timeUp = started && remaining <= 0;
@@ -75,6 +90,7 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
     setVisited((v) => new Set(v).add(next));
     setSelected(its[next]?.answer ?? '');
     shownAt.current = performance.now();
+    prov.current = emptyProv();
     requestAnimationFrame(() => heading.current?.focus());
     void visit(next);
   }
@@ -82,6 +98,7 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
   async function commit(a: Action | null, advance: boolean) {
     let its = itemsRef.current;
     if (a) {
+      a.prov = provSummary(prov.current, performance.now());
       const r = await window.saakshi.act(a);
       if (!r.ok) { setNotice(r.error); return; }
       const st: ItemState = { state: a.state, answer: a.answer, seq: r.seq };
@@ -109,14 +126,16 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
         <p>{t.candidate}: {boot.cand} · {boot.seatId} · {t.form} {boot.form}</p>
         <LangToggle lang={lang} setLang={setLang} t={t} />
         <p className="badge bound">{t.unlocked} {boot.release?.via === 'code' ? t.viaCode : ''}</p>
+        {gate && <GatePanel gate={gate} t={t} onRecheck={recheck} />}
         <p>{t.startNote}</p>
-        <button className="primary" onClick={async () => {
+        <button className="primary" disabled={gate?.verdict === 'block'} onClick={async () => {
           const r = await window.saakshi.start();
           if (!r.ok) { setNotice(r.error); return; }
           setStarted(true);
           setClock({ base: r.activeMs, at: performance.now() });
           setVisited((v) => new Set(v).add(order[0]));
           shownAt.current = performance.now();
+          prov.current = emptyProv();
           void visit(order[0]);
         }}>{t.start}</button>
         <p role="status">{notice || boot.notice}</p>
@@ -155,7 +174,7 @@ function Exam({ boot, paper, t, lang, setLang }: { boot: ExamBoot; paper: Paper;
         {boot.credited && <Credit c={boot.credited} t={t} />}
         <LangToggle lang={lang} setLang={setLang} t={t} />
         <SyncStatus v={sync} t={t} />
-        <FaceChip label={t.faces} unavailable={t.cameraOff} off={!boot.camera} offLabel={t.cameraTest} />
+        <FaceChip label={t.faces} unavailable={t.cameraOff} off={!boot.camera} offLabel={t.cameraTest} expected={boot.faces ?? 1} />
         <button className="submit" onClick={() => setConfirming(true)}>{t.submit}</button>
       </header>
       <Banner boot={boot} sync={sync} t={t} />

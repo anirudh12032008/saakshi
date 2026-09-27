@@ -1,9 +1,40 @@
 import { useState, type FormEvent } from 'react';
-import type { ExamBoot, GateMethod, Lang } from '../../shared/ipc.ts';
+import type { ExamBoot, GateMethod, GateView, Lang } from '../../shared/ipc.ts';
 import { enrolProblem, GATE, shortHex } from './enrol-state.ts';
 import type { Strings } from './i18n.ts';
 
 interface P { boot: ExamBoot; t: Strings; lang: Lang; setLang: (l: Lang) => void }
+
+/**
+ * The integrity gate panel (plan §3.4): the verdict as a word (never colour alone), every finding naming its
+ * level and the tools involved, and a re-check button once the candidate has closed the named tools.
+ * `review` and `amber` never disable Start — only `block` does (Decision 2).
+ */
+export function GatePanel({ gate, t, onRecheck }: { gate: GateView; t: Strings; onRecheck: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const findings = gate.findings;
+  async function recheck() { setBusy(true); try { await onRecheck(); } finally { setBusy(false); } }
+  return (
+    <section className={`gate-panel lvl-${gate.verdict}`} aria-labelledby="gate-h">
+      <h2 id="gate-h">{t.gate.title}</h2>
+      <p className="badge" role="status">{t.gate.verdict[gate.verdict]}</p>
+      {findings.length > 0 && (
+        <ul className="gate-findings">
+          {findings.map((f, i) => (
+            <li key={i} className={`lvl-${f.level}`}>
+              <span className="lvl-word">{t.gate.level[f.level]}</span>{' '}
+              <span>{f.detail}</span>
+              {f.names.length > 0 && <span className="names"> · {f.names.join(' · ')}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {gate.verdict === 'block' && <p>{t.gate.blockedNote}</p>}
+      <button onClick={recheck} disabled={busy}>{t.gate.recheck}</button>
+      <p className="checked-at">{t.gate.checkedAt(gate.checkedAt)}</p>
+    </section>
+  );
+}
 
 export function TestBanner({ t }: { t: Strings }) {
   return <div className="test-banner" role="note">{t.testBanner}</div>;

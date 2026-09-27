@@ -87,4 +87,15 @@ button.submit { margin-left: auto; border-color: var(--ink); font-weight: 700; }
 .banner.cell, .banner.link { color: #7a4100; background: #fef7e0; border-color: #b06000; }
 .banner.slow, .banner.paused { color: #0b3d91; background: #e8f0fe; border-color: #1565c0; }
 .badge.credit { color: #0d5222; background: #e6f4ea; }
+
+.gate-panel { display: grid; gap: .5rem; max-width: 32rem; margin: 1rem 0; padding: 1rem; border-radius: .5rem; border: 1px solid var(--line); }
+.gate-findings { display: grid; gap: .375rem; padding: 0; margin: 0; list-style: none; }
+.gate-findings li { padding: .5rem .75rem; border-radius: .375rem; }
+.gate-findings .names { font-weight: 600; }
+.lvl-word { font-weight: 700; text-transform: uppercase; font-size: .75rem; }
+.lvl-block, .gate-findings .lvl-block { background: #fce8e6; color: #8c1d18; }
+.lvl-review, .gate-findings .lvl-review { background: #e8f0fe; color: #0b3d91; }
+.lvl-amber, .gate-findings .lvl-amber { background: #fef7e0; color: #7a4100; }
+.lvl-green, .gate-findings .lvl-info { background: #e6f4ea; color: #0d652d; }
+.checked-at { font-size: .8rem; color: var(--muted); }
 .move { margin-top: 1.5rem; border-top: 1px solid var(--line); padding-top: 1rem; }

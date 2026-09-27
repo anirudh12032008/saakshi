@@ -1,4 +1,5 @@
 import type { State } from '@saakshi/core/protocol';
+import type { Level, Verdict } from '@saakshi/core/integrity';
 import type { BindState, GateMethod, Lang } from '../../shared/ipc.ts';
 import type { EnrolProblem } from './enrol-state.ts';
 import type { BannerKind, Tick } from './exam-state.ts';
@@ -18,6 +19,10 @@ export interface Strings {
   banner: Record<BannerKind, string>; eta: (t: string) => string; preserved: (local: number, relay: number, cell: number) => string;
   moveTitle: string; moveNote: string; moveButton: string; movingTitle: string; movingNote: string; yourKey: string;
   movedTitle: string; movedNote: string; credited: (t: string, by: string) => string; awaitingApproval: (t: string) => string;
+  gate: {
+    title: string; recheck: string; blockedNote: string; checkedAt: (at: number) => string;
+    verdict: Record<Verdict, string>; level: Record<Level, string>;
+  };
 }
 
 export const T: Record<Lang, Strings> = {
@@ -74,6 +79,12 @@ export const T: Record<Lang, Strings> = {
     movedNote: 'Your exam continues on the other computer. Nothing typed here counts. Please call the invigilator.',
     credited: (t, by) => `+${t} credited · approved by ${by}`,
     awaitingApproval: (t) => `+${t} credited · awaiting approval`,
+    gate: {
+      title: 'Integrity check', recheck: 'Check again', blockedNote: 'Close the named tools, then check again.',
+      checkedAt: (at) => (at ? `Last checked ${new Date(at).toLocaleTimeString()}` : 'Not yet checked'),
+      verdict: { green: 'Ready', amber: 'Amber', review: 'Review', block: 'Blocked' },
+      level: { block: 'block', review: 'review', amber: 'amber', info: 'info' },
+    },
   },
   hi: {
     title: 'साक्षी परीक्षा', candidate: 'अभ्यर्थी', form: 'प्रश्न-पत्र', start: 'परीक्षा शुरू करें',
@@ -128,5 +139,11 @@ export const T: Record<Lang, Strings> = {
     movedNote: 'आपकी परीक्षा दूसरे कंप्यूटर पर जारी है। यहाँ टाइप किया गया कुछ भी नहीं गिना जाएगा। कृपया निरीक्षक को बुलाएँ।',
     credited: (t, by) => `+${t} जोड़ा गया · ${by} द्वारा स्वीकृत`,
     awaitingApproval: (t) => `+${t} जोड़ा गया · स्वीकृति की प्रतीक्षा`,
+    gate: {
+      title: 'सुरक्षा जाँच', recheck: 'फिर से जाँचें', blockedNote: 'नामित उपकरण बंद करें, फिर से जाँचें।',
+      checkedAt: (at) => (at ? `अंतिम जाँच ${new Date(at).toLocaleTimeString()}` : 'अभी तक जाँच नहीं हुई'),
+      verdict: { green: 'तैयार', amber: 'एम्बर', review: 'समीक्षा', block: 'अवरुद्ध' },
+      level: { block: 'अवरुद्ध', review: 'समीक्षा', amber: 'एम्बर', info: 'सूचना' },
+    },
   },
 };
