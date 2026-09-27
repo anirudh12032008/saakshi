@@ -21,7 +21,7 @@ function syncDir(dir: string): void {
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
-function writeDurable(path: string, data: Uint8Array): void {
+export function writeDurable(path: string, data: Uint8Array): void {
   const tmp = `${path}.tmp`;
   const fd = openSync(tmp, 'w');
   try { writeSync(fd, data); fsyncSync(fd); } finally { closeSync(fd); }

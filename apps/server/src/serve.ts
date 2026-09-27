@@ -1,6 +1,6 @@
 import type { HTMLBundle } from 'bun';
 import { parseSyncReq, type HeadsRes, type NodeState, type StreamView, type SyncReq, type SyncRes } from '@saakshi/core/wire';
-import type { Hub } from './sse.ts';
+import type { Hub, Timeouts } from './sse.ts';
 
 export interface Api {
   readonly mode: 'cell' | 'relay';
@@ -8,11 +8,13 @@ export interface Api {
   sync(req: SyncReq): Promise<SyncRes | 'REBUILDING'>;
   views(): StreamView[];
 }
-type Handler = (req: Request) => Response | Promise<Response>;
+/** A route handler. Bun passes the server as the second argument; SSE routes need server.timeout. */
+export type Handler = (req: Request, server: Timeouts) => Response | Promise<Response>;
+export type Routes = Record<string, Partial<Record<'GET' | 'POST', Handler>>>;
 export interface ServeOpts {
   port: number; hostname?: string; idleTimeout?: number; consoleHtml?: HTMLBundle;
   /** Mode-specific routes (cell: /v1/shift, /v1/dev/rogue). The built-in routes win on a clash. */
-  routes?: Record<string, Partial<Record<'GET' | 'POST', Handler>>>;
+  routes?: Routes;
 }
 
 export const heads = (api: Api): HeadsRes => ({ mode: api.mode, state: api.state(), streams: api.views() });

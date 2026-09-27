@@ -6,6 +6,7 @@ import { concat, randomBytes, utf8 } from './bytes.ts';
 import { canon, parseCanon } from './canon.ts';
 import { V, bodyArray, bodyCommit, bodyFromArray, type Body, type Ctx } from './protocol.ts';
 import { toLowS, type Verify } from './sig.ts';
+import type { BoxKeys } from './box.ts';
 
 export interface KeyPair { priv: Uint8Array; pub: Uint8Array }
 
@@ -66,3 +67,6 @@ export function openBody(cellPriv: Uint8Array, c: BodyCtx, envelope: Uint8Array,
   if (bodyCommit(salt, body) !== expectCommit) throw new Error('bodyCommit mismatch');
   return { salt, body };
 }
+
+/** Native ECDH for sealed boxes (Addendum B.4): the same bytes as box.ts's nobleBox. */
+export const nativeBox: BoxKeys = { newKey: newKeyPair, ecdh };

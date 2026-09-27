@@ -6,7 +6,7 @@ import { randomBytes, toHex } from '../packages/core/src/bytes.ts';
 import { DEV_EXAM, devForm, devPseud, devSeat, type KeysFile } from '../packages/core/src/dev.ts';
 import { signedLine } from '../packages/core/src/journal.ts';
 import { responsesOf } from '../packages/core/src/log.ts';
-import { sealBody, signer } from '../packages/core/src/node.ts';
+import { sealBody, signer, type KeyPair } from '../packages/core/src/node.ts';
 import { bodyArray, entryHash, finalHash, genesisPrev, type Body, type Ctx, type Header, type Kind } from '../packages/core/src/protocol.ts';
 import type { ResponseSheet } from '../packages/core/src/sheet.ts';
 import { toB64, type WireEntry } from '../packages/core/src/wire.ts';
@@ -26,8 +26,8 @@ export class SimSeat {
   #cellPub: Uint8Array;
   #keyEpoch: number;
 
-  constructor(keys: KeysFile, cand: string, cellPub: Uint8Array, keyEpoch = 1) {
-    const k = devSeat(keys, cand);
+  constructor(keys: KeysFile, cand: string, cellPub: Uint8Array, keyEpoch = 1, seat?: KeyPair) {
+    const k = seat ?? devSeat(keys, cand);
     if (!k) throw new Error(`no DEV seat key for ${cand}`);
     this.ctx = { ...DEV_EXAM, cand };
     this.#sign = signer(k);

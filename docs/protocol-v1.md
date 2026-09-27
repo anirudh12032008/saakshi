@@ -432,3 +432,54 @@ A verifier checks:
 5. the receipt code and the cell countersignature;
 6. the STH signature;
 7. the inclusion of `leafArray(…, h, finalHash)` (§10).
+
+## 15. Addendum B (Stage 3, 2026-09-27)
+
+This addendum is additive only. No byte defined in §1–§14 changes, so `V` stays 1.
+
+- Vectors: `fixtures/vectors/protocol-v1-addendum-b.json`, produced by `tools/gen-vectors-addendum-b.ts`, checked by `packages/core/test/addendum-b.test.ts`.
+- Code: `box.ts`, `enrol.ts`, `paper.ts`, `policy.ts`.
+
+**B.1 Signatures.** These are signed as `m = UTF-8(canon(array))` with no domain byte (as A.1):
+
+| Structure | Array | Signed by |
+|---|---|---|
+| cell key certificate | `["cellkey",exam,cellId,cellKeyId,pub]` | the exam authority |
+| bind certificate | `["bind",exam,shift,attempt,cand,seatId,pubkey,keyEpoch,fromSeq,attestHash]` (§5) | the cell |
+| policy | `["policy",exam,shift,centre,text]` | the exam authority |
+| manifest | `["manifest",exam,shift,[[form,ciphertextHash,kc_f]…],ts]` | the exam authority |
+| release | `["release",exam,shift,form,kc_f,ts]` (§5) | control (the authority key in DEV) |
+
+**B.2 Fields.**
+- `cellKeyId` = the first 16 hex characters of `hex(SHA-256(pub))`. `pub`/`pubkey` are 130 lowercase hex (65-byte uncompressed P-256).
+- `keyEpoch ≥ 1`, `fromSeq ≥ 0`. The key in a bind certificate signs the candidate's entries with `seq > fromSeq`. First enrolment: `keyEpoch 1`, `fromSeq 0`.
+- `attestHash`, `ciphertextHash` and `kc_f` are 64 hex. In the manifest, forms are sorted by name (JS `<`). `ts` is ms since the Unix epoch.
+- `text` in a policy is the policy's JSON (non-normative fields: `v, exam, shift, centre, cell {id, keyId, pub}, durationMs, roster {cand: {form, extraMs, pseud}}, issuedAt`). A seat refuses a policy whose signature does not verify.
+
+**B.3 Gate attestation.** `attestHash = hex(SHA-256(UTF-8(canon(["attest",exam,shift,operatorId,time,method,cand]))))`, `time` in ms, `method` one of `aadhaar-face`, `aadhaar-fingerprint`, `id-document`.
+
+**B.4 Sealed box.**
+```
+box = ephPub(65) ‖ nonce(24) ‖ XChaCha20-Poly1305(key, nonce).encrypt(pt)      -- no AAD
+key = HKDF-SHA256(ikm = ECDH(ephPriv, recipientPub) x-coordinate, salt = none, info = UTF-8(canon(info)), L = 32)
+```
+- PIN to the cell: `info = ["saakshi-pin",1,exam,shift,attempt,cand,seatId]`, `pt` = the B.5 record.
+- Custodian share to control's release key: `info = ["saakshi-share",1,exam,shift,custodian,releaseKeyId]`, `pt` = the 97-byte share (§9); `releaseKeyId` follows the `cellKeyId` rule.
+
+**B.5 PIN record.** A PIN is exactly 6 ASCII digits. `record = canon(["pin", hex(salt16), 16384, 8, 1, hex(scrypt(UTF-8(pin), salt, N=16384, r=8, p=1, dkLen=32))])`. It is stored and transmitted only inside a B.4 box to the cell.
+
+**B.6 Symmetric boxes.** `box = nonce(24) ‖ XChaCha20-Poly1305(key, nonce, AAD = UTF-8(canon(aad))).encrypt(pt)`.
+
+| Box | key | aad | pt |
+|---|---|---|---|
+| paper of form `f` | `K_f` (`kF1` for `F1`, `kF2` for `F2`) | `["saakshi-paper",exam,shift,f]` | the paper JSON |
+| code list | `L` | `["saakshi-codes",exam,shift]` | JSON `{centre: code}` |
+| custodian share file | `scrypt(pass', salt16, 16384, 8, 1, 32)`; `pass'` = the passphrase without spaces or dashes, upper-cased | `["saakshi-custodian",exam,shift,custodian]` | the 97-byte share |
+
+`ciphertextHash = hex(SHA-256(paper box))`.
+
+**B.7 The seat check (normative).** A key `K` for form `f` is accepted only if `kc_f(K)` (§5) equals the signed manifest's `kc_f` for `f`. This holds on every path. A release that carries a signature must also verify under the authority key, with its `kc_f` equal to the manifest's. The offline-code release (the relay's unwrap of `W_c`, §9) carries no signature.
+
+**B.8 Active time.** Relay and cell reject a new entry, as BAD_SUBMISSION and never FORK, when its `activeMs` is less than the previous entry's and both have the same `keyEpoch`.
+
+**B.9 Conventions (not checked).** The unlock body is `["body","","","",[form,kc_f,via]]`, `via` ∈ {`push`, `code`}. A seat running the DEV test keystore journals `integrity` with meta `["test-mode","journal key not in the OS keychain"]` right after its unlock.

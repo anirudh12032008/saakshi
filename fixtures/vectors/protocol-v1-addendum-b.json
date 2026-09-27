@@ -1,0 +1,117 @@
+{
+  "_note": "Protocol v1 Addendum B. Signatures, nonces, salts of boxes and ephemeral keys are random: verify or open them, never compare bytes.",
+  "attest": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "operatorId": "GATE-42-OP7",
+      "time": 1790000000000,
+      "method": "aadhaar-face",
+      "cand": "C0001"
+    },
+    "attestHash": "42d42db47dbee7ab46b77be4f122410c423ceee00368641e60ee1d0da97238cc"
+  },
+  "cellkey": {
+    "in": {
+      "exam": "DEMO-2026",
+      "cellId": "cell-1",
+      "keyId": "03b747b123134f59",
+      "pub": "040f7d0e310a30f2ef4c8d29db9812c6b2efb8aa1883dd44255ce8435f629cdf9df66e4ec545568ec3f9e3a903863d1f02c7aa318f8dc32179b0e8855ec999056d"
+    },
+    "text": "[\"cellkey\",\"DEMO-2026\",\"cell-1\",\"03b747b123134f59\",\"040f7d0e310a30f2ef4c8d29db9812c6b2efb8aa1883dd44255ce8435f629cdf9df66e4ec545568ec3f9e3a903863d1f02c7aa318f8dc32179b0e8855ec999056d\"]",
+    "sig": "07c572a5a4e7187e1d3c3479e43a77fba854c9c298223d28201212f68b75b3314df6b6f99fcb18c095b7e993407e91a20fedf7d5b0dc7465518c091e1a847f37"
+  },
+  "bind": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "attempt": 1,
+      "cand": "C0001",
+      "seatId": "CEN042-S01",
+      "pub": "04e4a95150339ae377cb897f2249debe3d05e48d494722935e3f5e59f8cd3e20d3d4943179569d5fbdc1d941859cd354311f21deb2fcecb449aab85e573165e61e",
+      "keyEpoch": 1,
+      "fromSeq": 0,
+      "attestHash": "42d42db47dbee7ab46b77be4f122410c423ceee00368641e60ee1d0da97238cc"
+    },
+    "text": "[\"bind\",\"DEMO-2026\",\"S1\",1,\"C0001\",\"CEN042-S01\",\"04e4a95150339ae377cb897f2249debe3d05e48d494722935e3f5e59f8cd3e20d3d4943179569d5fbdc1d941859cd354311f21deb2fcecb449aab85e573165e61e\",1,0,\"42d42db47dbee7ab46b77be4f122410c423ceee00368641e60ee1d0da97238cc\"]",
+    "sig": "73b39f2329313e5b0559464ceeb55b0c62865835b1d8ed5717efdf1cadf608826d47257a00f6797690df38b4a43c0774f9a8781d2ba8c569ce46b807fb063531"
+  },
+  "pin": {
+    "pin": "123456",
+    "salt": "01010101010101010101010101010101",
+    "record": "[\"pin\",\"01010101010101010101010101010101\",16384,8,1,\"abd8129e5c37cfaee19872c3bc74909da46c758f98bc04c612eed5b277951d58\"]",
+    "box": "04c1772193eecb63d82dd0fde38a5e25aa03cd8d63962b6d844ff96a7c56eb65856747483797f77f422d0f34523b5ddbc6930262428a5f22cdc5a5aaa0bb23e22967ea2574141409c5c23c685cb3a3f6daf044ed98c15fd7bdd014f1b6a43bbc21d4d38e0bde5ed18be13d7b4e74ce04397d545b5c73decb5097e1942592dff1e9ab9973c6b7ecfe87354086f9fcfe9b54f4018ef08a0446ff997344ace419a7e5a1376700155ad18dd074435fd1452b5d95ffd87cc9f5cf64b3d89eebe3b84b001e65c38d8dcc4fb6f495e0bee18b71014da853da32c59ae773d4995e8a335c"
+  },
+  "policy": {
+    "signed": {
+      "text": "{\"v\":1,\"exam\":\"DEMO-2026\",\"shift\":\"S1\",\"centre\":\"CEN042\",\"cell\":{\"id\":\"cell-1\",\"keyId\":\"03b747b123134f59\",\"pub\":\"040f7d0e310a30f2ef4c8d29db9812c6b2efb8aa1883dd44255ce8435f629cdf9df66e4ec545568ec3f9e3a903863d1f02c7aa318f8dc32179b0e8855ec999056d\"},\"durationMs\":1800000,\"roster\":{\"C0001\":{\"form\":\"F1\",\"extraMs\":0,\"pseud\":\"7777777777777777777777777777777777777777777777777777777777777777\"}},\"issuedAt\":1790000000000}",
+      "sig": "4f40c670a32991d35ab054e73371c3e6633e91c0b1016b7015c54705733221c71409d08823549dc8e0cbf732f3d07256c8016b0a77a526670fa50a4d17b445c0"
+    }
+  },
+  "paper": {
+    "K": "1111111111111111111111111111111111111111111111111111111111111111",
+    "text": "{\"exam\":\"DEMO-2026\",\"form\":\"F1\",\"items\":[{\"id\":\"I01\",\"subject\":\"physics\",\"en\":{\"q\":\"What is the SI unit of force?\",\"o\":[\"Joule\",\"Watt\",\"Pascal\",\"Newton\"]},\"hi\":{\"q\":\"बल का SI मात्रक क्या है?\",\"o\":[\"जूल\",\"वाट\",\"पास्कल\",\"न्यूटन\"]}}]}",
+    "ct": "df137702c4028f13e1e0e45c65432c3e3d8e0f535be2f919427dab4bda722d6dfdb975e654e393b2c74665ea310954c70e17393585b1f3db4dba05cebc4288b9517b0a4f89b1733c5dce9859884f39877df8dd6dcbc154f80a6e4126595187a74c87152cf9f1f74ff2d1f5c9922c78bb795b0e7bba42bf87ea771602397c1e9dbabf841f7fd2a891a776fde35c527e7de97aef59697ca572178baeb400bb583a1b2ce612d30a6103bf6c533280382a662a9ac576df09abdb460390bd7b540360d914349684cdf8d61b1f75d4c6a4a7aa003ad1633d9267e48d4d28e31c5eb8b45f91fd8ca02ab980f063260b778fca9f7f8a0e38c9f30e6ee0fe5a901e35c7e4b1ac798b36c4594e44e31246310eb45984573b6dd0a9a5004b22f7bda35f45a3b738e9b9ea9d9ce1cc82cc71c6c7ab46a54353f11f0f5fcca65f53ff8e29123f9b8a7915859b6d5153da09c218b83a2dcb4ac5"
+  },
+  "manifest": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "forms": [
+        {
+          "form": "F1",
+          "ciphertextHash": "2ce59c708fa3d052afa56536884e88efd086ad6a2b41f4ee6d6e035d4df80252",
+          "kcf": "6065a397d8b6299bbacba68453af1f9920929f4f02b067fd04f86d7ad43f0ba5"
+        },
+        {
+          "form": "F2",
+          "ciphertextHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "kcf": "1fa6ee6c269ec8d7ce7621835c69f7f234fd1614f87ba04f9da03c58ed6aa4e0"
+        }
+      ],
+      "ts": 1790000000000
+    },
+    "text": "[\"manifest\",\"DEMO-2026\",\"S1\",[[\"F1\",\"2ce59c708fa3d052afa56536884e88efd086ad6a2b41f4ee6d6e035d4df80252\",\"6065a397d8b6299bbacba68453af1f9920929f4f02b067fd04f86d7ad43f0ba5\"],[\"F2\",\"0000000000000000000000000000000000000000000000000000000000000000\",\"1fa6ee6c269ec8d7ce7621835c69f7f234fd1614f87ba04f9da03c58ed6aa4e0\"]],1790000000000]",
+    "sig": "166df3eff58f15230723aa1a103f18bd523620420d6066879edebb9cc9ff9c7415c443e996e314a9cbaade7121886c6f508631bc418586cb6c9d21d716d682cb"
+  },
+  "release": {
+    "in": {
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "form": "F1",
+      "kcf": "6065a397d8b6299bbacba68453af1f9920929f4f02b067fd04f86d7ad43f0ba5",
+      "ts": 1790000100000
+    },
+    "text": "[\"release\",\"DEMO-2026\",\"S1\",\"F1\",\"6065a397d8b6299bbacba68453af1f9920929f4f02b067fd04f86d7ad43f0ba5\",1790000100000]",
+    "sig": "e7f93001ec5a8573e918f7795c5c48dd9ac8ef4bde09ba19079bf97f09f60c1f6ed314d6be5646ce4c0f24b64c9f45f27cbfc209414f8eae9014ee1f6f301fdf",
+    "key": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "codes": {
+    "L": "3333333333333333333333333333333333333333333333333333333333333333",
+    "codes": {
+      "CEN042": "N5JY1E59BR0FGNVQW"
+    },
+    "ct": "215adc263f9c7ff86c04cc16310e65b1dcd0e8343886858f9cc5abe5ff582c18022b493106c82454c4ba342028eb51d2d82fd92508ff811c120a5129f6dd9578568105a4694c"
+  },
+  "shareFile": {
+    "pass": "TESTPASSPHRASE01",
+    "share": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+    "file": {
+      "v": 1,
+      "exam": "DEMO-2026",
+      "shift": "S1",
+      "custodian": "NTA",
+      "salt": "ca3867d79650411d074338094926de2f",
+      "N": 16384,
+      "r": 8,
+      "p": 1,
+      "box": "076cb19db8e7061ad4b61cff87da7e811b4d81d49b133fa3eafe1ae1af9ad63d94d3193acea4b848c2d118cfdf136847fb339d133ff4c3c49714df066d1732ec8177111ea00bc44bdbb767aa847afa4d2d0bffeabd48dd64bd6cfe27a6b40737fdfcfefc4e245cffb74483d0ab2e97d9bc3df06f81edd45a8496e936893586b8ae9d40b77b4279aeb2"
+    }
+  },
+  "shareBox": {
+    "keyId": "feedfacecafebeef",
+    "custodian": "NTA",
+    "recipientSeat": 7,
+    "box": "040c4dde5828b8f68dd0a5e7295f9952691e6bb04df3b7a6b339badf8485cf08f7400fe0230ab8bb5e8c80dbe26a7a201f16f3969844a244223a128bd77b4d10cbbce3b8524eaf0ef65df488d3e927d4a4bae39c5cc3300907ca2f77d9874a635fc5996705f95c1e5b8671c9b40dfbbb35c8bb7f06511a2b56479aa68967fa73b7c4f0b73368b39c191086d1108bc30022608ddcccb26fe307935beb75ffbdcff1516d6dec3c254ba03d703ae9fb8cbb15e5edd84357b7bcb125c8cb95df1eccc47946e556680bd758c5"
+  }
+}
