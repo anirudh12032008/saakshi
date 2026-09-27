@@ -8,7 +8,12 @@ export interface Api {
   sync(req: SyncReq): Promise<SyncRes | 'REBUILDING'>;
   views(): StreamView[];
 }
-export interface ServeOpts { port: number; hostname?: string; idleTimeout?: number; consoleHtml?: HTMLBundle }
+type Handler = (req: Request) => Response | Promise<Response>;
+export interface ServeOpts {
+  port: number; hostname?: string; idleTimeout?: number; consoleHtml?: HTMLBundle;
+  /** Mode-specific routes (cell: /v1/shift, /v1/dev/rogue). The built-in routes win on a clash. */
+  routes?: Record<string, Partial<Record<'GET' | 'POST', Handler>>>;
+}
 
 export const heads = (api: Api): HeadsRes => ({ mode: api.mode, state: api.state(), streams: api.views() });
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -20,7 +25,7 @@ export function serve(api: Api, hub: Hub, o: ServeOpts) {
     hostname: o.hostname ?? '127.0.0.1',
     idleTimeout: o.idleTimeout ?? 10,
     maxRequestBodySize: 16 * 1024 * 1024,           // 500 × (4 KB line + 16 KB envelope) fits
-    routes: {
+    routes: { ...o.routes,
       '/v1/sync': {
         POST: async (req) => {
           let body: SyncReq;

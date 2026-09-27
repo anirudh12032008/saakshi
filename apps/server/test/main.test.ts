@@ -43,3 +43,24 @@ test('refuses to start without DEV=1 (no enrolment until Stage 3)', async () => 
   const p = Bun.spawn(['bun', MAIN], { stdout: 'pipe', stderr: 'pipe', env });
   expect(await p.exited).toBe(2);
 });
+
+test('control boots with DEV=1, prints READY, serves /control and reports an unreachable cell as 502', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-main-'));
+  const p = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'control', DEV: '1', PORT: '0', DIR: join(dir, 'control'), CELL_URL: 'http://127.0.0.1:9', RELAY_URL: 'http://127.0.0.1:9' } });
+  try {
+    const r = await ready(p.stdout);
+    expect(r).toMatchObject({ mode: 'control', state: 'LIVE' });
+    expect(await (await fetch(`http://127.0.0.1:${r.port}/control`)).text()).toContain('Rogue insider edits an answer');
+    expect((await fetch(`http://127.0.0.1:${r.port}/v1/recon`)).status).toBe(502);
+  } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a cell serves its response sheets at /v1/shift (400 without exam and shift)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'saakshi-main-'));
+  const p = Bun.spawn(['bun', MAIN], { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, MODE: 'cell', DEV: '1', PORT: '0', DB: join(dir, 'c.db') } });
+  try {
+    const { port } = await ready(p.stdout);
+    expect((await fetch(`http://127.0.0.1:${port}/v1/shift`)).status).toBe(400);
+    expect(await (await fetch(`http://127.0.0.1:${port}/v1/shift?exam=DEMO-2026&shift=S1`)).json()).toEqual({ cell: 'cell-1', exam: 'DEMO-2026', shift: 'S1', sheets: [] });
+  } finally { p.kill(); await p.exited; rmSync(dir, { recursive: true, force: true }); }
+});
