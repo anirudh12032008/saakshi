@@ -5,7 +5,8 @@ import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
 import type { ArchiveReport, Incident, LinkView, Notice, TimeRow } from '@saakshi/core/ops';
 import { OPS_DEMO } from '@saakshi/core/ops';
-import { archiveLines, commitment, findingText, fleetSummary, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, readinessTile, reviewCard, tileText, timeCells } from '../src/control-view.ts';
+import type { RadarFlag, ScoreRow } from '@saakshi/core/analytics';
+import { archiveLines, commitment, findingText, flagRows, fleetSummary, headline, incidentCard, kpis, linkLine, noticeCard, noticeText, reconCells, releaseLines, readinessTile, reviewCard, riskChip, tileText, timeCells } from '../src/control-view.ts';
 
 const row: ReconRow = { centre: 'CEN-01', exam: 'DEMO-2026', shift: 'S1', registered: 8, checkedIn: 1, unlocked: 1, submitted: 1, receipts: 1, leaves: 1, headsEqual: true, headMismatches: [], green: true };
 
@@ -119,3 +120,27 @@ test('review card: a face flag reads plainly and says what the image is', () => 
 });
 
 test('the control page keeps the type scale', () => { expect(typeScaleOk(readFileSync(join(import.meta.dir, '../src/control.html'), 'utf8'))).toBe(true); });
+
+test('flag rows: history always reads corroboration only, or says why not', () => {
+  const escalate: RadarFlag = { cand: 'C0001', centre: 'CEN042', shift: 'S1', level: 'escalate',
+    signals: [{ signal: 'speed-accuracy', reason: 'too fast, too accurate', observed: 0.98, expected: 0.4, p: 0.001 }, { signal: 'same-room', reason: 'shared wrong answers', observed: 0.9, expected: 0.1, p: 0.002, room: 'R1' }],
+    history: { note: 'jumped 40 points versus past performance', corroborates: true } };
+  expect(flagRows([escalate])).toEqual([{ cand: 'C0001', centre: 'CEN042', level: 'Escalate', signals: 'speed-accuracy + same-room', reasons: ['too fast, too accurate', 'shared wrong answers'], history: 'corroboration only — jumped 40 points versus past performance' }]);
+  const review: RadarFlag = { cand: 'C0002', centre: 'CEN042', shift: 'S1', level: 'review', signals: [{ signal: 'cusum', reason: 'sudden shift', observed: 3, expected: 1, p: 0.01 }] };
+  expect(flagRows([review])[0].history).toBe('no registry record');
+  const watch: RadarFlag = { cand: 'C0003', centre: 'CEN042', shift: 'S1', level: 'watch', signals: [{ signal: 'cusum', reason: 'sudden shift', observed: 3, expected: 1, p: 0.01 }] };
+  expect(flagRows([watch])[0].history).toBe('');
+});
+
+test('risk chip: a word and a tone, never colour alone; undefined when the centre has no row', () => {
+  expect(riskChip({ centre: 'CEN042', risk: 0.27, decision: 'add observer', reasons: ['x'], rank: 1, note: '', telemetry: {} })).toEqual({ text: 'add observer · risk 27%', tone: 'watch' });
+  expect(riskChip({ centre: 'CEN001', risk: 0.02, decision: 'allot', reasons: [], rank: 9, note: '', telemetry: {} })?.tone).toBe('ok');
+  expect(riskChip({ centre: 'CEN009', risk: 0.91, decision: 'do not allot', reasons: [], rank: 1, note: '', telemetry: {} })?.tone).toBe('stop');
+  expect(riskChip(undefined)).toBeUndefined();
+});
+
+test('notice card: incomplete unless all three languages are present', () => {
+  const n: Notice = { id: 'N-1', incident: 'X', kind: 'CENTRE_OUTAGE', centres: ['CEN042'], audience: 14, en: 'Power outage.', hi: 'बिजली गई।', channels: ['sms'], draftedAt: 0 };
+  expect(noticeCard(n)).toEqual({ en: 'Power outage.', hi: 'बिजली गई।', ta: '', complete: false });
+  expect(noticeCard({ ...n, ta: 'மின்சாரம் இல்லை.' }).complete).toBe(true);
+});

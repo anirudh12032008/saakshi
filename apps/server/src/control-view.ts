@@ -3,6 +3,7 @@ import type { CentreTile, FleetView, ReleaseStatus } from '@saakshi/core/directo
 import type { Manifest } from '@saakshi/core/paper';
 import type { Verdict } from '@saakshi/core/integrity';
 import { RUNGS, type ArchiveReport, type Incident, type LinkView, type Notice, type Severity, type TimeRow } from '@saakshi/core/ops';
+import type { RadarFlag, ScoreRow } from '@saakshi/core/analytics';
 import { blastText, mmss } from './incidents.ts';
 import type { CentreReadiness } from './readiness-view.ts';
 import { VERDICT_WORD } from './readiness-view.ts';
@@ -111,6 +112,30 @@ export function reviewCard(i: ReviewItem, now: number): { title: string; line: s
   const what = i.code === 'face-none' ? 'no face for 10 s or more' : `${i.faces} faces seen, ${i.expected} expected${i.expected > 1 ? ' (scribe)' : ''}`;
   const state = i.decision ? `${i.decision} by ${i.by}` : 'awaiting review';
   return { title: `${i.cand} · ${i.seatId}`, line: `${what} · ${mmss(now - i.at)} ago · ${state}`, alt: i.thumb ? `face check frame, ${what}` : 'no image kept', canDecide: !i.decision };
+}
+
+const LEVEL_WORD = { watch: 'Watch', review: 'Review', escalate: 'Escalate' } as const;
+export interface FlagRow { cand: string; centre: string; level: string; signals: string; reasons: string[]; history: string }
+
+/** Corroboration only, per the user rule: history never raises a flag on its own. */
+export function flagRows(flags: RadarFlag[]): FlagRow[] {
+  return flags.map((f) => ({
+    cand: f.cand, centre: f.centre, level: LEVEL_WORD[f.level],
+    signals: f.signals.map((s) => s.signal).join(' + '),
+    reasons: f.signals.map((s) => s.reason),
+    history: f.history ? `corroboration only — ${f.history.note}` : f.level === 'watch' ? '' : 'no registry record',
+  }));
+}
+
+const RISK_TONE = { allot: 'ok', 'add observer': 'watch', 'do not allot': 'stop' } as const;
+export function riskChip(row?: ScoreRow): { text: string; tone: 'ok' | 'watch' | 'stop' } | undefined {
+  if (!row) return undefined;
+  return { text: `${row.decision} · risk ${Math.round(row.risk * 100)}%`, tone: RISK_TONE[row.decision] };
+}
+
+export function noticeCard(n: Notice): { en: string; hi: string; ta: string; complete: boolean } {
+  const ta = n.ta ?? '';
+  return { en: n.en, hi: n.hi, ta, complete: Boolean(n.en && n.hi && ta) };
 }
 
 export function archiveLines(a: ArchiveReport): string[] {

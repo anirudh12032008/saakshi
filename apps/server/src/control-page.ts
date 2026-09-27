@@ -2,10 +2,11 @@ import type { SignedSth } from '@saakshi/core/log';
 import type { Finding, ReconRow } from '@saakshi/core/sheet';
 import type { FleetView, ReleaseStatus } from '@saakshi/core/directory';
 import type { ArchiveReport, Incident, LinkView, Notice, Severity, TimeRow } from '@saakshi/core/ops';
+import type { AnalyticsRun, Classification, IncidentIn, InvReport, ScoreRow, SignedDecision } from '@saakshi/core/analytics';
 import type { ReadinessBoard } from './readiness-view.ts';
 import { seatLine } from './readiness-view.ts';
 import type { ReviewItem } from './review.ts';
-import { archiveLines, commitment, findingText, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeText, reconCells, releaseLines, readinessTile, reviewCard, tileText, timeCells } from './control-view.ts';
+import { archiveLines, commitment, findingText, flagRows, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeCard, noticeText, reconCells, releaseLines, readinessTile, reviewCard, riskChip, tileText, timeCells } from './control-view.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const say = (id: string, text: string, tone = '') => { const el = $(id); el.textContent = text; el.className = `out ${tone}`.trim(); };
@@ -76,6 +77,12 @@ setInterval(recon, 2000);
 
 const li = (text: string): HTMLLIElement => { const x = document.createElement('li'); x.textContent = text; return x; };
 let lastSummary = '';
+let scoreByCentre = new Map<string, ScoreRow>();
+
+async function scorecardTick(): Promise<void> {
+  try { const { rows } = await call<{ rows: ScoreRow[] }>('GET', '/v1/scorecard'); scoreByCentre = new Map(rows.map((r) => [r.centre, r])); }
+  catch { /* not computed yet: keep the last board */ }
+}
 
 async function fleetTick(): Promise<void> {
   try {
@@ -91,6 +98,8 @@ async function fleetTick(): Promise<void> {
       const title = document.createElement('strong'), line = document.createElement('span'), word = document.createElement('span');
       title.textContent = x.title; line.textContent = x.line; word.textContent = x.word;
       item.append(title, line, word);
+      const chip = riskChip(scoreByCentre.get(t.centre));
+      if (chip) { const c = el('span', chip.text, `chip ${chip.tone} risk-line`); c.title = scoreByCentre.get(t.centre)?.reasons[0] ?? ''; item.append(c); }
       return item;
     }));
     const summary = fleetSummary(f);
@@ -131,8 +140,10 @@ $('wan').addEventListener('submit', async (ev) => {
 
 void fleetTick();
 void releaseTick();
+void scorecardTick();
 setInterval(fleetTick, 1000);
 setInterval(releaseTick, 2000);
+setInterval(scorecardTick, 5000);
 
 const el = (tag: string, text = '', cls = ''): HTMLElement => { const x = document.createElement(tag); x.textContent = text; if (cls) x.className = cls; return x; };
 async function incidentsTick(): Promise<void> {
@@ -237,3 +248,106 @@ void readinessTick();
 void reviewTick();
 setInterval(readinessTick, 2000);
 setInterval(reviewTick, 2000);
+
+// --- Decide fairly ---
+let running = false;
+function setDecideRunning(n: number): void {
+  running = true;
+  const b = $<HTMLButtonElement>('decide-run');
+  b.disabled = true; b.textContent = `Running the pipeline on ${n} candidates…`;
+}
+function clearDecideRunning(): void {
+  running = false;
+  const b = $<HTMLButtonElement>('decide-run');
+  b.disabled = false; b.textContent = 'Run';
+}
+function showRun(run: AnalyticsRun): void {
+  $('headline').textContent = run.headline;
+  $('flags').replaceChildren(...flagRows(run.flags).map((r) => {
+    const li2 = el('li');
+    li2.append(el('strong', `${r.cand} · ${r.centre}`), el('span', r.level, 'level'), el('span', r.signals), el('span', r.reasons.join('; ')));
+    if (r.history) li2.append(el('span', r.history, 'note'));
+    return li2;
+  }));
+  $('report').textContent = run.report;
+}
+async function analyticsTick(): Promise<void> {
+  try {
+    const { run, signoff, running: r } = await call<{ run?: AnalyticsRun; signoff?: SignedDecision; running: boolean }>('GET', '/v1/analytics');
+    if (run) showRun(run);
+    if (signoff) say('signoff-out', `Signed off by ${signoff.by} at ${new Date(signoff.at).toLocaleTimeString()}, report sha256 ${signoff.reportHash.slice(0, 16)}…`, 'ok');
+    if (r && !running) setDecideRunning(0); else if (!r && running) clearDecideRunning();
+  } catch { /* no run yet */ }
+}
+$('decide-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target as HTMLFormElement);
+  const perimeterText = String(f.get('perimeter') ?? '').trim();
+  const items = String(f.get('items') ?? '').trim();
+  const body: IncidentIn = {
+    id: String(f.get('id')),
+    breach: { perimeter: !perimeterText || perimeterText === 'unknown' ? 'unknown' : perimeterText.split(',').map((s) => s.trim()).filter(Boolean),
+      systemic: f.get('systemic') === 'on', evidence: String(f.get('evidence') ?? ''), ...(items ? { items: items.split(',').map((s) => s.trim()).filter(Boolean) } : {}) },
+  };
+  setDecideRunning(0);
+  try { showRun(await call<AnalyticsRun>('POST', '/v1/analytics/run', body)); say('decide-status', 'Run complete.', 'ok'); }
+  catch (e) { say('decide-status', (e as Error).message, 'bad'); }
+  finally { clearDecideRunning(); }
+});
+$('signoff').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target as HTMLFormElement);
+  try {
+    const s = await call<SignedDecision>('POST', '/v1/analytics/signoff', { by: f.get('by') });
+    say('signoff-out', `Signed off by ${s.by} at ${new Date(s.at).toLocaleTimeString()}, report sha256 ${s.reportHash.slice(0, 16)}…`, 'ok');
+  } catch (e) { say('signoff-out', (e as Error).message, 'bad'); }
+});
+void analyticsTick();
+setInterval(analyticsTick, 3000);
+
+// --- Invigilator reports ---
+async function reportsTick(): Promise<void> {
+  try {
+    const { items } = await call<{ items: { report: InvReport; cls: Classification }[] }>('GET', '/v1/reports');
+    $('report-list').replaceChildren(...items.map(({ report, cls }) => {
+      const li2 = el('li');
+      li2.append(el('strong', `${cls.kind} · ${cls.seats} seats${cls.linked ? ` · linked ${cls.linked}` : ''}`), el('span', report.text));
+      return li2;
+    }));
+  } catch (e) { $('report-list').replaceChildren(el('li', `Reports unavailable: ${(e as Error).message}`)); }
+}
+$('report-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target as HTMLFormElement);
+  try { await call('POST', '/v1/reports', { centre: f.get('centre'), by: f.get('by'), text: f.get('text') }); (ev.target as HTMLFormElement).reset(); void reportsTick(); }
+  catch (e) { $('report-list').replaceChildren(el('li', (e as Error).message)); }
+});
+void reportsTick();
+setInterval(reportsTick, 3000);
+if (!$<HTMLSelectElement>('report-centre').options.length) fleetTick().then(() => {
+  const sel = $<HTMLSelectElement>('off-centre');
+  $<HTMLSelectElement>('report-centre').replaceChildren(...Array.from(sel.options).map((o) => new Option(o.value, o.value)));
+});
+
+// --- Notices in EN / HI / TA ---
+async function noticeDraftsTick(): Promise<void> {
+  try {
+    const { drafts } = await call<{ drafts: Notice[] }>('GET', '/v1/notices');
+    $('notice-drafts').replaceChildren(...drafts.map((n) => {
+      const c = noticeCard(n), li2 = el('li'), langs = el('div', '', 'langs');
+      const enP = el('p', c.en), hiP = el('p', c.hi), taP = el('p', c.ta || '— not yet drafted —');
+      enP.lang = 'en'; hiP.lang = 'hi'; taP.lang = 'ta';
+      langs.append(enP, hiP, taP);
+      const redraft = el('button', 'Redraft with provider');
+      redraft.addEventListener('click', () => void call('POST', '/v1/notices/redraft', { id: n.id }).then(noticeDraftsTick, (e: Error) => say('chaos-out', e.message, 'bad')));
+      const approve = el('button', `Approve notice ${n.id}`, 'primary') as HTMLButtonElement;
+      approve.disabled = !c.complete;
+      if (!c.complete) approve.title = 'Needs all three languages before it can be approved.';
+      approve.addEventListener('click', () => void call('POST', '/v1/notices/approve', { id: n.id, by: $<HTMLInputElement>('ack-by').value }).then(noticeDraftsTick, (e: Error) => say('chaos-out', e.message, 'bad')));
+      li2.append(langs, redraft, approve);
+      return li2;
+    }));
+  } catch { /* retry next tick */ }
+}
+void noticeDraftsTick();
+setInterval(noticeDraftsTick, 3000);
