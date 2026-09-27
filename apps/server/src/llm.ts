@@ -46,8 +46,11 @@ const SUMMARY: Record<ReportKind, string> = {
   SEAT_SILENT: 'Invigilator reports seats frozen or not responding.',
   OTHER: 'Invigilator report needs a human to read it.',
 };
+// A power report and a lost link are the same outage from the invigilator's side: either kind links to an open incident of either.
+const OUTAGE: string[] = ['CENTRE_OUTAGE', 'RELAY_WAN_DOWN'];
+const sameKind = (a: string, b: string) => a === b || (OUTAGE.includes(a) && OUTAGE.includes(b));
 const linkOf = (kind: ReportKind, centre: string, open: Open): string | undefined =>
-  open.filter((i) => i.kind === kind && i.centres.includes(centre)).at(-1)?.id;       // newest = last
+  open.filter((i) => sameKind(i.kind, kind) && i.centres.includes(centre)).at(-1)?.id;       // newest = last
 
 export function templateClassify(r: InvReport, open: Open): Classification {
   const kind = RULES.find(([re]) => re.test(r.text))?.[1] ?? 'OTHER';

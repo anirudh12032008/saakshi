@@ -16,6 +16,7 @@ test('the demo stack: three cells, the Centre 42 relay, control pointed at the s
   expect(s.map((n) => n.name)).toEqual(['cell-1', 'cell-2', 'cell-3', 'relay', 'control']);
   expect(s[1]).toMatchObject({ db: join(resolve('/x/data'), 'cell-2.db'), env: { MODE: 'cell', CELL_ID: 'cell-2', PORT: '7081', EXAM: resolve('/x/exam') } });   // Windows CI too
   expect(s[4].env).toMatchObject({ MODE: 'control', STACK_URL: 'http://127.0.0.1:7099', RELAY_URL: 'http://127.0.0.1:7070' });
+  expect(demoSpecs({ exam: '/x/exam', data: '/x/data', stackUrl: 'u', paper: '/x/p' })[0].env.FORMS).toBe(join(resolve('/x/p'), 'forms.json'));   // cells check items against G1's forms
   expect(demoSpecs({ exam: '/x/exam', data: '/x/data', stackUrl: 'u', cohort: '/x/g1.jsonl' }).at(-1)).toMatchObject({ name: 'swarm', ready: 'SWARM ' });
   expect(seatDataDir('darwin')).toMatch(/Library[\\/]Application Support[\\/]Saakshi$/);
   expect(seatDataDir('win32', { APPDATA: 'C:\\Users\\a\\AppData\\Roaming' })).toMatch(/Saakshi$/);

@@ -158,16 +158,21 @@ try {
   const storedNow = async () => (await call<FleetView>(`${C}/v1/fleet`)).cells.reduce((n, c) => n + c.entries, 0);
   await until(async () => (await storedNow()) === (await sentNow()), 180_000, 'sent = stored');
   numbers.caughtUpMs = Date.now() - tPlug;
-  let verified = 0;
-  for (const c of X.cells) {
-    const exp = await call<ShiftExport>(`${c.url}/v1/shift?exam=${X.exam}&shift=${X.shift}`);
-    for (const s of exp.sheets) {
-      const v = verifySheet(s, forms, onlyAuthority, verifier, X.cells);
-      if (['keys', 'chain', 'bodies'].every((n) => v.checks.find((x) => x.name === n)?.ok)) verified += s.entries.length;
+  // The fleet view is a polled snapshot, so the counts can agree for a moment while entries are still in flight: retry until one pass agrees.
+  let sent = 0, verified = 0, stored = 0;
+  await until(async () => {
+    sent = await sentNow();
+    verified = 0;
+    for (const c of X.cells) {
+      const exp = await call<ShiftExport>(`${c.url}/v1/shift?exam=${X.exam}&shift=${X.shift}`);
+      for (const s of exp.sheets) {
+        const v = verifySheet(s, forms, onlyAuthority, verifier, X.cells);
+        if (['keys', 'chain', 'bodies'].every((n) => v.checks.find((x) => x.name === n)?.ok)) verified += s.entries.length;
+      }
     }
-  }
-  const sent = await sentNow(), stored = await storedNow();
-  if (!(sent === verified && verified === stored)) fail(`sent ${sent} · verified ${verified} · stored ${stored}`);
+    stored = await storedNow();
+    return sent === verified && verified === stored;
+  }, 60_000, 'sent = verified = stored', 1_000).catch(() => fail(`sent ${sent} · verified ${verified} · stored ${stored}`));
   step(`sent = verified = stored = ${stored} entries (verified: every chain, key certificate and body checked with only the authority key pinned); lost 0`);
 
   // 7. Seat A at blue ✓✓, backlog 0 → force-quit → seat B, PIN, the invigilator approves → resumes; seat A returns → ORPHANED.
@@ -181,14 +186,16 @@ try {
   await until(() => !!seatB.boot().moveable, 15_000, 'seat B refused: bound elsewhere');
   await seatB.handover(PIN);
   const moveKey = seatB.boot().moveKey!;
-  const pending = (await call<{ pending: { cand: string; key: string }[] }>(`${R}/v1/handover/pending`)).pending;
-  if (!pending.some((p) => p.cand === 'C0001' && p.key === moveKey)) fail('the move is not waiting at the relay console');
+  // The seat's first POST can miss the relay (it is still draining the swarm); the seat resends on its own poll, so wait for it.
+  await until(async () => (await call<{ pending: { cand: string; key: string }[] }>(`${R}/v1/handover/pending`)).pending.some((p) => p.cand === 'C0001' && p.key === moveKey),
+    15_000, 'the move waiting at the relay console').catch(async (e) => fail(`the move is not waiting at the relay console: ${(e as Error).message}; key ${moveKey}; seat: ${seatB.boot().notice ?? ''}; relay: ${JSON.stringify(await call(`${R}/v1/handover/pending`))}`));
   await call(`${R}/v1/handover/approve`, 'POST', { cand: 'C0001', key: moveKey, invigilator: 'INV-42-A' });
   await until(() => seatB.boot().phase === 'exam', 30_000, 'seat B resuming');
   const b = seatB.boot();
   for (const [item, st] of Object.entries(itemsA)) if (b.items[item]?.state !== st.state || b.items[item]?.answer !== st.answer) fail(`${item} did not come back`);
-  // The timer resumes at entry F's activeMs (C.5); the time seat A ran after F comes back as credit, measured by the relay's clock.
-  if (!b.credited || b.credited.approvedBy !== 'INV-42-A' || b.activeMs > activeA || b.activeMs + b.credited.ms < activeA) fail(`time or credit: ${JSON.stringify({ activeA, b: b.activeMs, credited: b.credited })}`);
+  // The timer resumes at entry F's activeMs (C.5); the time seat A ran after F comes back as credit, measured by the relay's clock
+  // from when the relay received F, so F's seat→relay delay (up to ~0.5 s here while the swarm loads the machine) is not credited.
+  if (!b.credited || b.credited.approvedBy !== 'INV-42-A' || b.activeMs > activeA || b.activeMs + b.credited.ms < activeA - 2_000) fail(`time or credit: ${JSON.stringify({ activeA, b: b.activeMs, credited: b.credited })}`);
   numbers.moveCreditedMs = b.credited.ms;
   step(`seat B resumed C0001: ${Object.keys(itemsA).length} answers restored, timer ${mmss(b.activeMs)}, +${mmss(b.credited.ms)} credited · approved by INV-42-A`);
   answer(seatB, 2);

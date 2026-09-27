@@ -27,6 +27,8 @@ test('templateClassify: power → CENTRE_OUTAGE with the seat count, linked to t
   expect(c).toEqual({ kind: 'CENTRE_OUTAGE', centre: 'CEN042', seats: 14, summary: expect.any(String), source: 'template', linked: 'I-9' });
   expect(templateClassify({ ...rep, text: 'screen frozen on 3 systems' }, []).kind).toBe('SEAT_SILENT');
   expect(templateClassify({ ...rep, text: 'something odd' }, [])).toMatchObject({ kind: 'OTHER', seats: 0 });
+  expect(templateClassify(rep, [{ id: 'I-4', kind: 'RELAY_WAN_DOWN', centres: ['CEN042'] }]).linked).toBe('I-4');   // power ↔ lost link
+  expect(templateClassify(rep, [{ id: 'I-5', kind: 'SEAT_SILENT', centres: ['CEN042'] }]).linked).toBeUndefined();
 });
 
 test('templateNotice: EN, HI and TA for every notice kind; TA is Tamil script; answers-lost 0 says so', () => {

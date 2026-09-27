@@ -76,7 +76,7 @@ export function demoSpecs(o: { exam: string; data: string; stackUrl: string; coh
   const paper = resolve(o.paper ?? join(ROOT, 'fixtures/paper'));
   const specs: NodeSpec[] = (o.cellPorts ?? [7080, 7081, 7082]).map((port, i) => {
     const db = join(data, `cell-${i + 1}.db`);
-    return { name: `cell-${i + 1}`, db, env: { MODE: 'cell', CELL_ID: `cell-${i + 1}`, PORT: String(port), EXAM: exam, DB: db } };
+    return { name: `cell-${i + 1}`, db, env: { MODE: 'cell', CELL_ID: `cell-${i + 1}`, PORT: String(port), EXAM: exam, DB: db, FORMS: join(paper, 'forms.json') } };   // the cells check each item against the form
   });
   specs.push({ name: 'relay', db: join(data, 'relay.db'), env: { MODE: 'relay', PORT: String(relayPort), EXAM: exam, DB: join(data, 'relay.db') } });
   specs.push({

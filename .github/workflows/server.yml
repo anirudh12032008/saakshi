@@ -12,7 +12,7 @@ concurrency:
 jobs:
   macos:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -39,3 +39,8 @@ jobs:
         run: bun tools/act3.ts
       - name: Act 1 end to end (readiness amber → gate blocks AnyDesk + overlay-sim by name → green → in-exam finding once → INTEGRITY_CRITICAL → face flag → review)
         run: bun tools/act1.ts
+      - name: Analytics (fast suite)
+        working-directory: analytics
+        run: uv run pytest -q -m "not full"
+      - name: Act 5 end to end (cells' export → radar → history → decision → scorecard → report → notice EN/HI/TA → sign-off)
+        run: bun tools/act5.ts
