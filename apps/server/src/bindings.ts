@@ -3,8 +3,9 @@
 // sealed to the cell key (which lives outside this DB) even at rest. ponytail: one exam-shift, attempt 1, per node.
 import type { Database, Statement } from 'bun:sqlite';
 import { hexToBytes, toHex, utf8 } from '@saakshi/core/bytes';
-import { canon } from '@saakshi/core/canon';
-import { bindArray, checkWireBind, isP256Pub, openPinBox, type Bind, type BindReq, type WireBind } from '@saakshi/core/enrol';
+import { canon, parseCanon } from '@saakshi/core/canon';
+import { bindArray, bindFromArray, checkWireBind, isP256Pub, openPinBox, type Bind, type BindReq, type WireBind } from '@saakshi/core/enrol';
+import type { HandoverGrant } from '@saakshi/core/handover';
 import { nativeBox, signer, verifier } from '@saakshi/core/node';
 
 export type EnrolCode = 'NOT_REGISTERED' | 'ALREADY_BOUND' | 'UNSUPPORTED' | 'BAD';
@@ -18,6 +19,7 @@ export class Bindings {
   #db: Database;
   #rows = new Map<string, Row>();
   #keys = new Map<string, Uint8Array>();
+  #from = new Map<string, number>();                          // `${cand}/${keyEpoch}` → fromSeq
   #insert: Statement;
   #sign?: (m: Uint8Array) => Uint8Array;
 
@@ -27,6 +29,10 @@ export class Bindings {
     db.run(`CREATE TABLE IF NOT EXISTS bindings (exam TEXT NOT NULL, shift TEXT NOT NULL, attempt INTEGER NOT NULL, cand TEXT NOT NULL,
       key_epoch INTEGER NOT NULL, pub TEXT NOT NULL, cert TEXT NOT NULL, sig TEXT NOT NULL, cell TEXT NOT NULL, pin_box TEXT NOT NULL,
       PRIMARY KEY (exam, shift, attempt, cand, key_epoch)) WITHOUT ROWID`);
+    db.run(`CREATE TABLE IF NOT EXISTS pin_tries (exam TEXT NOT NULL, shift TEXT NOT NULL, cand TEXT NOT NULL, n INTEGER NOT NULL,
+      PRIMARY KEY (exam, shift, cand)) WITHOUT ROWID`);
+    db.run(`CREATE TABLE IF NOT EXISTS grants (exam TEXT NOT NULL, shift TEXT NOT NULL, cand TEXT NOT NULL, pub TEXT NOT NULL, body TEXT NOT NULL,
+      PRIMARY KEY (exam, shift, cand, pub)) WITHOUT ROWID`);
     this.#insert = db.query('INSERT OR IGNORE INTO bindings (exam, shift, attempt, cand, key_epoch, pub, cert, sig, cell, pin_box) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?)');
     for (const r of db.query('SELECT cand, key_epoch, pub, cert, sig, cell, pin_box FROM bindings WHERE exam = ? AND shift = ? AND attempt = 1').all(o.exam, o.shift) as Row[]) this.#put(r);
     if (o.cell.priv) this.#sign = signer({ priv: o.cell.priv, pub: o.cell.pub });
@@ -78,6 +84,44 @@ export class Bindings {
     return { ok: true, bind: wire(row) };
   }
 
-  #put(r: Row): void { const k = `${r.cand}/${r.key_epoch}`; this.#rows.set(k, r); this.#keys.set(k, hexToBytes(r.pub)); }
+  /** Addendum C.4: the fromSeq of a certified epoch (the ingest's orphan rule). */
+  fromSeqOf = (cand: string, keyEpoch: number): number | undefined => this.#from.get(`${cand}/${keyEpoch}`);
+  /** The candidate's current binding (the highest epoch). */
+  latest(cand: string): { bind: Bind; wire: WireBind } | undefined {
+    let e = 0;
+    while (this.#rows.has(`${cand}/${e + 1}`)) e++;
+    const r = e ? this.#rows.get(`${cand}/${e}`)! : undefined;
+    return r && { bind: bindFromArray(parseCanon(r.cert)), wire: wire(r) };
+  }
+  /** Cell only: sign and store a binding (Addendum C.4). The caller has checked everything. */
+  issue(b: Bind, pinBox: string): WireBind {
+    if (!this.#sign) throw new Error('issue runs on the cell');
+    const cert = canon(bindArray(b));
+    const row: Row = { cand: b.cand, key_epoch: b.keyEpoch, pub: b.pub, cert, sig: toHex(this.#sign(utf8(cert))), cell: this.#o.cell.id, pin_box: pinBox };
+    this.#store(row);
+    return wire(row);
+  }
+  /** Wrong handover PINs per candidate (Addendum C.3), kept in the DB so a restart forgets nothing. */
+  pinFailures(cand: string): number {
+    return (this.#db.query('SELECT n FROM pin_tries WHERE exam = ? AND shift = ? AND cand = ?').get(this.#o.exam, this.#o.shift, cand) as { n: number } | null)?.n ?? 0;
+  }
+  failPin(cand: string): number {
+    this.#db.query('INSERT INTO pin_tries (exam, shift, cand, n) VALUES (?, ?, ?, 1) ON CONFLICT (exam, shift, cand) DO UPDATE SET n = n + 1').run(this.#o.exam, this.#o.shift, cand);
+    return this.pinFailures(cand);
+  }
+  /** The grant already issued for a move to this key: the same move again gets the same grant. */
+  grantFor(cand: string, pub: string): HandoverGrant | undefined {
+    const r = this.#db.query('SELECT body FROM grants WHERE exam = ? AND shift = ? AND cand = ? AND pub = ?').get(this.#o.exam, this.#o.shift, cand, pub) as { body: string } | null;
+    return r ? (JSON.parse(r.body) as HandoverGrant) : undefined;
+  }
+  saveGrant(g: HandoverGrant): void {
+    const b = bindFromArray(parseCanon(g.bind.cert));
+    this.#db.query('INSERT OR IGNORE INTO grants (exam, shift, cand, pub, body) VALUES (?, ?, ?, ?, ?)').run(this.#o.exam, this.#o.shift, b.cand, b.pub, JSON.stringify(g));
+  }
+
+  #put(r: Row): void {
+    const k = `${r.cand}/${r.key_epoch}`;
+    this.#rows.set(k, r); this.#keys.set(k, hexToBytes(r.pub)); this.#from.set(k, bindFromArray(parseCanon(r.cert)).fromSeq);
+  }
   #store(r: Row): void { this.#insert.run(this.#o.exam, this.#o.shift, r.cand, r.key_epoch, r.pub, r.cert, r.sig, r.cell, r.pin_box); this.#put(r); }
 }

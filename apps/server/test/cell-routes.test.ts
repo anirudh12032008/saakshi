@@ -70,8 +70,8 @@ test('/v1/binds lists certificates a verifier accepts; /v1/stats counts per cent
   expect((await call<CellStats>('/v1/stats', 'GET')).body).toEqual({
     cell: 'cell-1', state: 'LIVE', entries: 25,
     centres: {
-      CEN042: { registered: 2, bound: 1, unlocked: 1, submitted: 1, entries: 22 },
-      CEN001: { registered: 1, bound: 1, unlocked: 1, submitted: 0, entries: 3 },
+      CEN042: { registered: 2, bound: 1, unlocked: 1, submitted: 1, entries: 22, lastSeen: 1 },
+      CEN001: { registered: 1, bound: 1, unlocked: 1, submitted: 0, entries: 3, lastSeen: 1 },
     },
   });
 });

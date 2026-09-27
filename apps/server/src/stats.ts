@@ -2,7 +2,7 @@
 import type { CellStats, CentreStats, Directory } from '@saakshi/core/directory';
 import type { NodeState, StreamView } from '@saakshi/core/wire';
 
-export function cellStats(i: { cellId: string; state: NodeState; dir: Directory; views: StreamView[]; bound: string[]; submitted: string[] }): CellStats {
+export function cellStats(i: { cellId: string; state: NodeState; dir: Directory; views: StreamView[]; bound: string[]; submitted: string[]; rebuild?: { done: number; expected: number } }): CellStats {
   const centres: Record<string, CentreStats> = {};
   for (const [id, c] of Object.entries(i.dir.centres)) if (c.cell === i.cellId) centres[id] = { registered: 0, bound: 0, unlocked: 0, submitted: 0, entries: 0 };
   const at = (cand: string): CentreStats | undefined => { const c = i.dir.cands[cand]; return c && centres[c.centre]; };
@@ -14,9 +14,10 @@ export function cellStats(i: { cellId: string; state: NodeState; dir: Directory;
     if (v.exam !== i.dir.exam || v.shift !== i.dir.shift) continue;
     const s = at(v.cand);
     if (!s) continue;
+    if (v.seenAt > (s.lastSeen ?? 0)) s.lastSeen = v.seenAt;                       // when this centre's relay last reached the cell
     s.entries += v.head;
     entries += v.head;
     if (v.head >= 1) s.unlocked++;                                                 // seq 1 is always the unlock
   }
-  return { cell: i.cellId, state: i.state, entries, centres };
+  return { cell: i.cellId, state: i.state, entries, centres, ...(i.rebuild ? { rebuild: i.rebuild } : {}) };
 }

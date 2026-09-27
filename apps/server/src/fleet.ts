@@ -29,7 +29,8 @@ export function fleet(o: { dir: Directory; stats?: (c: CellEntry) => Promise<Cel
     const cells = o.dir.cells.map((c) => {
       const g = byCell.get(c.id)!;
       if (g.status === 'fulfilled') lastEntries[c.id] = g.value.entries;                  // a down cell keeps its last count
-      return { id: c.id, state: g.status === 'fulfilled' ? g.value.state : ('DOWN' as const), entries: lastEntries[c.id] };
+      return { id: c.id, state: g.status === 'fulfilled' ? g.value.state : ('DOWN' as const), entries: lastEntries[c.id],
+        ...(g.status === 'fulfilled' && g.value.rebuild ? { rebuild: g.value.rebuild } : {}) };
     });
     const centres: CentreTile[] = Object.entries(o.dir.centres).sort(([a], [b]) => a.localeCompare(b)).map(([centre, { cell }]) => {
       const g = byCell.get(cell);
