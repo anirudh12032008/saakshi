@@ -1,0 +1,10 @@
+✓ stack up: 3 cells, CEN042's relay, control (DEMO timers, probe every 2 s)
+✓ readiness board: CEN042 AMBER (C0003 · CEN042-S03 · Amber — battery | C0001 · CEN042-S01 · Ready | C0002 · CEN042-S02 · Ready)
+✓ seat A BLOCKED by name: C0001 · CEN042-S01 · Blocked — AnyDesk, overlay-sim
+✓ released by NTA + NIC; seat A's start() refused: "This seat cannot start: AnyDesk, overlay-sim. Close them and press Re-check."
+✓ seat A closed both tools → re-check → green; all three seats started
+✓ seat B (scribe): NVDA allowed (info); 20 × 2 faces → nothing; 5 × 3 faces → 1 face-extra flag, 3 faces / 2 expected, thumbnail opened with the review key → cleared by REVIEWER-1
+✓ in-exam: AnyDesk for 3 probes → 1 integrity entry; P1 INTEGRITY_CRITICAL "blocklisted at C0001's seat: AnyDesk"; seat A keeps answering
+✓ answers carry provenance; submitted, sealed; /verify green with only the authority key; receipt 6X90ZWN9QEVBJCZ47
+Act 1: blocked by name (AnyDesk, overlay-sim) → green; CEN042 amber; 1 integrity entry for 3 probes; INTEGRITY_CRITICAL; face-extra → review → cleared; submitted and verified
+PASS

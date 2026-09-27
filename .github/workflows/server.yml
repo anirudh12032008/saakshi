@@ -37,3 +37,5 @@ jobs:
         run: bun tools/chaos.ts --runs 3
       - name: Act 3 end to end (degrade → SYNC_LAG → cut → pull the plug → rebuild → move by PIN → archive → CERT-In)
         run: bun tools/act3.ts
+      - name: Act 1 end to end (readiness amber → gate blocks AnyDesk + overlay-sim by name → green → in-exam finding once → INTEGRITY_CRITICAL → face flag → review)
+        run: bun tools/act1.ts
