@@ -1,0 +1,21 @@
+{
+ "id": "Act 5 — Centre 42 outage and the declared leak",
+ "note": "Act 5 committee input. Centre 42's outage (minutes 40-160) as a disruption; the 2k twin has 10 centres, so the demo-affected centre is CEN002. The declared leak perimeter is G1 seed 7's planted leak centres (truth.json leak.centres). No gaps and no left: control adds measured ones at run time.",
+ "disruptions": [
+  {
+   "centre": "CEN002",
+   "shift": "S1",
+   "fromMin": 40,
+   "toMin": 160
+  }
+ ],
+ "breach": {
+  "perimeter": [
+   "CEN005",
+   "CEN010",
+   "CEN009"
+  ],
+  "systemic": false,
+  "evidence": "Leak declared by the committee at the planted leak centres (G1 seed 7)"
+ }
+}

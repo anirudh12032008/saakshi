@@ -1,0 +1,21 @@
+{
+ "id": "Act 5 — Centre 42 outage and the declared leak",
+ "note": "Act 5 committee input. Centre 42's outage (minutes 40-160) as a disruption, placed at CEN002: CEN042 is the real demo centre, so the swarm skips its G1 rows and the cells' export has none there (the engine refuses a disruption at a centre with no rows). The declared leak perimeter is G1 seed 7's planted leak centres (truth.json leak.centres). No gaps and no left: control adds measured ones at run time.",
+ "disruptions": [
+  {
+   "centre": "CEN002",
+   "shift": "S1",
+   "fromMin": 40,
+   "toMin": 160
+  }
+ ],
+ "breach": {
+  "perimeter": [
+   "CEN005",
+   "CEN023",
+   "CEN088"
+  ],
+  "systemic": false,
+  "evidence": "Leak declared by the committee at the planted leak centres (G1 seed 7)"
+ }
+}
