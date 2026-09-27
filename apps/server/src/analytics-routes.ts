@@ -87,7 +87,11 @@ export function analyticsRoutes(o: AnalyticsRoutesOpts): Routes {
     writeFileSync(cohortPath, toJsonl(rows));
 
     const time = await o.timeRows();
-    const incidentIn = buildIncident({ input, time, incidents: o.incidents(), dir: o.dir, startMs: o.startMs });
+    const built = buildIncident({ input, time, incidents: o.incidents(), dir: o.dir, startMs: o.startMs });
+    // An outage at a centre with no candidates in the export (e.g. a live WAN-down at a centre nobody sat at) affects no one,
+    // and the engine refuses a disruption at a missing centre-shift — so it is dropped, not allowed to fail the whole run.
+    const sat = new Set(rows.map((r) => r.centre));
+    const incidentIn = { ...built, disruptions: built.disruptions?.filter((d) => sat.has(d.centre)) };
     const incidentPath = join(scratch, 'incident.json');
     writeFileSync(incidentPath, JSON.stringify(incidentIn));
 

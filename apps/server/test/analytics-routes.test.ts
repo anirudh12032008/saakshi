@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,7 +44,7 @@ function opts(o: {
       fetch: (o.fetchImpl ?? defaultFetch) as typeof fetch, runUv: o.runUv,
       custody: (action, detail) => custody.push({ action, detail }),
     }),
-    custody,
+    custody, controlDir,
   };
 }
 
@@ -192,4 +193,16 @@ test('bunRunUv: a missing uv binary is exit 127, not a throw (Windows CI has no 
   const r = await bunRunUv({ uv: 'definitely-not-uv-xyz', cwd: '.', timeoutMs: 5000 })('m', []);
   expect(r.code).toBe(127);
   expect(r.stderr).toContain('cannot run uv');
+});
+
+test('an outage at a centre nobody sat at is dropped, not allowed to fail the run (20k: live WAN-down at the demo centre)', async () => {
+  let seen = '';
+  const capture: RunUv = async (module, args) => {
+    if (module === 'saakshi_analytics.pipeline') seen = readFileSync(args[args.indexOf('--incident') + 1], 'utf8');
+    return runUvOk(module, args);
+  };
+  const { routes } = opts({ runUv: capture });
+  const res = await post(routes, '/v1/analytics/run', { id: 'INC-1', disruptions: [{ centre: 'CEN001', shift: 'S1', fromMin: 0, toMin: 10 }] });
+  expect(res.status).toBe(200);
+  expect(JSON.parse(seen).disruptions).toEqual([]);   // the export has no CEN001 rows
 });
