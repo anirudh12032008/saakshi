@@ -126,7 +126,7 @@ wheels = [
 [[package]]
 name = "saakshi-analytics"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "networkx" },
     { name = "numpy" },
