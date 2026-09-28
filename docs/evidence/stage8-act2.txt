@@ -1,0 +1,16 @@
+wrote 300 candidates x 100 items to /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act2-2uC9ZV/g1
+✓ provisioned 308 candidates at 7 centres (6 simulated + CEN042) on 3 cells; packaged; packager secrets zeroised
+  hexdump package/paper-F1.bin: bc1e ff68 7251 cf35 2fd7 3d65 37ae 4dca 2955 9b39 1709 4f42 …
+✓ the paper on disk is ciphertext: no question text in it
+✓ seat C0001 enrolled at CEN042: its bind certificate verified against the policy-pinned cell key; the paper stays locked
+✓ swarm: 6 simulated centres, 300 candidates enrolled
+✓ CEN042's link cut
+✓ released by NTA + NIC; pushed to cell-1, cell-2, cell-3; keys zeroised at control
+✓ 6 of 7 centres green; CEN042 locked (link cut); 308 candidates registered
+✓ a typo and CEN001's code are refused at CEN042
+✓ CEN042 unlocked with the phoned code: the seat checked kc_f and journaled the unlock via "code"
+✓ a forged key pushed by the relay was rejected by the seat (it does not match kc_f)
+✓ relay restarted: the release reached the seat again by snapshot and by push; exactly one unlock
+✓ custody log: 2 custodians released, keys zeroised, codes revealed for CEN001 and CEN042, each logged
+✓ 6586 entries committed at the cells; 300 candidates submitted
+PASS
