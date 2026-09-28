@@ -123,3 +123,9 @@ test('CERT-In: a draft template with the facts, the 6-hour deadline, blanks for 
   expect(html).not.toContain('<script>alert');
   expect(html).toContain('&#60;script&#62;');
 });
+
+test('a witness alert (S6) is a P0 TAMPER on the log itself, whole-shift blast radius', () => {
+  const x = new Incidents(dir, OPS_DEMO);
+  const [t] = x.evaluate({ now: 0, events: [{ id: 1, at: 0, cell: 'witness', code: 'EQUIVOCATION', cand: '', centre: '', seq: 3, reason: 'inconsistent: history was rewritten' }] });
+  expect(t).toMatchObject({ kind: 'TAMPER', severity: 'P0', key: 'TAMPER:log', title: 'The witness refused to cosign the shift log', detail: 'inconsistent: history was rewritten', blast: { candidates: 9, answersLost: null } });
+});

@@ -1,8 +1,8 @@
 // Control: append submitted chains to the per-shift log and sign a new STH (protocol Addendum A.2/A.3). Pure: no files.
 import { hexToBytes, toHex } from '@saakshi/core/bytes';
 import { parseSignedLine, verifyChainKeyed } from '@saakshi/core/journal';
-import { NO_PREV_STH, leafHashHex, sthId, sthMessage, type Sth } from '@saakshi/core/log';
-import { inclusionProof, rootOf } from '@saakshi/core/merkle';
+import { NO_PREV_STH, leafHashHex, sthId, sthMessage, type SignedSth, type Sth } from '@saakshi/core/log';
+import { consistencyProof, inclusionProof, rootOf } from '@saakshi/core/merkle';
 import { signer, verifier, type KeyPair } from '@saakshi/core/node';
 import { bodyCommit, bodyFromArray } from '@saakshi/core/protocol';
 import type { LogLeaf, Proof, ResponseSheet, ShiftExport, SthRecord, Trust } from '@saakshi/core/sheet';
@@ -67,4 +67,14 @@ export function proofFor(rec: SthRecord, sheet: ResponseSheet, cells?: CellCert[
   if (index < 0 || index >= signed.sth.size) return undefined;
   const hs = rec.leaves.slice(0, signed.sth.size).map((l) => hexToBytes(leafHashHex(l)));
   return { v: 1, sheet, sth: signed, index, inclusion: inclusionProof(hs, index).map(toHex), ...(cells?.length ? { cells } : {}) };
+}
+
+/** GET /v1/sth (addendum F.1): the latest STH plus an RFC 9162 consistency proof from the witness's last size `from`. */
+export interface SthHead { sth: SignedSth; consistency: string[] }
+export function headFrom(rec: SthRecord, from: number): SthHead | undefined {
+  const sth = rec.sths.at(-1);
+  if (!sth) return undefined;
+  const n = sth.sth.size;
+  const ok = Number.isSafeInteger(from) && from >= 1 && from < n;
+  return { sth, consistency: ok ? consistencyProof(rec.leaves.slice(0, n).map((l) => hexToBytes(leafHashHex(l))), from).map(toHex) : [] };
 }

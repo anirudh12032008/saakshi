@@ -50,7 +50,7 @@ export interface Incident {
   /** Path of the CERT-In draft, relative to control's DIR. */
   certIn?: string; cand?: string; data: Record<string, string | number>;
 }
-export type EventCode = 'BAD_SUBMISSION' | 'FORK' | 'ORPHANED' | 'LATE' | 'HANDOVER' | 'GAP' | 'INTEGRITY';
+export type EventCode = 'BAD_SUBMISSION' | 'FORK' | 'EQUIVOCATION' | 'ORPHANED' | 'LATE' | 'HANDOVER' | 'GAP' | 'INTEGRITY';
 /** One row of a cell's evidence table, as GET /v1/events serves it. data: the parsed JSON reason, when it is one. */
 export interface CellEvent { id: number; at: number; cell: string; code: EventCode; cand: string; centre: string; seq: number; reason: string; data?: Record<string, string | number> }
 

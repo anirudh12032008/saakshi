@@ -1,5 +1,5 @@
 // MODE=control (Stage 2 minimum): seal the shift, audit, reconcile, the DEV rogue button, proofs, evidence packs, /verify.
-// State is plain files under o.dir (see the plan's Global Constraints). The witness (S6) and the second archive store (Stage 4) come later.
+// State is plain files under o.dir (see the plan's Global Constraints). GET /v1/sth feeds the witness (S6, MODE=witness).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
@@ -11,7 +11,7 @@ import type { HeadsRes } from '@saakshi/core/wire';
 import { audit } from './audit.ts';
 import { buildPack } from './evidence.ts';
 import { reconcile } from './recon.ts';
-import { proofFor, seal } from './seal.ts';
+import { headFrom, proofFor, seal } from './seal.ts';
 import { verifyHtml } from './verify-build.ts';
 
 export interface ControlOpts {
@@ -25,6 +25,8 @@ export interface ControlOpts {
   cells?: CellCert[];
   /** Stage 4: every audit's findings go to the incident engine (TAMPER). */
   onFindings?: (f: Finding[]) => void;
+  /** S6: the witness, whose cosign status GET /v1/witness relays. */
+  witnessUrl?: string;
 }
 
 class HttpError extends Error {
@@ -129,6 +131,15 @@ export function controlRoutes(o: ControlOpts, page: HTMLBundle) {
       const out = await upstream<{ up: boolean }>(`${o.relayUrl}/v1/dev/wan`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ up: b.up }) });
       custody('chaos-wan', { centre: o.centre, up: b.up, note: "DEV chaos: the demo centre's WAN link" });
       return json(out);
+    }) },
+    '/v1/sth': { GET: handle(async (req) => {
+      const rec = readRec(), h = rec && headFrom(rec, Number(new URL(req.url).searchParams.get('from') ?? 0));
+      if (!h) throw new HttpError(404, 'seal the shift first');
+      return json(h);
+    }) },
+    '/v1/witness': { GET: handle(async () => {
+      if (!o.witnessUrl) throw new HttpError(404, 'no witness configured (WITNESS_URL)');
+      return json(await upstream(`${o.witnessUrl}/v1/witness`));
     }) },
     '/v1/proof': { GET: handle(async (req) => json(await proof(candOf(req)))) },
     '/v1/evidence': { GET: handle(async (req) => {

@@ -183,6 +183,8 @@ export class Incidents {
       this.#seen.add(k);
       const d = e.data ?? {}, c = e.cand;
       if (e.code === 'FORK') out.push({ kind: 'TAMPER', key: `TAMPER:${c}`, cand: c, title: `Two different signed entries for ${c}`, detail: `${dcName(e.cell)}, seq ${e.seq}: ${e.reason}`, blast: one(e.centre, null) });
+      else if (e.code === 'EQUIVOCATION') out.push({ kind: 'TAMPER', key: 'TAMPER:log', title: 'The witness refused to cosign the shift log', detail: e.reason,
+        blast: { cells: [], centres: Object.keys(this.#dir.centres), candidates: Object.keys(this.#dir.cands).length, answersLost: null } });
       else if (e.code === 'BAD_SUBMISSION') out.push({ kind: 'BAD_SUBMISSION', key: `BAD_SUBMISSION:${c || e.cell}`, cand: c || undefined, title: `Refused entries${c ? ` for ${c}` : ''}`, detail: e.reason, blast: one(e.centre), data: { count: 1 } });
       else if (e.code === 'ORPHANED') out.push({ kind: 'ORPHANED', key: `ORPHANED:${c}`, cand: c, title: `${c}'s old seat is still sending`, detail: 'its entries after the move are kept as evidence (ORPHANED), not counted', blast: one(e.centre), data: { count: 1 } });
       else if (e.code === 'LATE') out.push({ kind: 'LATE', key: `LATE:${c}`, cand: c, title: `Entries after the hard stop for ${c}`, detail: `${e.reason}; kept as evidence for a human decision`, blast: one(e.centre), data: { count: 1 } });

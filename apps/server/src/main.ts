@@ -1,4 +1,4 @@
-// Saakshi server: MODE=relay|cell|control, DEV=1 only. With EXAM=<dir> (Stage 3) keys, roster, policy and paper come from the
+// Saakshi server: MODE=relay|cell|control|witness, DEV=1 only. With EXAM=<dir> (Stage 3) keys, roster, policy and paper come from the
 // provisioned and packaged exam directory, and seats are trusted only through cell-signed bindings. Without EXAM, every mode
 // behaves exactly as in Stage 2 (fixture seat keys, DEV roster): the Stage 1–2 tests and tools rely on that.
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -45,10 +45,11 @@ import { Hub } from './sse.ts';
 import statusHtml from './status.html';
 import { openDb, pragmas } from './store.ts';
 import { timeAudit } from './time-audit.ts';
+import { witness } from './witness.ts';
 
 const env = process.env;
 const mode = env.MODE;
-if (mode !== 'cell' && mode !== 'relay' && mode !== 'control') { console.error('MODE must be cell, relay or control'); process.exit(2); }
+if (mode !== 'cell' && mode !== 'relay' && mode !== 'control' && mode !== 'witness') { console.error('MODE must be cell, relay, control or witness'); process.exit(2); }
 if (env.DEV !== '1') { console.error('Saakshi runs only with DEV=1 (demo keys; see docs/threat-model.md)'); process.exit(2); }
 // ponytail: cell and control have unauthenticated routes (/v1/shift, the DEV rogue edit, /v1/enrol, /v1/release) until control↔cell
 // auth (S7 mTLS) lands, so they refuse to bind anywhere but loopback. Only the relay faces the centre LAN.
@@ -70,7 +71,12 @@ const ops = opsOf(X?.dir.ops);
 /** Addendum C.8: D_i + gap cap + slack, from the provisioned directory. DEV (no EXAM): no hard stop. */
 const deadlineMs = X ? (cand: string) => { const c = X.dir.cands[cand]; return c ? X.dir.durationMs + c.extraMs + ops.gapCapMs + ops.slackMs : undefined; } : undefined;
 
-if (mode === 'control') {
+if (mode === 'witness') {
+  const w = witness({ dir: resolve(env.DIR ?? 'data/witness'), controlUrl: env.CONTROL_URL ?? 'http://127.0.0.1:7090', authorityPub, ...exam });
+  w.start(Number(env.EVERY_MS ?? 2_000));
+  const server = Bun.serve({ port: Number(env.PORT ?? 7095), hostname: env.HOST ?? '127.0.0.1', routes: w.routes, fetch: () => json({ error: 'not found' }, 404) });
+  console.log(`READY ${JSON.stringify({ mode, port: server.port, exam: X?.root ?? null })}`);
+} else if (mode === 'control') {
   const dir = resolve(env.DIR ?? 'data/control');
   const authority = { priv: hexToBytes(keys.authority.priv), pub: authorityPub };
   const demo = X?.dir.demoCentre ?? DEV_CENTRE;
@@ -92,7 +98,7 @@ if (mode === 'control') {
   mkdirSync(dir, { recursive: true });
   const custody = (action: string, detail: Record<string, unknown>) =>
     appendFileSync(join(dir, 'custody.jsonl'), JSON.stringify({ at: new Date().toISOString(), actor: 'control (DEV)', action, ...exam, ...detail }) + '\n');
-  const mon = X && fl ? opsMonitor({ dir: X.dir, ops, controlDir: dir, fleet: () => fl.view(), relayUrl, release: rc ? () => rc.status() : undefined }) : undefined;
+  const mon = X && fl ? opsMonitor({ dir: X.dir, ops, controlDir: dir, fleet: () => fl.view(), relayUrl, witnessUrl: env.WITNESS_URL, release: rc ? () => rc.status() : undefined }) : undefined;
   const rkPath = X && join(X.root, FILES.reviewKey);
   const integ = rkPath && existsSync(rkPath)
     ? integrityRoutes({ relayUrl, dir: X!.dir, centre: demo, controlDir: dir, reviewPriv: hexToBytes((JSON.parse(readFileSync(rkPath, 'utf8')) as { priv: string }).priv), retentionMs: INTEGRITY_DEFAULT.retentionMs })
@@ -135,7 +141,7 @@ if (mode === 'control') {
         trust: X ? { ...trustFromKeys(keys), seats: {} } : trustFromKeys(keys),              // EXAM: seat keys come only from cell-signed bindings
         seatKeys, roster: X ? rosterOf(X.dir, demo) : devRoster(keys),
         cells: X?.dir.cells.map(({ id, keyId, pub, cert }) => ({ id, keyId, pub, cert })),
-        onFindings: mon ? (f) => mon.noteFindings(f) : undefined,
+        onFindings: mon ? (f) => mon.noteFindings(f) : undefined, witnessUrl: env.WITNESS_URL,
       }, controlHtml),
       ...rc?.routes,
       ...fl?.routes,

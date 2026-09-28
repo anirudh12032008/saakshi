@@ -12,7 +12,7 @@ import { draftNotice, NOTICE_KINDS, Outbox } from './comms.ts';
 import { Incidents } from './incidents.ts';
 
 export interface MonitorOpts {
-  dir: Directory; ops: Ops; controlDir: string; fleet: () => FleetView; relayUrl?: string;
+  dir: Directory; ops: Ops; controlDir: string; fleet: () => FleetView; relayUrl?: string; witnessUrl?: string;
   release?: () => ReleaseStatus | undefined; fetch?: typeof fetch; now?: () => number; everyMs?: number;
 }
 
@@ -29,7 +29,7 @@ export function opsMonitor(o: MonitorOpts) {
   const approved: Approval[] = existsSync(approvalsPath) ? readFileSync(approvalsPath, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as Approval) : [];
   const moves = new Map<string, Approval>();                                           // invigilators' approvals, from HANDOVER events
   const cursor = new Map<string, number>(o.dir.cells.map((c) => [c.id, 0]));
-  let relayCursor = 0;                                                                   // ponytail: a spare relay restarts its ids; its first events below the cursor are missed until it passes it
+  let relayCursor = 0, witnessCursor = 0;                                                                   // ponytail: a spare relay restarts its ids; its first events below the cursor are missed until it passes it
   let link: LinkView | undefined, findings: Finding[] = [], timer: ReturnType<typeof setTimeout> | undefined;
   const get = async <T>(url: string): Promise<T | undefined> => {
     try { const r = await f(url, { signal: AbortSignal.timeout(2_000) }); return r.ok ? ((await r.json()) as T) : undefined; } catch { return undefined; }
@@ -55,6 +55,10 @@ export function opsMonitor(o: MonitorOpts) {
     if (o.relayUrl) {                                                                  // the relay's own evidence: an old seat's ORPHANED tail stops there
       const r = await get<{ events: CellEvent[]; last: number }>(`${o.relayUrl}/v1/evidence?after=${relayCursor}`);
       if (r) { fresh.push(...r.events); relayCursor = r.last; }
+    }
+    if (o.witnessUrl) {                                                                // S6: the witness's alerts (equivocation, rewritten history)
+      const r = await get<{ events: CellEvent[]; last: number }>(`${o.witnessUrl}/v1/evidence?after=${witnessCursor}`);
+      if (r) { fresh.push(...r.events); witnessCursor = r.last; }
     }
     for (const e of fresh) if (e.code === 'HANDOVER' && e.data?.approvedBy) {
       const a: Approval = { cand: e.cand, seq: Number(e.data.fromSeq) + 1, by: String(e.data.approvedBy), at: e.at };
