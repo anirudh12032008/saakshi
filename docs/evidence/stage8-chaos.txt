@@ -1,0 +1,27 @@
+Stage 8 chaos drill — 20 logged runs
+Command: bun tools/chaos.ts --runs 20 --out docs/evidence/stage8-chaos.jsonl
+Run at: 2026-09-28, darwin-arm64. Raw log: docs/evidence/stage8-chaos.jsonl (one CHAOS line per run).
+
+Note: the first attempt ran inside the default OS sandbox, which blocks local
+port binding (Bun.serve on port 0 -> EADDRINUSE/"Failed to start server"),
+so all 20 runs failed to start a cell/relay at all (not a product bug — a
+harness/sandbox limitation). Re-ran with the sandbox disabled for this one
+command; every run then started and passed. No product code was touched.
+
+Result: 20/20 runs PASS. 0 answers lost across all runs. RPO 0 on every run.
+
+Per-run: 8 seats x 100 entries = 800 answers sent per run, 16,000 total sent
+across 20 runs, 16,000 stored, 0 lost.
+
+Scenarios (cycled kill-cell, wipe-cell, spare-relay, 6-7 runs each):
+  kill-cell    (7 runs): SIGKILL the cell, restart on the same DB
+  wipe-cell    (7 runs): SIGKILL the cell + delete its DB, rebuild by replay from the relay
+  spare-relay  (6 runs): SIGKILL the relay + delete its DB, spare relay starts empty, seats resend from their journals
+
+RTO (failure -> every sent entry acknowledged by the cell again), ms:
+  scenario      n   min    median   max
+  kill-cell     7   1188   1234     1251
+  wipe-cell     7   1147   1220     1298
+  spare-relay   6   932    955      966
+
+Failures: none. All 20 runs ok=true, lost=0, rpo=0, relayAcked==cellAcked==sent on every run.
