@@ -108,8 +108,21 @@ This ledger lists every claim the pitch, the deck and the README make, the evide
 | C3 | Accessible: keyboard-only use, ARIA, 200% zoom | Built in Stage 1 and checked by hand; Playwright e2e now runs against the packaged Windows e2e build in CI (`--test-mode --no-camera --use-fake-device-for-media-stream`), green | **Playwright e2e passing; the WCAG audit is still not done** |
 | C4 | In-exam banner, public status page, notice outbox | `exam-state.test.ts`, `move.test.ts` (banner); `status-view.test.ts`, `ops-routes.test.ts`, `act3.ts` step 11 (public status page with no PII); mock outbox channels | **Proven on our chaos drill**. Claude-drafted notices and Tamil: **Planned (Stage 6)** |
 | C5 | 20k live candidates across 100 centres | `tools/swarm.ts`: 99 simulated centres replay the full G1 cohort (≈20k candidates) in one process, live (commit `5cd2f0a`); `bun tools/act2.ts` runs the same flow end to end on real cell/relay/control processes with a small cohort (300 candidates, 7 centres) | **Built**. Throughput: **~1.1k entries/s sustained on one core** (Apple M5, full G1 cohort at `--speed 20`, cells in-process; commit `5cd2f0a`), lower under heavy machine load; the cross-process HTTP number is **Planned (Stage 7)**. Stage 6: `bun tools/act5.ts --full` runs 19,811 live candidates across real cell/relay/control processes end to end (1,981,100 export rows, 935 s, [evidence](evidence/stage6-act5-full.txt)) |
-| C6 | Throughput, p50/p99, WAN bytes per candidate-hour, seat CPU on low-end hardware | — | **Planned (Stage 7)** |
+| C6 | Throughput, p50/p99, WAN bytes per candidate-hour, seat CPU on low-end hardware | `tools/measure.ts`, [`evidence/stage7-load.txt`](evidence/stage7-load.txt): 20k-candidate swarm (19,803 unlocked, 99 centres, 3 real cell processes over HTTP), 60 s measured window, 227,882 entries sent (0 rejected) → ~3,800 entries/s sustained | **Proven on this Mac (Apple M5)**, see the table below. Windows power-saver seat CPU is **Planned**, pending the laptop (Stage 7) |
 | C7 | A Rust cell ingest matches the TypeScript one on the same vectors | — | **Planned (optional Stage R)** |
+
+### Measured on this Mac (Stage 7, 2026-09-28)
+
+Apple M5, 10 cores (4P+6E), 16 GiB RAM, macOS 26.0 (build 26A428). Method and raw numbers: [`evidence/stage7-load.txt`](evidence/stage7-load.txt), produced by `bun tools/measure.ts --n 20000 --centres 99 --speed 40 --seconds 60` (unsandboxed, for local port binding). 20,000-candidate G1 cohort, 99 simulated centres (in-memory relays, real store-and-forward) against 3 real cell processes (bun, `MODE=cell`) over HTTP on loopback, real custodian release. Only rows actually measured are listed; nothing here is invented.
+
+| Metric | Measured value | Note |
+|---|---|---|
+| Cell counters | 227,882 entries stored across 3 cells (77,338 / 75,992 / 74,552), 0 rejected, 19,803/19,803 candidates unlocked | `cell-N /v1/stats`, unmodified route |
+| Ingest latency (relay→cell `/v1/sync`) | p50 = 44.1 ms, p99 = 168.1 ms | 3,697 calls in the 60 s window, measured by timing the real HTTP round trip `forward.ts`'s `Forwarder` makes on every sync |
+| Relay↔cell WAN bytes | 351,263,160 bytes (144.9 MB req + 206.4 MB res) over 60 s for 19,803 unlocked candidates → **~1,064,000 bytes/candidate-hour** | JSON request/response bytes actually sent over loopback HTTP; the per-hour figure extrapolates a 60 s window and is **not** a real 3-hour exam's duty cycle (answering slows after the opening rush) |
+| Seat CPU/RSS (Mac) | CPU% p50 = 2.3, max = 4.3; RSS p50 = 166.2 MiB, max = 166.5 MiB | One real `Seat` (apps/seat main-process class, Electron-free), full enrol→release→answer flow, sampled with `ps` on its own isolated process over 10 s of answering. Excludes Electron's renderer/GPU overhead |
+| Seat CPU/RSS (Windows, power-saver) | **Not measured** | Pending the Windows laptop (Stage 7) |
+| RPO / RTO | 0 answers lost across 20 logged chaos runs; RTO ≈ 1–1.3 s p50 | Not re-measured here — cited from [`evidence/stage8-chaos.jsonl`](evidence/stage8-chaos.jsonl) / R8 below, produced by `tools/chaos.ts` |
 
 ## MoSCoW freeze: M1–M12 (Stage 6, 2026-09-27)
 
