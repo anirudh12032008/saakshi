@@ -552,3 +552,15 @@ This addendum is additive only. No byte defined in §1–§17 changes, so `V` st
 |---|---|---|
 | E.1 | **Export rows.** For each sheet in a cell's `ShiftExport` (dedupe by `cand`, keeping the sheet with the most entries; ties → the highest `attempt`) and each item of the candidate's form (directory `form` → `forms.json` order), one row with the frozen `fixtures/schemas/v1.json` cohort fields plus the export fields. From the directory: `centre`, `form`, `lang` (default `"en"`), `pwd` (default 0); `shift` = the export's shift. From the entries whose body `item` is this item (in `seq` order): `state`/`answer` = the last one's (none → `"NV"`, `""`); `dwellMs` = Σ `meta[0]` (non-negative integers; anything else counts 0); `visits` = their count; `changes` = the number of consecutive pairs whose `answer` differs; `tFirstMs` = `activeMs` of the first whose `answer ≠ ""` (none → −1); `seq`, `rxWall` (the relay's `rx[0]`, 0 if absent) and `h` (hex `entryHash`) of the last one (none → 0, 0, 64 zeros). Bodies recorded as `missing`/`unreadable` count as no entry. Rows are sorted by `cand`, then form position | The radar and the engine analyse the system's own record |
 | E.2 | **Decision sign-off** `["decision",exam,shift,reportHash,by,at]`, signed (A.1 style: `msg(array)`) by control's decision key; `reportHash` = hex SHA-256 of the report file's bytes; `by` 1–64 characters | A named human approved exactly this report |
+
+## 19. Addendum F (S6 witness, 2026-09-28)
+
+This addendum is additive only. No byte defined in §1–§18 changes, so `V` stays 1.
+
+- Code: `apps/server/src/witness.ts`, `seal.ts` (`headFrom`). Tests: `apps/server/test/witness.test.ts`.
+
+| # | Addendum | Why |
+|---|---|---|
+| F.1 | **Head fetch.** Control `GET /v1/sth?from=m` → `{sth:{sth,sig}, consistency:[hex…]}`: the latest STH and the §10 consistency proof from size `m` to its size (empty when `m < 1` or `m ≥ size`). 404 before the first seal | The witness needs proof, not trust, that the log only grew |
+| F.2 | **Cosignature** `["cosig",sthId,ts]`, signed (A.1 style: `msg(array)`) by the witness key. The witness cosigns a head only if the authority signature verifies and, against the last head it cosigned, the size did not shrink, an equal size has an equal root, and a larger size has a valid consistency proof | Control can no longer rewrite or fork the register unnoticed |
+| F.3 | **Alerts.** Witness `GET /v1/evidence?after=n` serves each refusal as an event with `cell:"witness"`, `code:"EQUIVOCATION"`, `seq` = the refused size, `reason` = `bad-signature\|shrunk\|equivocation\|inconsistent: …`. Control's monitor turns it into a P0 `TAMPER` incident keyed `TAMPER:log`. `GET /v1/witness` (relayed by control) shows the last cosigned head and the witness public key | The existing incident ladder and CERT-In hook handle it |

@@ -17,14 +17,14 @@ flowchart LR
     Seat["Seat (Electron)\nsigns + hash-chains\nevery answer"] -- LAN --> Relay["Centre relay (untrusted)\nstores and forwards\ncannot read answers"]
     Relay -- WAN --> Cell["Cell (national DC)\nopens, verifies,\ncountersigns"]
     Cell --> Control["Control\nseals the register (STH)\naudit, /verify, evidence pack"]
-    Control -. planned, Stage 7 .-> Witness["Witness\nindependent co-signer"]
+    Control -- STH + consistency proof --> Witness["Witness\nindependent co-signer"]
 ```
 
 - **Seat** — Electron app at the exam PC. Signs and hash-chains every answer locally, fsyncs, and keeps working offline.
 - **Cell relay** — untrusted store-and-forward at the centre. Sees only sealed envelopes, never answer text.
 - **Cell** — one of three independent national-DC processes. Opens bodies, verifies chains, countersigns, seals a per-shift Merkle register.
-- **Control** — signs the sealed register's tree head (STH) alone today, runs the audit, serves `/verify` and the evidence pack.
-- **Witness** — an independent co-signer for the STH so control is no longer a single point of trust. **Planned, Stage 7** (T15 in `docs/claims-ledger.md`; not built).
+- **Control** — signs the sealed register's tree head (STH), runs the audit, serves `/verify` and the evidence pack.
+- **Witness** — a separate `MODE=witness` process that polls control's STH, checks an RFC 9162 consistency proof against the last head it cosigned, and cosigns only consistent heads; a rewritten or forked register raises a P0 TAMPER incident at control. **Built** (T15 in `docs/claims-ledger.md`; `apps/server/test/witness.test.ts`). In the demo it runs on the same machine under the same operator, so it is independent in code, not yet in custody.
 
 The key limit the whole design is built around: *a seat signature proves the record wasn't altered after the device produced it — not that the candidate chose it* (`docs/threat-model.md`).
 
@@ -89,7 +89,7 @@ All five need local loopback ports and are meant to run unsandboxed; `act2`/`act
 - **M4 (integrity gate and in-exam monitor)** is frozen with limits: detection is by process/window **name matching** only, proven against a renamed binary and the seat's own overlay-sim, not a genuine tool on real hardware; the live camera face check is a manual step, not run in CI (`docs/claims-ledger.md`, `docs/traceability.md`).
 - **M9 (candidate comms)** is frozen with limits: Tamil UI, banner, notices and status page are built and shown live in Act 5, but **Tamil question text is not built** (the item bank has no Tamil, so TA mode shows English question text with a note) — and per D17, **Claude's HI/TA drafts are machine translations, not reviewed by a native Tamil speaker** (`docs/claims-ledger.md` D17, MoSCoW freeze table).
 - **No field data.** Every radar, decision-engine and centre-risk number in this README and in the claims ledger comes from generators we wrote (G1/G2), not a real exam. G2 differs from G1 only in noise and pacing, not in structure, and the same team wrote both — these are model results, not field results.
-- Witness co-signing (T15), TLS between components, and measured throughput/RTO at real WAN scale are **Planned, Stage 7** and not built.
+- The witness (T15) is built but runs beside control in the demo, not under a separate organisation. TLS between components, and measured throughput/RTO at real WAN scale are **Planned, Stage 7** and not built.
 
 Full detail, trust boundaries and the stage-by-stage "not built yet" table: [`docs/threat-model.md`](docs/threat-model.md).
 

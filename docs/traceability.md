@@ -22,13 +22,13 @@ This document traces each of the 12 focus areas of the Challenge 6 brief to the 
 | 2 | Early failure prediction | M8 readiness, S4 predicted risk, SYNC_LAG | **Partly built** | SYNC_LAG (Stage 4); readiness board (Stages 5–6) |
 | 3 | Incident detection, classification, escalation | M8 rules and ladder, S3 classification | **Built** | — |
 | 4 | Backup and DR | M2, M3 | **Partly built** | Spare relay, 2-store archive, RPO/RTO (Stage 4) |
-| 5 | Tamper-evident storage | M1, M5, M7, S6 | **Built (without S6)** | Witness (Stage 7) |
+| 5 | Tamper-evident storage | M1, M5, M7, S6 | **Built** | — |
 | 6 | Suspicious patterns | M4, M11, S1, S5 | **Partly built** | Integrity gate and monitor, pointer provenance (Stage 5) |
 | 7 | Reconciliation and validation | M1 NEED protocol, M7 reconciliation report | **Built** | — |
 | 8 | Candidate communication | M9, S3 notices | **Built** | Tamil question text (the bank has none) |
 | 9 | Re-schedule / re-conduct decision | M12, S2 | **Built**, live on the cells' export | — |
 | 10 | Fairness when disrupted | M6, M12 | **Partly built** | Gap journal, caps, handover (Stage 4) |
-| 11 | Audit trail and evidence reports | M7 evidence pack, S6 | **Built** (without S6) | Witness (Stage 7) |
+| 11 | Audit trail and evidence reports | M7 evidence pack, S6 | **Built** | — |
 | 12 | AI analytics for systemic risk | S1, S3, S4 | **Built** | Field accuracy (no field data) |
 
 ## Detail
@@ -82,8 +82,7 @@ Paths are relative to the repo root.
 - **Code:** `packages/core/src/journal.ts`, `merkle.ts`, `log.ts`, `custody.ts`, `node.ts`, `sig.ts`; `apps/seat/src/main/journal-store.ts`; `apps/server/src/seal.ts`, `audit.ts`, `custodian-view.ts`, `release-control.ts`; `tools/package.ts`.
 - **Tests:** `packages/core/test/journal.test.ts` (1,000 flips), `sig.test.ts` (1,000 signatures), `merkle.test.ts`, `custody.test.ts`, `vectors.test.ts`, `addendum.test.ts`, `stage3-core.test.ts`; `apps/server/test/seal.test.ts`, `audit.test.ts`, `tamper.test.ts`, `release-control.test.ts`, `package.test.ts`, `relay-routes.test.ts`; `apps/seat/test/journal-store.test.ts`, `release.test.ts`, `seat.test.ts`; `bun tools/act2.ts`.
 
-**Planned:**
-- Witness (S6): **Stage 7**.
+- **Witness (S6):** `MODE=witness` cosigns each STH only with a valid consistency proof from the last one it cosigned; rewritten history, equivocation, a shrinking log or a bad signature become a P0 TAMPER incident. Code: `apps/server/src/witness.ts`, `seal.ts` (`headFrom`), `control.ts` (`GET /v1/sth`, `/v1/witness`), `incidents.ts`, `ops-monitor.ts`, `tools/stack.ts`. Tests: `apps/server/test/witness.test.ts`, `incidents.test.ts`, `tools-stage4.test.ts`; consistency golden cases in `packages/core/test/vectors.test.ts`, `merkle.test.ts`.
 
 ### 6. Suspicious patterns: M4, M11, S1, S5
 
@@ -161,7 +160,7 @@ Paths are relative to the repo root.
 - **Code:** `apps/server/src/audit.ts`, `evidence.ts`, `control.ts`, `verify-page.ts`, `verify-view.ts`; `packages/core/src/verify.ts`, `selftest.ts`; `tools/act4.ts`.
 - **Tests:** `audit.test.ts`, `tamper.test.ts`, `evidence.test.ts`, `verify-page.test.ts`, `control.test.ts`; `packages/core/test/verify.test.ts`, `selftest.test.ts`; `bun tools/act4.ts`, which also runs in CI.
 
-**Planned:** witness co-signature (S6), **Stage 7**.
+**Built:** witness co-signature (S6), see §5 (`witness.test.ts`).
 
 ### 12. AI analytics for systemic risk: S1, S3, S4
 
