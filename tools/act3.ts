@@ -53,7 +53,7 @@ if (!cohort) {
   cohort = join(out, 'cohort.jsonl');
 }
 
-const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), stack: freePort() };
+const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), witness: freePort(), stack: freePort() };
 const R = `http://127.0.0.1:${ports.relay}`, C = `http://127.0.0.1:${ports.control}`;
 const exam = join(dir, 'exam');
 let stack: Stack | undefined, swarm: Swarm | undefined, supervisor: ReturnType<Stack['serve']> | undefined;
@@ -79,7 +79,7 @@ try {
   if (!onCell2.length) fail('this cohort puts no centre on cell-2');
 
   // 2. The processes, under the supervisor control's chaos buttons talk to.
-  const specs = demoSpecs({ exam, data: join(dir, 'data'), stackUrl: `http://127.0.0.1:${ports.stack}`, cellPorts: ports.cells, relayPort: ports.relay, controlPort: ports.control });
+  const specs = demoSpecs({ exam, data: join(dir, 'data'), stackUrl: `http://127.0.0.1:${ports.stack}`, cellPorts: ports.cells, relayPort: ports.relay, controlPort: ports.control, witnessPort: ports.witness });
   specs.find((s) => s.name === 'relay')!.env.HOST = '127.0.0.1';
   mkdirSync(join(dir, 'data'), { recursive: true });
   stack = new Stack(specs, { cwd: dir, log: (n, l) => { if (/PLUG|HANDOVER|WAN|PURGED|ROGUE/.test(l)) console.log(`  [${n}] ${l}`); } });

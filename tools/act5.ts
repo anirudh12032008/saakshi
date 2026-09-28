@@ -54,7 +54,7 @@ try {
   step(`G1 twin (${full ? '20k' : '2k'}, seed 7) and its 100-item paper`);
 
   // 2. Provision (DEMO ops), package with the G1 paper, start the stack with the swarm; the custodians release.
-  const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), stack: freePort() };
+  const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), witness: freePort(), stack: freePort() };
   const C = `http://127.0.0.1:${ports.control}`;
   const exam = join(dir, 'exam'), data = join(dir, 'data');
   const X = provision({ out: exam, keys, cands: await cohortCands(cohort), cellUrls: ports.cells.map((p) => `http://127.0.0.1:${p}`), ops: OPS_DEMO });
@@ -62,7 +62,7 @@ try {
   writePackage(exam, pkg);
   const custodians = { NTA: { file: pkg.shares.NTA, pass: pkg.passphrases.NTA }, NIC: { file: pkg.shares.NIC, pass: pkg.passphrases.NIC } };
   zeroise(pkg);
-  const specs = demoSpecs({ exam, data, cohort, paper, speed: full ? 2000 : 1000, stackUrl: `http://127.0.0.1:${ports.stack}`, cellPorts: ports.cells, relayPort: ports.relay, controlPort: ports.control });
+  const specs = demoSpecs({ exam, data, cohort, paper, speed: full ? 2000 : 1000, stackUrl: `http://127.0.0.1:${ports.stack}`, cellPorts: ports.cells, relayPort: ports.relay, controlPort: ports.control, witnessPort: ports.witness });
   specs.find((s) => s.name === 'relay')!.env.HOST = '127.0.0.1';
   const control = specs.find((s) => s.name === 'control')!;
   control.env.SAAKSHI_LLM = 'template';

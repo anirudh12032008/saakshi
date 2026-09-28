@@ -49,7 +49,7 @@ const withAnyDesk = (overlay: boolean) => clean({ procs: ok([{ pid: 1, name: 'C:
   ...(overlay ? [{ pid: 77, name: 'C:\\s\\overlay-sim.exe' }] : [])]), captureExcluded: ok(overlay ? [77] : []) });
 const snaps: Record<string, ProbeSnapshot> = {};
 
-const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), stack: freePort() };
+const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), witness: freePort(), stack: freePort() };
 const R = `http://127.0.0.1:${ports.relay}`, C = `http://127.0.0.1:${ports.control}`;
 const exam = join(dir, 'exam');
 let stack: Stack | undefined, supervisor: ReturnType<Stack['serve']> | undefined;
@@ -76,7 +76,7 @@ try {
   const demoRoster = Object.entries(X.cands).filter(([, c]) => c.centre === X.demoCentre).map(([c]) => c).sort();
   const [candA, candB, candC] = demoRoster;
   const cellUrl = X.cells.find((c) => c.id === X.centres[X.demoCentre].cell)!.url;
-  const specs = demoSpecs({ exam, data: join(dir, 'data'), stackUrl: `http://127.0.0.1:${ports.stack}`, cellPorts: ports.cells, relayPort: ports.relay, controlPort: ports.control });
+  const specs = demoSpecs({ exam, data: join(dir, 'data'), stackUrl: `http://127.0.0.1:${ports.stack}`, cellPorts: ports.cells, relayPort: ports.relay, controlPort: ports.control, witnessPort: ports.witness });
   specs.find((s) => s.name === 'relay')!.env.HOST = '127.0.0.1';
   mkdirSync(join(dir, 'data'), { recursive: true });
   stack = new Stack(specs, { cwd: dir, log: () => {} });

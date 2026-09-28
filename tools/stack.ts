@@ -71,8 +71,8 @@ export class Stack {
   }
 }
 
-export function demoSpecs(o: { exam: string; data: string; stackUrl: string; cohort?: string; paper?: string; speed?: number; cellPorts?: number[]; relayPort?: number; controlPort?: number }): NodeSpec[] {
-  const exam = resolve(o.exam), data = resolve(o.data), relayPort = o.relayPort ?? 7070;
+export function demoSpecs(o: { exam: string; data: string; stackUrl: string; cohort?: string; paper?: string; speed?: number; cellPorts?: number[]; relayPort?: number; controlPort?: number; witnessPort?: number }): NodeSpec[] {
+  const exam = resolve(o.exam), data = resolve(o.data), relayPort = o.relayPort ?? 7070, controlPort = o.controlPort ?? 7090, witnessPort = o.witnessPort ?? 7095;
   const paper = resolve(o.paper ?? join(ROOT, 'fixtures/paper'));
   const specs: NodeSpec[] = (o.cellPorts ?? [7080, 7081, 7082]).map((port, i) => {
     const db = join(data, `cell-${i + 1}.db`);
@@ -81,10 +81,12 @@ export function demoSpecs(o: { exam: string; data: string; stackUrl: string; coh
   specs.push({ name: 'relay', db: join(data, 'relay.db'), env: { MODE: 'relay', PORT: String(relayPort), EXAM: exam, DB: join(data, 'relay.db') } });
   specs.push({
     name: 'control', env: {
-      MODE: 'control', PORT: String(o.controlPort ?? 7090), EXAM: exam, DIR: join(data, 'control'), STACK_URL: o.stackUrl, RELAY_URL: `http://127.0.0.1:${relayPort}`,
+      MODE: 'control', PORT: String(controlPort), EXAM: exam, DIR: join(data, 'control'), STACK_URL: o.stackUrl, RELAY_URL: `http://127.0.0.1:${relayPort}`,
+      WITNESS_URL: `http://127.0.0.1:${witnessPort}`,
       FORMS: join(paper, 'forms.json'), KEY: join(paper, 'key.json'), PAPER: paper,
     },
   });
+  specs.push({ name: 'witness', env: { MODE: 'witness', PORT: String(witnessPort), EXAM: exam, DIR: join(data, 'witness'), CONTROL_URL: `http://127.0.0.1:${controlPort}` } });   // S6
   if (o.cohort) specs.push({ name: 'swarm', cmd: ['bun', join(ROOT, 'tools/swarm.ts'), '--exam', exam, '--cohort', resolve(o.cohort), '--paper', paper, '--speed', String(o.speed ?? 20)], ready: 'SWARM ', env: {} });
   return specs;
 }
