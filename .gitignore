@@ -12,3 +12,6 @@ apps/seat/src/renderer/public/mediapipe/wasm/
 data/
 .pnpm-store/
 data-s2/
+docs/video/out/
+docs/video/cards/
+docs/video/clips/
