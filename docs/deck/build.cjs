@@ -5,6 +5,7 @@ pres.layout = 'LAYOUT_16x9'; // 10 x 5.625
 const INK = '14213D', SAF = 'E07A1F', PAPER = 'FFFFFF', MIST = 'EEF1F6', GREY = '5B6475', GREEN = '1F8A5B';
 const H = 'Cambria', B = 'Calibri';
 
+const cell = (t, c, b) => ({ text: t, options: { color: c || INK, bold: !!b, fontFace: B, fontSize: 11 } });
 function title(s, t, dark) {
   s.addText(t, { x: 0.5, y: 0.35, w: 9, h: 0.7, fontFace: H, fontSize: 30, bold: true, color: dark ? PAPER : INK, margin: 0, isTextBox: true });
 }
@@ -72,9 +73,9 @@ boxes.forEach(([h, b], i) => {
   if (i < 3) s.addShape(pres.shapes.RIGHT_ARROW, { x: x + 1.98, y: 2.15, w: 0.3, h: 0.3, fill: { color: SAF }, line: { type: 'none' } });
 });
 s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 7.4, y: 3.55, w: 1.95, h: 1.1, fill: { color: PAPER }, rectRadius: 0.08, line: { color: GREY, dashType: 'dash', width: 1 } });
-s.addText([{ text: 'Witness', options: { bold: true, breakLine: true } }, { text: 'co-signs the log (planned, Stage 7)' }], { x: 7.5, y: 3.6, w: 1.75, h: 1.0, fontFace: B, fontSize: 12, color: GREY, align: 'center', valign: 'middle', margin: 0, isTextBox: true });
+s.addText([{ text: 'Witness', options: { bold: true, breakLine: true } }, { text: 'co-signs the log (Built; same host as control)' }], { x: 7.5, y: 3.6, w: 1.75, h: 1.0, fontFace: B, fontSize: 12, color: GREY, align: 'center', valign: 'middle', margin: 0, isTextBox: true });
 bullets(s, ['Answers are WhatsApp-style ticks: ✓ relay has it, ✓✓ data centre has it, blue = countersigned.', 'Paper keys are a two-key locker: any 2 of 3 custodians (NTA, NIC, observer).'], 0.5, 3.55, 6.6, 1.3, 14);
-s.addNotes('[0:40–0:55] Seat to relay to three independent data-centre cells to control. The relay at the centre is treated as hostile: it cannot read answers or forge a tick. The witness is on the roadmap, not built — we say so.');
+s.addNotes('[0:40–0:55] Seat to relay to three independent data-centre cells to control. The relay at the centre is treated as hostile: it cannot read answers or forge a tick. The witness is built and cosigns the log, but in the demo it runs on the same host as control, so it is not yet independent custody — we say so.');
 
 // 5 Act 1
 s = mk(false); tag(s, 'ACT 1 · BEFORE'); title(s, 'Risky seats caught before T0');
@@ -89,7 +90,7 @@ s = mk(false); tag(s, 'ACT 2 · T0'); title(s, 'The exam starts on time — even
 bullets(s, ['We degrade Centre 42\'s link: SYNC_LAG warns before the cut.', 'Two of three custodians approve; one alone cannot release the paper.', 'The superintendent types a phoned code: it unlocks only Centre 42, this shift. A typo or another centre\'s code fails.', 'Before T0 the paper is ciphertext on disk; a forged key from the relay is rejected.'], 0.5, 1.3, 5.4, 3.7, 14);
 stat(s, 6.3, 1.3, 3.2, '1.0–1.9 s', 'SYNC_LAG warning before the WAN cut (3 runs)');
 stat(s, 6.3, 2.85, 3.2, '2 of 3', 'custodians needed to release paper keys');
-src(s, 'Evidence: claims-ledger P1–P4, D16; docs/evidence/stage4-act3.txt. SYNC_LAG is proven on our chaos drill only, not real WAN data.');
+src(s, 'Evidence: docs/evidence/stage8-act2.txt (PASS, 308 candidates, 7 centres); claims-ledger P1–P4, D16. SYNC_LAG is proven on our chaos drill only, not real WAN data.');
 s.addNotes('[1:10–1:25] Act 2. Prediction first: SYNC_LAG raised 1.0 to 1.9 seconds before the cut across three runs — on our drill, not real WAN. Split custody: 2 of 3. The offline code is scoped to one centre and shift, and survives phone dictation.');
 
 // 7 Act 3
@@ -138,9 +139,17 @@ s.addNotes('[2:20–2:30] Fairness. First-time candidates have no history, so hi
 
 // 11 Honest limits
 s = mk(false); title(s, 'What we do not claim');
-bullets(s, ['Not cheat-proof: deterrence plus detection; records are tamper-evident.', 'Detection is name matching; the live camera check is manual.', 'Radar and risk model: synthetic cohorts only — no field accuracy.', 'Not measured yet: 20k over real WAN, power loss, low-end seat CPU.', 'Archive WORM is simulated; the sign-off key is a DEV key (HSM on roadmap).', 'Witness co-signing and pinned TLS are planned (Stage 7).'], 0.5, 1.3, 9, 3.8, 15);
+bullets(s, ['Not cheat-proof: deterrence plus detection; records are tamper-evident.', 'Detection is name matching; the live camera check is manual.', 'Radar and risk model: synthetic cohorts only — no field accuracy.', 'Not measured yet: real WAN, power loss, low-end seat CPU (20k was one Mac, loopback).', 'Archive WORM is simulated; the sign-off key is a DEV key (HSM on roadmap).', 'Witness is Built but on the same host as control, so not independent custody yet; pinned TLS is planned.'], 0.5, 1.3, 9, 3.8, 15);
 src(s, 'Sources: docs/threat-model.md, docs/claims-ledger.md ("Claims we deliberately don\'t make").');
 s.addNotes('[2:30–2:40] We lead with our limits because a trust system that oversells is worthless. Everything on this slide is written in our threat model and claims ledger.');
+
+// Measured numbers
+s = mk(false); title(s, 'Measured numbers');
+const mrows = [['Ingest latency, relay to cell', 'p50 44 ms · p99 168 ms', 'stage7-load.txt'], ['Stored / rejected (20k cohort)', '227,882 entries · 0 rejected', 'stage7-load.txt'], ['Candidates unlocked', '19,803 / 19,803', 'stage7-load.txt'], ['Relay traffic per candidate-hour', '≈1.06 MB (60 s window extrapolated)', 'stage7-load.txt'], ['Seat CPU / RSS (Node main process)', '2.3% median · 166 MiB', 'stage7-load.txt'], ['Chaos drill, 20 runs', '0 of 16,000 answers lost · RTO medians 0.96–1.23 s', 'stage8-chaos.txt']];
+const mt = [[cell('Measure', GREY, 1), cell('Result', GREY, 1), cell('File (docs/evidence/)', GREY, 1)]].concat(mrows.map(r => [cell(r[0]), cell(r[1], SAF, 1), cell(r[2])]));
+s.addTable(mt, { x: 0.5, y: 1.2, w: 9, colW: [3.4, 3.7, 1.9], rowH: 0.45, border: { type: 'solid', color: 'D5DAE3', pt: 0.75 }, fill: { color: PAPER } });
+src(s, 'One Apple M5 Mac, 3 real cells on loopback, 99 simulated centres, synthetic cohort. Seat figures cover the Node main process only; not real WAN.');
+s.addNotes('Measured numbers, all from docs/evidence. One Mac, loopback, synthetic G1 cohort at 20,000 candidates. Bytes per candidate-hour extrapolates a 60-second window and is not a real exam duty cycle. Seat CPU and memory cover the Node main process only. Chaos: 20 of 20 runs passed, 16,000 sent and stored, RTO medians 1.22 to 1.23 s for kill and wipe and 0.955 s for spare relay.');
 
 // 12 Protocol not product
 s = mk(true); title(s, 'A protocol, not a product', true);
@@ -151,11 +160,10 @@ s.addNotes('[2:40–2:50] Close. We are not asking NTA to buy our software; we a
 // 13 Traceability
 s = mk(false); title(s, 'All 12 focus areas, traced to code and tests');
 const rows = [['1 Real-time monitoring', 'Partly'], ['2 Early failure prediction', 'Partly'], ['3 Incident detection & escalation', 'Built'], ['4 Backup and DR', 'Partly'], ['5 Tamper-evident storage', 'Built*'], ['6 Suspicious patterns', 'Partly'], ['7 Reconciliation', 'Built'], ['8 Candidate communication', 'Built'], ['9 Re-conduct decision', 'Built'], ['10 Fairness when disrupted', 'Partly'], ['11 Audit trail & evidence', 'Built*'], ['12 AI systemic-risk analytics', 'Built']];
-const cell = (t, c, b) => ({ text: t, options: { color: c || INK, bold: !!b, fontFace: B, fontSize: 11 } });
 const tbl = [];
 for (let i = 0; i < 6; i++) { const a = rows[i], c = rows[i + 6]; tbl.push([cell(a[0]), cell(a[1], a[1].startsWith('B') ? GREEN : SAF, 1), cell(c[0]), cell(c[1], c[1].startsWith('B') ? GREEN : SAF, 1)]); }
 s.addTable(tbl, { x: 0.5, y: 1.3, w: 9, colW: [3.3, 1.2, 3.3, 1.2], rowH: 0.48, border: { type: 'solid', color: 'D5DAE3', pt: 0.75 }, fill: { color: PAPER } });
-src(s, 'Source: docs/traceability.md summary table. * without the witness (Stage 7). "Partly" rows name their remaining stage there.');
+src(s, 'Source: docs/traceability.md summary table. * witness Built, but on the same host as control (not independent custody). "Partly" rows name their remaining stage there.');
 s.addNotes('[2:50–3:00] Every one of the 12 focus areas maps to features, code and tests in traceability.md — seven built, five partly built with the remaining stage named. Thank you — happy to break anything live.');
 
 pres.writeFile({ fileName: __dirname + '/saakshi.pptx' }).then(f => console.log('wrote', f));

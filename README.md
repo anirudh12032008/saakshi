@@ -84,6 +84,24 @@ All five need local loopback ports and are meant to run unsandboxed; `act2`/`act
 
 ---
 
+## Measured numbers
+
+Measured on one Apple M5 Mac (16 GiB), 3 real cells on loopback, 99 simulated centres, synthetic G1 cohort. Not real WAN.
+
+| Measure | Result | Source |
+|---|---|---|
+| Ingest latency, relay to cell (3,697 calls) | p50 44.1 ms, p99 168.1 ms | `docs/evidence/stage7-load.txt` |
+| Entries stored / rejected at 20k candidates | 227,882 / 0 | `docs/evidence/stage7-load.txt` |
+| Candidates unlocked | 19,803 of 19,803 | `docs/evidence/stage7-load.txt` |
+| Relay-to-cell traffic | about 1.06 MB per candidate-hour | `docs/evidence/stage7-load.txt` |
+| Seat CPU / RSS | 2.3% median (max 4.3%) / 166 MiB | `docs/evidence/stage7-load.txt` |
+| Chaos drill (kill-cell, wipe-cell, spare-relay) | 20/20 pass, 0 of 16,000 answers lost, RTO median 0.96 to 1.23 s | `docs/evidence/stage8-chaos.txt` |
+| Offline-start act | PASS, 308 candidates at 7 centres, 6,586 entries committed | `docs/evidence/stage8-act2.txt` |
+
+Caveats: the per-candidate-hour figure extrapolates a 60 s measurement window and is not a real exam duty cycle. Seat CPU/RSS cover the Node main process only, over about 10 s. All of it is loopback on one host, so it says nothing about real WAN.
+
+---
+
 ## Honest limits
 
 - **M4 (integrity gate and in-exam monitor)** is frozen with limits: detection is by process/window **name matching** only, proven against a renamed binary and the seat's own overlay-sim, not a genuine tool on real hardware; the live camera face check is a manual step, not run in CI (`docs/claims-ledger.md`, `docs/traceability.md`).
