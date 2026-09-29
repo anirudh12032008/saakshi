@@ -57,6 +57,7 @@ if (!cohort) {
 
 const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), witness: freePort(), stack: freePort() };
 const R = `http://127.0.0.1:${ports.relay}`, C = `http://127.0.0.1:${ports.control}`;
+console.log(`CONTROL ${C}`);   // tools/record.ts attaches its browser here
 const exam = join(dir, 'exam');
 let stack: Stack | undefined, swarm: Swarm | undefined, supervisor: ReturnType<Stack['serve']> | undefined;
 const seats: Seat[] = [];
@@ -263,6 +264,7 @@ try {
   console.log(`ACT3-NUMBERS ${JSON.stringify({ ...numbers, host: `${process.platform}-${process.arch}`, candidates: swarm.stats().cands + 1 })}`);
   console.log('PASS');
 } finally {
+  if (process.env.VIDEO_HOLD) { console.log('HOLD'); await Bun.stdin.text(); }   // tools/record.ts tours the final state, then closes stdin
   for (const s of seats) { try { s.close(); } catch { /* closed already (the force-quit) */ } }
   await swarm?.stop();
   await stack?.stopAll();

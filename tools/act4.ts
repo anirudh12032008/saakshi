@@ -51,6 +51,7 @@ const cellP = await spawnServer({ MODE: 'cell', PORT: String(cellPort), DB: join
 const relayP = await spawnServer({ MODE: 'relay', PORT: String(relayPort), HOST: '127.0.0.1', DB: join(dir, 'relay.db'), CELL_URL: `http://127.0.0.1:${cellPort}` });
 const controlP = await spawnServer({ MODE: 'control', PORT: String(controlPort), DIR: join(dir, 'control'), CELL_URL: `http://127.0.0.1:${cellPort}`, RELAY_URL: `http://127.0.0.1:${relayPort}` });
 const C = `http://127.0.0.1:${controlPort}`;
+console.log(`CONTROL ${C}`);   // tools/record.ts attaches its browser here
 let exam: ExamSession | undefined;
 
 try {
@@ -135,6 +136,7 @@ try {
   step(`evidence pack ${prefix.slice(0, -1)}.tar.gz: ${names.length} files, manifest verifies`);
   console.log('PASS');
 } finally {
+  if (process.env.VIDEO_HOLD) { console.log('HOLD'); await Bun.stdin.text(); }   // tools/record.ts tours the final state, then closes stdin
   exam?.close();
   for (const p of [controlP, relayP, cellP]) p.proc.kill();
   await Promise.all([controlP, relayP, cellP].map((p) => p.proc.exited));

@@ -8,7 +8,7 @@
 //   Usage: bun tools/video.ts [--cuts 7,3]
 //   Outputs: docs/video/out/cut-7min.mp4, cut-3min.mp4 (+ .srt each), docs/video/cards/act{N}.png
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -102,6 +102,86 @@ function buildCut(name: '7min' | '3min', cardClips: Record<number, string>) {
   console.log(`[video] wrote ${outMp4} (${t.toFixed(1)}s) + sidecar .srt`);
 }
 
+// ---- Narrated cuts (docs/video/narration.md): playwright .webm clips + macOS `say` voiceover + burned-in captions ----
+// Sections: Act 0 (docs/video/clips/act0.png), Acts 1-5 (act{N}-live.webm + act{N}-tour.webm, then the caption card), Close (close.png).
+// Each act is retimed to its voiceover length (live part sped up, tour kept near 1x). Output: out/saakshi-demo-{7,3}min.mp4 (+ .srt).
+const VOICE = 'Rishi', GAP = 0.35, TAIL = 0.6;
+const dur = (f: string) => parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString());
+
+function parseNarration(): Record<string, Record<string, string[]>> {
+  const out: Record<string, Record<string, string[]>> = {};
+  let sec = '', cut = '';
+  for (const l of readFileSync(join(ROOT, 'docs/video/narration.md'), 'utf8').split('\n')) {
+    if (l.startsWith('## ')) { sec = l.slice(3).split(' ')[0] === 'Close' ? '6' : l.match(/Act (\d)/)![1]; out[sec] = {}; }
+    else if (l.startsWith('### ')) { cut = l.slice(4).trim(); out[sec][cut] = []; }
+    else if (sec && cut && l.trim() && !l.startsWith('card:')) out[sec][cut].push(l.trim());
+  }
+  return out;
+}
+
+function buildNarrated(name: '7min' | '3min', lines: Record<string, Record<string, string[]>>, cardClips: Record<number, string>) {
+  const work = join(OUT_DIR, `.work-n-${name}`);
+  mkdirSync(work, { recursive: true });
+  const sections: string[] = [];
+  const cues: { start: number; end: number; text: string }[] = [];
+  let total = 0;
+  for (const id of [0, 1, 2, 3, 4, 5, 6]) {
+    const sentences = lines[id][name];
+    // 1) voiceover: one `say` per sentence, joined with short gaps; cue times fall out of the real durations.
+    const parts: string[] = [], rel: { start: number; end: number; text: string }[] = [];
+    let a = 0;
+    sentences.forEach((text, i) => {
+      const w = join(work, `s${id}-${i}.wav`);
+      execFileSync('say', ['-v', VOICE, '-o', join(work, `s${id}-${i}.aiff`), text]);
+      ffmpeg(['-i', join(work, `s${id}-${i}.aiff`), '-ar', '44100', '-ac', '1', w]);
+      const d = dur(w);
+      rel.push({ start: a, end: a + d, text });
+      parts.push(w); a += d + GAP;
+    });
+    const T = a + TAIL;
+    const gap = join(work, 'gap.wav');
+    ffmpeg(['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono', '-t', String(GAP), gap]);
+    const list = join(work, `a${id}.txt`);
+    writeFileSync(list, parts.map((p) => `file '${p}'\nfile '${gap}'`).join('\n'));
+    const audio = join(work, `a${id}.wav`);
+    ffmpeg(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', audio]);
+    // 2) visuals retimed to T.
+    const vis = join(work, `v${id}.mp4`);
+    const scale = 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25,format=yuv420p';
+    if (id === 0 || id === 6) {
+      ffmpeg(['-loop', '1', '-framerate', '25', '-i', join(CLIPS_DIR, id === 0 ? 'act0.png' : 'close.png'), '-t', String(T), '-vf', scale, '-c:v', 'libx264', vis]);
+    } else {
+      const live = join(CLIPS_DIR, `act${id}-live.webm`), tour = join(CLIPS_DIR, `act${id}-tour.webm`);
+      const dl = dur(live), dt = dur(tour);
+      if (dl < 5) ffmpeg(['-i', tour, '-vf', `setpts=${T / dt}*PTS,${scale}`, '-t', String(T), '-c:v', 'libx264', vis]);
+      else {
+        const Tt = T - dt >= 8 ? dt : T * 0.5, Tl = T - Tt;
+        ffmpeg(['-i', live, '-i', tour, '-filter_complex',
+          `[0:v]setpts=${Tl / dl}*PTS,${scale}[a];[1:v]setpts=${Tt / dt}*PTS,${scale}[b];[a][b]concat=n=2:v=1:a=0[v]`,
+          '-map', '[v]', '-t', String(T), '-c:v', 'libx264', vis]);
+      }
+    }
+    // 3) burn captions, then append the caption card (acts 1-5) and mux the voiceover.
+    writeFileSync(join(work, `c${id}.srt`), rel.map((c, i) => `${i + 1}\n${srtTimestamp(c.start)} --> ${srtTimestamp(c.end)}\n${c.text}\n`).join('\n'));
+    const capped = join(work, `vc${id}.mp4`);
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', `v${id}.mp4`, '-vf',
+      `subtitles=c${id}.srt:force_style='FontName=Helvetica,FontSize=14,Outline=1,Shadow=0,MarginV=24,BorderStyle=3,OutlineColour=&HB0000000'`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', `vc${id}.mp4`], { cwd: work, stdio: 'inherit' });
+    const sec = join(work, `sec${id}.mp4`);
+    const card = id >= 1 && id <= 5;
+    ffmpeg(card
+      ? ['-i', capped, '-i', cardClips[id], '-i', audio, '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v];[2:a]apad[a]', '-map', '[v]', '-map', '[a]', '-shortest', '-c:v', 'libx264', '-c:a', 'aac', '-pix_fmt', 'yuv420p', sec]
+      : ['-i', capped, '-i', audio, '-filter_complex', '[1:a]apad[a]', '-map', '0:v', '-map', '[a]', '-shortest', '-c:v', 'copy', '-c:a', 'aac', sec]);
+    sections.push(sec);
+    for (const c of rel) cues.push({ start: total + c.start, end: total + c.end, text: c.text });
+    total += T + (card ? CARD_SECONDS : 0);
+  }
+  writeFileSync(join(work, 'list.txt'), sections.map((s) => `file '${s}'`).join('\n'));
+  const outMp4 = join(OUT_DIR, `saakshi-demo-${name}.mp4`);
+  ffmpeg(['-f', 'concat', '-safe', '0', '-i', join(work, 'list.txt'), '-c', 'copy', outMp4]);
+  writeFileSync(join(OUT_DIR, `saakshi-demo-${name}.srt`), cues.map((c, i) => `${i + 1}\n${srtTimestamp(c.start)} --> ${srtTimestamp(c.end)}\n${c.text}\n`).join('\n'));
+  console.log(`[video] wrote ${outMp4} (${dur(outMp4).toFixed(1)}s)`);
+}
+
 function main() {
   const arg = process.argv.find((a) => a.startsWith('--cuts='));
   const cuts = (arg ? arg.split('=')[1] : '7,3').split(',').map((s) => (s.trim() === '7' ? '7min' : '3min')) as ('7min' | '3min')[];
@@ -116,7 +196,10 @@ function main() {
     console.log(`[video] card for act ${act.id}: ${clip}`);
   }
 
-  for (const cut of cuts) buildCut(cut, cardClips);
+  if (existsSync(join(ROOT, 'docs/video/narration.md')) && existsSync(join(CLIPS_DIR, 'act1-live.webm'))) {
+    const n = parseNarration();
+    for (const cut of cuts) buildNarrated(cut, n, cardClips);
+  } else for (const cut of cuts) buildCut(cut, cardClips);
 }
 
 main();

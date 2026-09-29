@@ -72,6 +72,7 @@ if (!cohort) {
 
 const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort() };
 const R = `http://127.0.0.1:${ports.relay}`, C = `http://127.0.0.1:${ports.control}`;
+console.log(`CONTROL ${C}`);   // tools/record.ts attaches its browser here
 const exam = join(dir, 'exam');
 const procs: { proc: ReturnType<typeof Bun.spawn> }[] = [];
 let swarm: Swarm | undefined, seat: Seat | undefined;
@@ -195,6 +196,7 @@ try {
   step(`${f2.entries} entries committed at the cells; ${f2.submitted} candidates submitted`);
   console.log('PASS');
 } finally {
+  if (process.env.VIDEO_HOLD) { console.log('HOLD'); await Bun.stdin.text(); }   // tools/record.ts tours the final state, then closes stdin
   seat?.close();
   await swarm?.stop();
   for (const p of procs) p.proc.kill();

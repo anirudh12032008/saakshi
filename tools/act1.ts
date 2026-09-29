@@ -51,6 +51,7 @@ const snaps: Record<string, ProbeSnapshot> = {};
 
 const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), witness: freePort(), stack: freePort() };
 const R = `http://127.0.0.1:${ports.relay}`, C = `http://127.0.0.1:${ports.control}`;
+console.log(`CONTROL ${C}`);   // tools/record.ts attaches its browser here
 const exam = join(dir, 'exam');
 let stack: Stack | undefined, supervisor: ReturnType<Stack['serve']> | undefined;
 const seats: Seat[] = [];
@@ -180,6 +181,7 @@ try {
   console.log(`Act 1: blocked by name (AnyDesk, overlay-sim) → green; ${X.demoCentre} amber; 1 integrity entry for ${probes} probes; INTEGRITY_CRITICAL; face-extra → review → cleared; submitted and verified`);
   console.log('PASS');
 } finally {
+  if (process.env.VIDEO_HOLD) { console.log('HOLD'); await Bun.stdin.text(); }   // tools/record.ts tours the final state, then closes stdin
   for (const s of seats) { try { s.close(); } catch { /* closed already */ } }
   await stack?.stopAll();
   supervisor?.stop(true);

@@ -56,6 +56,7 @@ try {
   // 2. Provision (DEMO ops), package with the G1 paper, start the stack with the swarm; the custodians release.
   const ports = { cells: [freePort(), freePort(), freePort()], relay: freePort(), control: freePort(), witness: freePort(), stack: freePort() };
   const C = `http://127.0.0.1:${ports.control}`;
+  console.log(`CONTROL ${C}`);   // tools/record.ts attaches its browser here
   const exam = join(dir, 'exam'), data = join(dir, 'data');
   const X = provision({ out: exam, keys, cands: await cohortCands(cohort), cellUrls: ports.cells.map((p) => `http://127.0.0.1:${p}`), ops: OPS_DEMO });
   const pkg = await buildPackage(X, { bank: readJson(join(paper, 'bank.json')), forms: readJson(join(paper, 'forms.json')) }, authority);
@@ -163,6 +164,7 @@ try {
     corroborated: run2.history.corroborated, rows: got.size, runSeconds, totalSeconds: Math.round((Date.now() - t0) / 1000), host: `${process.platform}-${process.arch}` })}`);
   console.log('PASS');
 } finally {
+  if (process.env.VIDEO_HOLD) { console.log('HOLD'); await Bun.stdin.text(); }   // tools/record.ts tours the final state, then closes stdin
   await stack?.stopAll();
   supervisor?.stop(true);
   rmSync(dir, { recursive: true, force: true });
