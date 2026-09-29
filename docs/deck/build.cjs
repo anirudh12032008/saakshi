@@ -73,17 +73,17 @@ boxes.forEach(([h, b], i) => {
   if (i < 3) s.addShape(pres.shapes.RIGHT_ARROW, { x: x + 1.98, y: 2.15, w: 0.3, h: 0.3, fill: { color: SAF }, line: { type: 'none' } });
 });
 s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 7.4, y: 3.55, w: 1.95, h: 1.1, fill: { color: PAPER }, rectRadius: 0.08, line: { color: GREY, dashType: 'dash', width: 1 } });
-s.addText([{ text: 'Witness', options: { bold: true, breakLine: true } }, { text: 'co-signs the log (Built; same host as control)' }], { x: 7.5, y: 3.6, w: 1.75, h: 1.0, fontFace: B, fontSize: 12, color: GREY, align: 'center', valign: 'middle', margin: 0, isTextBox: true });
+s.addText([{ text: 'Witness', options: { bold: true, breakLine: true } }, { text: 'co-signs the log (built; demo runs it beside control)' }], { x: 7.5, y: 3.6, w: 1.75, h: 1.0, fontFace: B, fontSize: 12, color: GREY, align: 'center', valign: 'middle', margin: 0, isTextBox: true });
 bullets(s, ['Answers are WhatsApp-style ticks: ✓ relay has it, ✓✓ data centre has it, blue = countersigned.', 'Paper keys are a two-key locker: any 2 of 3 custodians (NTA, NIC, observer).'], 0.5, 3.55, 6.6, 1.3, 14);
-s.addNotes('[0:40–0:55] Seat to relay to three independent data-centre cells to control. The relay at the centre is treated as hostile: it cannot read answers or forge a tick. The witness is built and cosigns the log, but in the demo it runs on the same host as control, so it is not yet independent custody — we say so.');
+s.addNotes('[0:40–0:55] Seat to relay to three independent data-centre cells to control. The relay at the centre is treated as hostile: it cannot read answers or forge a tick. The witness is built and cosigns the log; in the demo it runs on the same host as control, and independent custody is on the roadmap.');
 
 // 5 Act 1
 s = mk(false); tag(s, 'ACT 1 · BEFORE'); title(s, 'Risky seats caught before T0');
-bullets(s, ['Seat A running AnyDesk and an overlay tool → gate names both and blocks.', 'Close them, press Re-check → green; all three seats start.', 'Scribe seat: NVDA allowed; 2 faces expected, 3 faces raise one flag that a human reviewer clears.', 'In-exam AnyDesk → an integrity entry, never an auto-submit; the seat keeps answering.'], 0.5, 1.3, 5.4, 3.7, 14);
+bullets(s, ['Seat A running AnyDesk and an overlay tool → gate names both and blocks.', 'Close them, press Re-check → green; all three seats start.', 'Scribe seat: 2 faces expected, 3 faces raise one flag that a human reviewer clears.', 'In-exam AnyDesk → an integrity entry, never an auto-submit; the seat keeps answering.'], 0.5, 1.3, 5.4, 3.7, 14);
 stat(s, 6.3, 1.3, 3.2, '2 of 2', 'tools named and blocked (AnyDesk, overlay-sim)');
 stat(s, 6.3, 2.85, 3.2, '5 of 5 → 1 flag', '3-face samples → one face-extra flag, human-cleared');
-src(s, 'Evidence: docs/evidence/stage5-act1.txt, stage5-gate-selftest.json. Limit: detection is by name matching only.');
-s.addNotes('[0:55–1:10] Act 1. The gate blocks by name, names the tool, and turns green once closed. Accessibility tools are allowed. Face presence runs on the device — no video, no recognition — and every flag goes to a human. Honest limit: name matching only.');
+src(s, 'Evidence: docs/evidence/stage5-act1.txt, stage5-gate-selftest.json. Detection is by process name.');
+s.addNotes('[0:55–1:10] Act 1. The gate blocks by name, names the tool, and turns green once closed. Face presence runs on the device — no video, no recognition — and every flag goes to a human. Detection is by process name.');
 
 // 6 Act 2
 s = mk(false); tag(s, 'ACT 2 · T0'); title(s, 'The exam starts on time — even offline');
@@ -99,7 +99,7 @@ stat(s, 0.5, 1.4, 2.8, '0', 'answers lost — P1 closed with lost 0', true, '6FD
 stat(s, 3.6, 1.4, 2.8, '6,593', 'entries: sent = verified = stored', true);
 stat(s, 6.7, 1.4, 2.8, '1.3–1.9 s', 'recovery time (RTO), RPO 0, 3 chaos runs', true);
 bullets(s, ['Cell 2 killed with SIGKILL and its database deleted; it rebuilt from the relays.', 'Candidates kept answering; the blast radius (1 cell · 2 centres · 100 candidates) was shown live.', 'A spare relay took over with nothing lost.'], 0.5, 3.1, 9, 1.9, 14, true);
-src(s, 'Evidence: docs/evidence/stage4-act3.txt, stage4-chaos.jsonl (8 seats × 100 entries, one Mac). Not measured: RPO/RTO at 20k over real WAN; power loss.', true);
+src(s, 'Evidence: docs/evidence/stage4-act3.txt, stage4-chaos.jsonl (8 seats × 100 entries, one Mac). Next: RPO/RTO over a real WAN.', true);
 s.addNotes('[1:25–1:45] Act 3, the wow moment. A judge kills Data Centre 2 and deletes its database. The P1 card shows the blast radius; candidates keep answering; it rebuilds from the relays and closes with answers lost 0 — 6,593 entries sent, verified and stored. Chaos runs: RTO 1.3 to 1.9 s, RPO 0. Scale caveat stated.');
 
 // 8 Act 4
@@ -138,10 +138,10 @@ src(s, 'Evidence: claims-ledger D4–D6, R11; docs/evidence/stage6-act5-full.txt
 s.addNotes('[2:20–2:30] Fairness. First-time candidates have no history, so history can only corroborate an exam-based flag — tested against an adversarial registry. Look-alike groups are not flagged, and nothing is ever auto-penalised.');
 
 // 11 Honest limits
-s = mk(false); title(s, 'What we do not claim');
-bullets(s, ['Not cheat-proof: deterrence plus detection; records are tamper-evident.', 'Detection is name matching; the live camera check is manual.', 'Radar and risk model: synthetic cohorts only — no field accuracy.', 'Not measured yet: real WAN, power loss, low-end seat CPU (20k was one Mac, loopback).', 'Archive WORM is simulated; the sign-off key is a DEV key (HSM on roadmap).', 'Witness is Built but on the same host as control, so not independent custody yet; pinned TLS is planned.'], 0.5, 1.3, 9, 3.8, 15);
+s = mk(false); title(s, 'Limits and roadmap');
+bullets(s, ['Deterrence plus detection, not cheat-proof; records are tamper-evident.', 'Integrity gate detects by process name; the camera face check is run by hand.', 'Radar and risk model are proven on synthetic cohorts; field accuracy comes from a pilot.', 'Next: field pilot on a real WAN, power-loss and low-end seat tests (20k ran on one Mac, loopback).', 'Next: HSM-held sign-off key and real WORM archive (today: DEV key, simulated WORM).', 'Next: independent-custody witness and pinned TLS between components.'], 0.5, 1.3, 9, 3.8, 15);
 src(s, 'Sources: docs/threat-model.md, docs/claims-ledger.md ("Claims we deliberately don\'t make").');
-s.addNotes('[2:30–2:40] We lead with our limits because a trust system that oversells is worthless. Everything on this slide is written in our threat model and claims ledger.');
+s.addNotes('[2:30–2:40] We state our limits and our roadmap plainly because a trust system that oversells is worthless. Everything on this slide is written in our threat model and claims ledger.');
 
 // Measured numbers
 s = mk(false); title(s, 'Measured numbers');
@@ -153,9 +153,9 @@ s.addNotes('Measured numbers, all from docs/evidence. One Mac, loopback, synthet
 
 // 12 Protocol not product
 s = mk(true); title(s, 'A protocol, not a product', true);
-bullets(s, ['Vendor conformance kit in NTA\'s RFP: any vendor\'s seat, relay or cell must pass the same chaos and tamper tests.', 'RACI: NTA owns policy, keys and decisions; NIC runs control and cells; vendors run centres; witnesses sit outside the operational path.', 'Apache-2.0 under the GoI open-source policy.', 'Rollout: shadow mode on a small NTA exam → relays and cells → mandate.'], 0.5, 1.3, 9, 3.6, 15, true);
-src(s, 'Source: docs/plan.md §6 Close and §7 item 12. Cost per candidate is not yet measured (Stage 7), so it is not shown.', true);
-s.addNotes('[2:40–2:50] Close. We are not asking NTA to buy our software; we are offering a protocol and a conformance kit to write into the RFP. Cost per candidate is a Stage 7 measurement — we will not quote a number we have not measured.');
+bullets(s, ['Vendor conformance kit in NTA\'s RFP: any vendor\'s seat, relay or cell must pass the same chaos and tamper tests.', 'RACI: NTA owns policy, keys and decisions; NIC runs control and cells; vendors run centres; witnesses sit outside the operational path.', 'Tested on macOS and Windows: Windows CI on windows-latest runs an end-to-end test of the packaged seat.', 'Apache-2.0 under the GoI open-source policy.', 'Rollout: shadow mode on a small NTA exam → relays and cells → mandate.'], 0.5, 1.3, 9, 3.7, 14, true);
+src(s, 'Source: docs/plan.md §6 Close and §7 item 12. Cost per candidate is not shown: we quote only what we have measured.', true);
+s.addNotes('[2:40–2:50] Close. We are not asking NTA to buy our software; we are offering a protocol and a conformance kit to write into the RFP. We quote only numbers we have measured, so no cost per candidate here.');
 
 // 13 Traceability
 s = mk(false); title(s, 'All 12 focus areas, traced to code and tests');
@@ -163,7 +163,7 @@ const rows = [['1 Real-time monitoring', 'Partly'], ['2 Early failure prediction
 const tbl = [];
 for (let i = 0; i < 6; i++) { const a = rows[i], c = rows[i + 6]; tbl.push([cell(a[0]), cell(a[1], a[1].startsWith('B') ? GREEN : SAF, 1), cell(c[0]), cell(c[1], c[1].startsWith('B') ? GREEN : SAF, 1)]); }
 s.addTable(tbl, { x: 0.5, y: 1.3, w: 9, colW: [3.3, 1.2, 3.3, 1.2], rowH: 0.48, border: { type: 'solid', color: 'D5DAE3', pt: 0.75 }, fill: { color: PAPER } });
-src(s, 'Source: docs/traceability.md summary table. * witness Built, but on the same host as control (not independent custody). "Partly" rows name their remaining stage there.');
+src(s, 'Source: docs/traceability.md summary table. * witness built; the demo runs it beside control. "Partly" rows list their remaining work there.');
 s.addNotes('[2:50–3:00] Every one of the 12 focus areas maps to features, code and tests in traceability.md — seven built, five partly built with the remaining stage named. Thank you — happy to break anything live.');
 
 pres.writeFile({ fileName: __dirname + '/saakshi.pptx' }).then(f => console.log('wrote', f));
