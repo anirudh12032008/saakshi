@@ -145,3 +145,7 @@ export function archiveLines(a: ArchiveReport): string[] {
     `${a.writtenMs !== undefined ? `Written in ${a.writtenMs} ms · ` : ''}verified in ${a.verifyMs} ms.`.replace(/^v/, 'V'),
   ];
 }
+
+/** S6: the cosign status line, from GET /v1/witness (undefined when there is no witness). */
+export const witnessLine = (w?: { cosig?: { size: number; ts: number } }): string =>
+  w?.cosig ? `Witness cosigned STH #${w.cosig.size} at ${new Date(w.cosig.ts).toISOString()}` : 'Witness: not cosigned';

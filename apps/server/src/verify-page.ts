@@ -60,6 +60,13 @@ $('form').addEventListener('submit', (ev) => ev.preventDefault());
 
 // Served by control: /verify?cand=C0001 loads that candidate's proof from the same origin. Opened from file://, nothing is fetched.
 const cand = new URLSearchParams(location.search).get('cand');
+if (location.protocol.startsWith('http')) {
+  // The same line as control-view's witnessLine, inlined: importing it here makes Bun's HTML bundler race with control's.
+  fetch('/v1/witness').then((r) => (r.ok ? r.json() : undefined), () => undefined).then((w?: { cosig?: { size: number; ts: number } }) => {
+    $('witness').textContent = w?.cosig ? `Witness cosigned STH #${w.cosig.size} at ${new Date(w.cosig.ts).toISOString()}` : 'Witness: not cosigned';
+    $('witness').hidden = false;
+  });
+}
 if (location.protocol.startsWith('http') && cand) {
   fetch(`/v1/proof?cand=${encodeURIComponent(cand)}`)
     .then(async (r) => (r.ok ? r.text() : Promise.reject(new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`))))

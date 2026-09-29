@@ -6,7 +6,7 @@ import type { AnalyticsRun, Classification, IncidentIn, InvReport, ScoreRow, Sig
 import type { ReadinessBoard } from './readiness-view.ts';
 import { seatLine } from './readiness-view.ts';
 import type { ReviewItem } from './review.ts';
-import { archiveLines, commitment, findingText, flagRows, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeCard, noticeText, reconCells, releaseLines, readinessTile, reviewCard, riskChip, tileText, timeCells } from './control-view.ts';
+import { archiveLines, commitment, findingText, flagRows, fleetSummary, group, headline, incidentCard, kpis, linkLine, noticeCard, noticeText, reconCells, releaseLines, readinessTile, reviewCard, riskChip, tileText, timeCells, witnessLine } from './control-view.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const say = (id: string, text: string, tone = '') => { const el = $(id); el.textContent = text; el.className = `out ${tone}`.trim(); };
@@ -74,6 +74,8 @@ $('evidence').addEventListener('submit', async (ev) => {
 
 void recon();
 setInterval(recon, 2000);
+const witnessTick = async () => say('witness', witnessLine(await call<Parameters<typeof witnessLine>[0]>('GET', '/v1/witness').catch(() => undefined)));
+void witnessTick(); setInterval(witnessTick, 2000);
 
 const li = (text: string): HTMLLIElement => { const x = document.createElement('li'); x.textContent = text; return x; };
 let lastSummary = '';

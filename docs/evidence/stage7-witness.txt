@@ -1,0 +1,28 @@
+wrote 300 candidates x 100 items to /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-8A97S6/g1
+✓ stack up: 3 cells, CEN042's relay, control (DEMO timers), supervisor on :56199
+✓ released by NTA + NIC; seat A answering at CEN042; swarm: 300 candidates
+  [relay] WAN DEGRADED (DEV chaos)
+✓ SYNC_LAG: "WAN failure likely: 40% of rounds failing (smoothed)" — 8 s after the link began to degrade, before it was cut
+  [relay] WAN DOWN (DEV chaos)
+✓ cut: RELAY_WAN_DOWN predicted 1 s earlier; banner at the seat; unacknowledged, it climbed to superintendent; acknowledged by SUP-42
+  [relay] WAN UP (DEV chaos)
+  [relay] WAN RESTORED from degraded (DEV chaos)
+  [cell-2] PLUG PULLED (SIGKILL); deleted /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-8A97S6/data/cell-2.db, /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-8A97S6/data/cell-2.db-wal, /var/folders/f_/wys08scj45573rh37ntrx02h0000gn/T/saakshi-act3-8A97S6/data/cell-2.db-shm
+✓ P1 "Data Centre 2 is down": 1 cell · 2 centres · 100 candidates · answers lost: not known yet
+✓ candidates keep answering: the swarm sent 194 more entries while Data Centre 2 was down
+✓ Data Centre 2 rebuilt from the relays: LIVE 13 s after the plug; the P1 closed with answers lost 0
+✓ sent = verified = stored = 6599 entries (verified: every chain, key certificate and body checked with only the authority key pinned); lost 0
+  [relay] HANDOVER-REQUEST {"cand":"C0001","seat":"CEN042-S02","key":"f249a25284512103"}
+  [relay] HANDOVER-GRANTED {"cand":"C0001","seat":"CEN042-S02","keyEpoch":2,"fromSeq":21,"via":"pin","approvedBy":"INV-42-A","creditedMs":51427}
+✓ seat B resumed C0001: 16 answers restored, timer 3:20, +0:51 credited · approved by INV-42-A
+✓ seat A came back: its tail is ORPHANED evidence (not tampering) and it says "moved"; the time audit shows the move, approved
+✓ /verify, pinning only the authority key: 2 key epoch(s) for C0001: certified by cell-1, whose key the exam authority certified; receipt 0E69JTSR3W16KHAZ~
+  [relay] PURGED {"exam":"DEMO-2026","shift":"S1","sthId":"70446703fea6bc6cec5fbeb291ce7a8c2bafb87bb97bdb20e8df63eeb5026fc4","entries":25}
+✓ archived to 2 write-once stores (written 21 ms, verified 117 ms); relay purged 25 entries on a signed order
+  [cell-1] ROGUE UPDATE bodies SET answer = 'D' WHERE exam = 'DEMO-2026' AND shift = 'S1' AND attempt = 1 AND cand = 'C0001' AND seq = 3;
+✓ TAMPER (P0) for C0001 climbed to the regulator; the CERT-In 6-hour report draft is at certin/TAMPER-10.html
+✓ notice N-CELL_DOWN-1 approved and sent to the outbox (mock); the public page shows it, with no PII
+✓ Witness cosigned STH #93 at 2026-09-29T03:11:55.132Z
+✓ control rewrote the log and re-signed a 94-leaf head: P0 TAMPER:log "The witness refused to cosign the shift log" (inconsistent: the 94-leaf head does not extend the 93-leaf head the witness cosigned: history was rewritten)
+ACT3-NUMBERS {"syncLagAfterDegradeMs":8038,"predictedBeforeDownMs":1024,"cell2LiveMs":6745,"caughtUpMs":228961,"moveCreditedMs":51427,"archiveWriteMs":21,"archiveVerifyMs":117,"purged":25,"host":"darwin-arm64","candidates":301}
+PASS

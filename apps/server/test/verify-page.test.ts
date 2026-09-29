@@ -7,6 +7,7 @@ import { formsOf } from '@saakshi/core/sheet';
 import { verifyProof } from '@saakshi/core/verify';
 import { proofFor, seal } from '../src/seal.ts';
 import { verifyHtml } from '../src/verify-build.ts';
+import { witnessLine } from '../src/control-view.ts';
 import { viewOf } from '../src/verify-view.ts';
 import { FORMS, SimSeat } from '../../../tools/sim-seat.ts';
 
@@ -36,9 +37,9 @@ test('verify.html compiles to one self-contained page with no network, no Node a
   expect(await verifyHtml()).toBe(html);                                         // cached
 });
 
-test('the page renders untrusted text with textContent only, and fetches only its own /v1/proof', () => {
+test('the page renders untrusted text with textContent only, and fetches only its own /v1/proof and /v1/witness', () => {
   expect(src).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
-  expect([...src.matchAll(/fetch\(/g)].length).toBe(1);
+  expect([...src.matchAll(/fetch\(/g)].length).toBe(2);
   expect(src).toContain('/v1/proof?cand=');
 });
 
@@ -61,4 +62,17 @@ test('viewOf: a proof that does not verify for other reasons is "invalid"', () =
   const v = viewOf(verifyProof(p, forms, trust));
   expect(v.verdict).toBe('invalid');
   expect(v.headline).toMatch(/register head/);
+});
+
+test('the cosign status line reads GET /v1/witness', () => {
+  expect(witnessLine({ cosig: { size: 7, ts: Date.UTC(2026, 8, 29, 10, 0, 0) } })).toBe('Witness cosigned STH #7 at 2026-09-29T10:00:00.000Z');
+  expect(witnessLine({})).toBe('Witness: not cosigned');
+  expect(witnessLine(undefined)).toBe('Witness: not cosigned');
+});
+
+test('/verify (served) and the control dashboard both show the cosign status', () => {
+  expect(src).toContain("fetch('/v1/witness')");
+  expect(src).toContain('`Witness cosigned STH #${w.cosig.size} at ${new Date(w.cosig.ts).toISOString()}` : \'Witness: not cosigned\'');
+  expect(readFileSync(join(import.meta.dir, '../src/control-page.ts'), 'utf8')).toContain("'/v1/witness'");
+  for (const f of ['verify.html', 'control.html']) expect(readFileSync(join(import.meta.dir, `../src/${f}`), 'utf8')).toContain('id="witness"');
 });

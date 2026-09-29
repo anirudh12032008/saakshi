@@ -8,16 +8,18 @@
 // the regulator rung drafts CERT-In → the public status carries no PII; a notice is approved.
 // Needs local ports (run it unsandboxed) and uv (it generates a small G1 unless --cohort is given).
 //   bun tools/act3.ts [--cohort path/to/cohort.jsonl]
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hexToBytes } from '../packages/core/src/bytes.ts';
+import { hexToBytes, toHex } from '../packages/core/src/bytes.ts';
 import { DEV_EXAM, type KeysFile } from '../packages/core/src/dev.ts';
 import type { FleetView, ReleaseStatus } from '../packages/core/src/directory.ts';
 import type { BindReq } from '../packages/core/src/enrol.ts';
-import { verifier } from '../packages/core/src/node.ts';
+import { leafHashHex, sthId, sthMessage } from '../packages/core/src/log.ts';
+import { rootOf } from '../packages/core/src/merkle.ts';
+import { signer, verifier } from '../packages/core/src/node.ts';
 import { OPS_DEMO, type Incident, type LinkView, type Notice, type PublicStatus, type TimeRow } from '../packages/core/src/ops.ts';
-import { formsOf, type Proof, type ShiftExport } from '../packages/core/src/sheet.ts';
+import { formsOf, type Proof, type ShiftExport, type SthRecord } from '../packages/core/src/sheet.ts';
 import { verifyProof, verifySheet } from '../packages/core/src/verify.ts';
 import type { EnrolResult } from '../apps/server/src/bindings.ts';
 import { shareRequest, type ReleaseKey } from '../apps/server/src/custodian-view.ts';
@@ -242,6 +244,21 @@ try {
   const pub = await call<PublicStatus>(`${C}/v1/status/public`);
   if (!pub.notices.length || /C0\d{3}|INV-42-A|SUP-42|CEN042-S0|CONTROL-1/.test(JSON.stringify(pub))) fail('the public page: no notice, or PII');
   step(`notice ${drafts[0].id} approved and sent to the outbox (mock); the public page shows it, with no PII`);
+
+  // 12. The witness (S6): it cosigned the sealed head. An insider at control rewrites leaf 0 of the log file and re-signs a longer
+  // head with the authority key; the witness refuses to cosign it and control raises a P0 TAMPER:log.
+  type WitnessView = { cosig?: { size: number; ts: number }; alerts: unknown[] };
+  await until(async () => !!(await call<WitnessView>(`${C}/v1/witness`)).cosig, 20_000, 'the witness cosigning the sealed head');
+  const cs = (await call<WitnessView>(`${C}/v1/witness`)).cosig!;
+  step(`Witness cosigned STH #${cs.size} at ${new Date(cs.ts).toISOString()}`);
+  const controlDir = join(dir, 'data', 'control'), recPath = join(controlDir, readdirSync(controlDir).find((f) => /^sth-.*\.json$/.test(f))!);
+  const rec = JSON.parse(readFileSync(recPath, 'utf8')) as SthRecord, head = rec.sths.at(-1)!.sth;
+  const leaves = [{ ...rec.leaves[0], finalHash: 'f'.repeat(64) }, ...rec.leaves.slice(1, head.size), rec.leaves[0]];
+  const sth = { ...head, size: leaves.length, root: toHex(rootOf(leaves.map((l) => hexToBytes(leafHashHex(l))))), prevSTH: sthId(head) };
+  writeFileSync(recPath, JSON.stringify({ ...rec, leaves, sths: [...rec.sths, { sth, sig: toHex(signer(authority)(sthMessage(sth))) }] }));
+  await until(async () => (await incidents()).some((i) => i.key === 'TAMPER:log' && i.severity === 'P0'), 30_000, 'P0 TAMPER:log');
+  const tl = (await incidents()).find((i) => i.key === 'TAMPER:log')!;
+  step(`control rewrote the log and re-signed a ${sth.size}-leaf head: P0 TAMPER:log "${tl.title}" (${tl.detail})`);
 
   console.log(`ACT3-NUMBERS ${JSON.stringify({ ...numbers, host: `${process.platform}-${process.arch}`, candidates: swarm.stats().cands + 1 })}`);
   console.log('PASS');
