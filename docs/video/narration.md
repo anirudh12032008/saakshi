@@ -50,7 +50,7 @@ A typo is refused, and so is another centre's code.
 The phoned code unlocks Centre 42, and the seat records that it started through the fallback.
 A forged key pushed by the relay is rejected by the seat.
 After a relay restart the release arrives again, and the seat still unlocks exactly once.
-In the recorded run, 308 candidates at 7 centres started, and 6,586 entries were committed.
+In the recorded run, 308 candidates at 7 centres started, and about 6,600 answer entries were committed.
 ### 3min
 Centre 42's link is cut, and two of three custodians release the paper.
 Every other centre goes green.
