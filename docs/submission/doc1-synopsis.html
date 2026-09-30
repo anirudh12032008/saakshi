@@ -1,91 +1,91 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Saakshi synopsis</title>
+<!doctype html><html><head><meta charset="utf-8"><title>Saakshi Solution Synopsis</title>
 <style>
-@page{size:A4;margin:12mm 13mm}
-body{font:10.5pt/1.4 -apple-system,Helvetica,Arial,sans-serif;color:#1a1f2b;margin:0}
-h1{font-size:26pt;margin:0 0 2pt}h2{font-size:14pt;border-bottom:2px solid #1f4e8c;padding-bottom:3pt;margin:12pt 0 8pt;color:#1f4e8c}
-.pg{page-break-after:always;height:270mm;overflow:hidden}.pg:last-child{page-break-after:auto}
-.sub{font-size:11pt;color:#555;margin:0 0 8pt}
-.two{display:flex;gap:10pt}.two>div{flex:1;padding:9pt 11pt;border-radius:6pt}
-.prob{background:#fbeeee;border-left:4px solid #b03a3a}.sol{background:#eef3fa;border-left:4px solid #1f4e8c}
-.two b{display:block;font-size:9pt;text-transform:uppercase;letter-spacing:.5pt;margin-bottom:3pt}
-.two p{margin:0;font-size:12pt;line-height:1.35}
-.tiles{display:flex;gap:8pt;margin:6pt 0}.tile{flex:1;background:#eef3fa;border:1px solid #c5ccd8;border-radius:6pt;padding:8pt;text-align:center}
-.tile .n{font-size:24pt;font-weight:700;color:#1f4e8c;line-height:1.05}.tile .l{font-size:9pt;color:#333;margin-top:2pt}
-.pro{display:flex;gap:10pt}.pro>div{flex:1;border:1px solid #c5ccd8;border-radius:6pt;padding:8pt;text-align:center}
-.pro h3{margin:4pt 0 3pt;font-size:13pt;color:#1f4e8c}.pro p{margin:0;font-size:10pt}
-table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:6pt 0}th,td{border:1px solid #c5ccd8;padding:4pt 6pt;text-align:left;vertical-align:top}th{background:#eef3fa}
-.foot{font-size:9pt;color:#555;margin-top:8pt;border-top:1px solid #c5ccd8;padding-top:4pt}a{color:#1f4e8c}
-.note{font-size:9pt;color:#444;margin:4pt 0}
+@page{size:13.333in 7.5in;margin:0}
+*{box-sizing:border-box}
+body{margin:0;font-family:Helvetica,Arial,sans-serif;color:#111}
+.s{width:13.333in;height:7.5in;position:relative;overflow:hidden;page-break-after:always;padding:.45in .7in;background:#fff}
+.s:last-child{page-break-after:auto}
+.lab{font-size:10pt;letter-spacing:1pt;color:#777;text-transform:uppercase}
+h2{font-size:34pt;margin:.06in 0 .22in;font-weight:700}
+.pn{position:absolute;right:.6in;bottom:.35in;font-size:10pt;color:#777}
+.ft{position:absolute;left:.7in;bottom:.35in;font-size:9pt;color:#777}
+.t{background:#000;color:#fff;padding:0 .9in}
+.t .d{font-size:20pt;margin-top:1.6in}.t h1{font-size:76pt;margin:.05in 0 .1in}
+.t .tag{font-size:21pt}.t hr{width:3.2in;border:0;border-top:1px solid #fff;margin:.45in 0 .2in;margin-left:0}
+.t .g{color:#aaa;font-size:12pt}.t .i{font-style:italic;font-size:12pt;margin-top:.8in}
+.two{display:flex;gap:.3in}.two>div{flex:1;border:1.5px solid #111;padding:.22in .28in}
+.two .b{background:#111;color:#fff}.two b{font-size:10pt;letter-spacing:1pt;text-transform:uppercase;display:block;margin-bottom:.08in}
+.two p{margin:0;font-size:17pt;line-height:1.3}
+.cards{display:flex;gap:.3in}.cards>div{flex:1;border:1.5px solid #111;padding:.3in;text-align:center}
+.cards h3{font-size:22pt;margin:.15in 0 .1in}.cards p{margin:0;font-size:14pt;line-height:1.35;color:#333}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:.2in}
+.tile{background:#f0f0f0;padding:.22in .15in;text-align:center}
+.tile .n{font-size:38pt;font-weight:700}.tile .l{font-size:11.5pt;color:#333;margin-top:.05in}
+.note{font-size:11.5pt;color:#444;margin:.14in 0 0}
+table{border-collapse:collapse;width:100%;font-size:12pt}
+th{background:#000;color:#fff;text-align:left;padding:.08in .12in}
+td{padding:.09in .12in;border-bottom:1px solid #bbb;vertical-align:top;line-height:1.3}
 </style></head><body>
-<div class=pg>
-<h1>Saakshi <span style="font-weight:400">(साक्षी, "witness")</span></h1>
-<p class=sub>Solution synopsis. A resilient, trustworthy online exam (CBT) system for Challenge 6.</p>
-<div class=two>
-<div class=prob><b>The problem</b><p>Online exams can fail, and when they do, nobody can prove what really happened.</p></div>
-<div class=sol><b>Our solution</b><p>Sign every answer at the seat, keep going through failures, and make any tampering easy to find and fix.</p></div></div>
+<div class="s t"><div class=d>साक्षी</div><h1>Saakshi</h1><div class=tag>A resilient, provable computer-based testing ecosystem</div><hr><div class=g>Hackathon Challenge 6 · Solution Synopsis</div><div class=i>Team Kawaai: Anirudh, Bhumika, Arjav</div></div>
 
-<h2>How an answer travels</h2>
-<svg viewBox="0 0 700 150" width="100%" font-family="Helvetica,Arial" font-size="12">
-<defs><marker id=a markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#1f4e8c"/></marker></defs>
-<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.5"><rect x="5" y="30" width="120" height="80" rx="8"/><rect x="155" y="30" width="120" height="80" rx="8"/><rect x="305" y="30" width="120" height="80" rx="8"/><rect x="455" y="30" width="120" height="80" rx="8"/></g>
-<g fill="#fff" stroke="#1f4e8c" stroke-width="1.5"><rect x="590" y="30" width="105" height="80" rx="8" stroke-dasharray="4 3"/></g>
-<g stroke="#1f4e8c" stroke-width="2" marker-end="url(#a)"><line x1=125 y1=70 x2=153 y2=70 /><line x1=275 y1=70 x2=303 y2=70 /><line x1=425 y1=70 x2=453 y2=70 /><line x1=575 y1=70 x2=588 y2=70 /></g>
+<div class=s><div class=lab>1 · SOLUTION SYNOPSIS</div><h2>Saakshi (साक्षी, "witness") in one page</h2>
+<div class=two>
+<div><b>The problem</b><p>Online exams can fail, and when they do, nobody can prove what really happened.</p></div>
+<div class=b><b>Our solution</b><p>Sign every answer at the seat, keep going through failures, and make any tampering easy to find and fix.</p></div></div>
+<svg style="margin-top:.35in" viewBox="0 0 700 150" width="100%" font-family="Helvetica,Arial" font-size="12">
+<defs><marker id=a markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#111"/></marker></defs>
+<g fill="#f0f0f0" stroke="#111" stroke-width="1.5"><rect x="5" y="30" width="120" height="80" rx="8"/><rect x="155" y="30" width="120" height="80" rx="8"/><rect x="305" y="30" width="120" height="80" rx="8"/><rect x="455" y="30" width="120" height="80" rx="8"/></g>
+<rect x="590" y="30" width="105" height="80" rx="8" fill="#fff" stroke="#111" stroke-width="1.5" stroke-dasharray="4 3"/>
+<g stroke="#111" stroke-width="2" marker-end="url(#a)"><line x1=125 y1=70 x2=153 y2=70 /><line x1=275 y1=70 x2=303 y2=70 /><line x1=425 y1=70 x2=453 y2=70 /><line x1=575 y1=70 x2=588 y2=70 /></g>
 <g text-anchor="middle"><text x="65" y="62" font-weight=bold>Seat</text><text x="65" y="80">signs each answer</text><text x="65" y="96">works offline</text>
 <text x="215" y="62" font-weight=bold>Relay</text><text x="215" y="80">carries sealed</text><text x="215" y="96">answers only</text>
 <text x="365" y="62" font-weight=bold>3 Cells</text><text x="365" y="80">check and</text><text x="365" y="96">countersign</text>
 <text x="515" y="62" font-weight=bold>Control</text><text x="515" y="80">seals the record</text><text x="515" y="96">audit and verify</text>
 <text x="642" y="62" font-weight=bold>Witness</text><text x="642" y="80">second check</text><text x="642" y="96">on the seal</text>
 <text x="215" y="22" fill="#b03a3a">cannot read answers</text></g></svg>
+<div class=note style="text-align:center">How an answer travels</div>
+<div class=ft>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</div><div class=pn>2</div></div>
 
-<h2>Three promises</h2>
-<p class=note style="margin-top:0">We cannot promise zero failures. We make every failure:</p>
-<div class=pro>
-<div><svg width="46" height="46" viewBox="0 0 48 48" fill="none" stroke="#1f4e8c" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M40 24a16 16 0 1 1-5-11.5"/><path d="M40 6v8h-8"/></svg><h3>Recoverable</h3><p>Lose a cell, a relay or a link and nothing is lost.</p></div>
-<div><svg width="46" height="46" viewBox="0 0 48 48" fill="none" stroke="#1f4e8c" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l16 6v12c0 10-7 17-16 20C15 40 8 33 8 23V11z"/><path d="M17 24l5 5 9-10"/></svg><h3>Contained</h3><p>One broken part stays one broken part. Other centres carry on.</p></div>
-<div><svg width="46" height="46" viewBox="0 0 48 48" fill="none" stroke="#1f4e8c" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="21" cy="21" r="13"/><path d="M31 31l12 12"/><path d="M15 21l5 5 8-9"/></svg><h3>Provable</h3><p>Any edit after the fact is located, and the true answer is shown.</p></div></div>
+<div class=s><div class=lab>1 · SOLUTION SYNOPSIS</div><h2>Three promises</h2>
+<p class=note style="font-size:16pt;margin:0 0 .3in">We cannot promise zero failures. We make every failure:</p>
+<div class=cards>
+<div><svg width="70" height="70" viewBox="0 0 48 48" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M40 24a16 16 0 1 1-5-11.5"/><path d="M40 6v8h-8"/></svg><h3>Recoverable</h3><p>Lose a cell, a relay or a link and nothing is lost.</p></div>
+<div><svg width="70" height="70" viewBox="0 0 48 48" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5l16 6v12c0 10-7 17-16 20C15 40 8 33 8 23V11z"/><path d="M17 24l5 5 9-10"/></svg><h3>Contained</h3><p>One broken part stays one broken part. Other centres carry on.</p></div>
+<div><svg width="70" height="70" viewBox="0 0 48 48" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="21" cy="21" r="13"/><path d="M31 31l12 12"/><path d="M15 21l5 5 8-9"/></svg><h3>Provable</h3><p>Any edit after the fact is located, and the true answer is shown.</p></div></div>
+<div class=ft>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</div><div class=pn>3</div></div>
 
-<h2>Numbers from our own tests</h2>
+<div class=s><div class=lab>1 · SOLUTION SYNOPSIS</div><h2>Numbers from our own tests</h2>
 <div class=tiles>
 <div class=tile><div class=n>0</div><div class=l>answers lost in 16,000 sent</div></div>
 <div class=tile><div class=n>20/20</div><div class=l>chaos drills passed</div></div>
 <div class=tile><div class=n>1,000</div><div class=l>of 1,000 tampered records located</div></div>
-<div class=tile><div class=n>~1 s</div><div class=l>to recover (median 0.96 to 1.23 s)</div></div></div>
-<div class=tiles>
+<div class=tile><div class=n>~1 s</div><div class=l>to recover (median 0.96 to 1.23 s)</div></div>
 <div class=tile><div class=n>19,803</div><div class=l>of 19,803 candidates unlocked</div></div>
 <div class=tile><div class=n>227,882</div><div class=l>entries stored, 0 rejected</div></div>
 <div class=tile><div class=n>44 ms</div><div class=l>median answer delivery (p99 168 ms)</div></div>
 <div class=tile><div class=n>2.3%</div><div class=l>median CPU used by the seat app</div></div></div>
 <p class=note>Measured on one Apple M5 Mac, 3 real cells, 99 simulated centres, synthetic data. Not a real wide-area network.</p>
-<p class=foot>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</p>
-</div>
+<div class=ft>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</div><div class=pn>4</div></div>
 
-<div class=pg>
-<h1 style="font-size:20pt">The five demo acts</h1>
-<p class=sub>Each act runs real software, not mocks, and leaves an evidence file.</p>
-<svg viewBox="0 0 700 120" width="100%" font-family="Helvetica,Arial" font-size="12">
-<line x1=40 y1=50 x2=660 y2=50 stroke="#1f4e8c" stroke-width="3"/>
-<g fill="#1f4e8c"><circle cx="70" cy="50" r="20"/><circle cx="210" cy="50" r="20"/><circle cx="350" cy="50" r="20"/><circle cx="490" cy="50" r="20"/><circle cx="630" cy="50" r="20"/></g>
-<g fill="#fff" text-anchor="middle" font-size="16" font-weight="bold"><text x="70" y="56">1</text><text x="210" y="56">2</text><text x="350" y="56">3</text><text x="490" y="56">4</text><text x="630" y="56">5</text></g>
-<g text-anchor="middle" font-weight="bold"><text x="70" y="95">Before</text><text x="210" y="95">Start</text><text x="350" y="95">During</text><text x="490" y="95">After</text><text x="630" y="95">Decide</text></g>
-<text x="70" y="112" text-anchor="middle" font-size="10" fill="#555">exam day</text><text x="350" y="112" text-anchor="middle" font-size="10" fill="#555">exam runs</text><text x="630" y="112" text-anchor="middle" font-size="10" fill="#555">results</text></svg>
-
+<div class=s><div class=lab>1 · SOLUTION SYNOPSIS</div><h2>The five demo acts</h2>
+<p class=note style="margin:-.1in 0 .12in">Each act runs real software, not mocks, and leaves an evidence file.</p>
 <table>
-<tr><th style="width:14%">Act</th><th>What we show</th><th style="width:28%">Result</th></tr>
+<tr><th style="width:14%">Act</th><th>What we show</th><th style="width:26%">Result</th></tr>
 <tr><td><b>1 Before</b><br>Gate check</td><td>A seat running AnyDesk and an overlay tool is blocked by name. Close them and it turns green. A face flag goes to a human reviewer.</td><td>2 tools named and blocked. 1 flag cleared by a person.</td></tr>
 <tr><td><b>2 Start</b><br>Key release</td><td>2 of 3 key holders release the paper keys. 6 of 7 centres unlock. Centre 42 has a cut link, so it stays locked until a phoned code unlocks it. A forged key is rejected.</td><td>308 candidates, 7 centres, 6,586 entries saved.</td></tr>
 <tr><td><b>3 During</b><br>Chaos</td><td>We cut a centre's link, wipe a data centre cell, and force-quit a seat. Candidates keep answering. The wiped cell rebuilds. The seat resumes on another PC.</td><td>Answers lost: 0. Recovery 1.3 to 1.9 s.</td></tr>
 <tr><td><b>4 After</b><br>Tamper audit</td><td>A rogue insider edits an answer in the database. The audit finds it. The verify page shows "record says C, the seat committed B" and restores B.</td><td>1,000 of 1,000 edits located.</td></tr>
 <tr><td><b>5 Decide</b><br>Analytics</td><td>Analytics on the cells' own data flag likely cheating and choose: pay compensation, re-test, or re-conduct a centre. A human always signs off. No candidate is penalised automatically.</td><td>53 flags, no honest candidate flagged (synthetic data).</td></tr></table>
+<div class=ft>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</div><div class=pn>5</div></div>
 
-<h2>What happens to a failed exam?</h2>
+<div class=s><div class=lab>1 · SOLUTION SYNOPSIS</div><h2>What happens to a failed exam?</h2>
 <svg viewBox="0 0 700 130" width="100%" font-family="Helvetica,Arial" font-size="12">
-<defs><marker id=b markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#1f4e8c"/></marker></defs>
-<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.5"><rect x="5" y="40" width="150" height="50" rx="8"/><rect x="270" y="5" width="180" height="38" rx="8"/><rect x="270" y="46" width="180" height="38" rx="8"/><rect x="270" y="87" width="180" height="38" rx="8"/><rect x="545" y="40" width="150" height="50" rx="8"/></g>
-<g stroke="#1f4e8c" stroke-width="2" marker-end="url(#b)"><line x1=155 y1=65 x2=268 y2=24 /><line x1=155 y1=65 x2=268 y2=65 /><line x1=155 y1=65 x2=268 y2=106 /><line x1=450 y1=24 x2=543 y2=60 /><line x1=450 y1=65 x2=543 y2=65 /><line x1=450 y1=106 x2=543 y2=70 /></g>
+<defs><marker id=b markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#111"/></marker></defs>
+<g fill="#f0f0f0" stroke="#111" stroke-width="1.5"><rect x="5" y="40" width="150" height="50" rx="8"/><rect x="270" y="5" width="180" height="38" rx="8"/><rect x="270" y="46" width="180" height="38" rx="8"/><rect x="270" y="87" width="180" height="38" rx="8"/><rect x="545" y="40" width="150" height="50" rx="8"/></g>
+<g stroke="#111" stroke-width="2" marker-end="url(#b)"><line x1=155 y1=65 x2=268 y2=24 /><line x1=155 y1=65 x2=268 y2=65 /><line x1=155 y1=65 x2=268 y2=106 /><line x1=450 y1=24 x2=543 y2=60 /><line x1=450 y1=65 x2=543 y2=65 /><line x1=450 y1=106 x2=543 y2=70 /></g>
 <g text-anchor="middle"><text x="80" y="60" font-weight=bold>Signed record</text><text x="80" y="77">of what happened</text>
 <text x="360" y="29">Pay compensation</text><text x="360" y="70">Re-test candidates</text><text x="360" y="111">Re-conduct a centre</text>
 <text x="620" y="60" font-weight=bold>Human reviewer</text><text x="620" y="77">signs off</text></g></svg>
-
-<p class=note><b>One honest limit:</b> a seat signature proves an answer was not changed after the device made it. It does not prove the candidate chose it. All analytics numbers use synthetic data.</p>
-<p class=foot>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</p>
-</div></body></html>
+<div class=two style="margin-top:.4in"><div><b>One honest limit</b><p style="font-size:15pt">A seat signature proves an answer was not changed after the device made it. It does not prove the candidate chose it. All analytics numbers use synthetic data.</p></div></div>
+<div class=ft>Tested on macOS and Windows. Code and evidence: https://github.com/anirudh12032008/saakshi</div><div class=pn>6</div></div>
+</body></html>
