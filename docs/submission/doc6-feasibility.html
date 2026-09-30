@@ -1,0 +1,111 @@
+<!doctype html><meta charset=utf-8><title>Saakshi feasibility plan</title>
+<style>
+@page{size:A4;margin:14mm 14mm}
+body{font:10.5pt/1.4 -apple-system,Helvetica,Arial,sans-serif;color:#1a1f2b;margin:0}
+h1{font-size:24pt;margin:0 0 2pt}h2{font-size:14pt;border-bottom:2px solid #1f4e8c;padding-bottom:3pt;margin:12pt 0 8pt;color:#1f4e8c}
+.pg{page-break-after:always;position:relative;min-height:265mm}.pg:last-child{page-break-after:auto}
+.sub{font-size:12pt;color:#333;margin:0 0 8pt}
+.box{background:#eef3fa;border-left:4px solid #1f4e8c;padding:6pt 10pt;margin:8pt 0}
+table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:6pt 0}th,td{border:1px solid #c5ccd8;padding:4pt 6pt;text-align:left;vertical-align:top}th{background:#eef3fa}
+td.c,th.c{text-align:center}
+.tiles{display:flex;gap:8pt;margin:8pt 0}.t{flex:1;border:1px solid #c5ccd8;border-top:4px solid #1f4e8c;padding:6pt;text-align:center}
+.t b{display:block;font-size:19pt;color:#1f4e8c}.t span{font-size:8.5pt;color:#444}
+.chk{list-style:none;padding:0;margin:0}.chk li{padding:3pt 0 3pt 20pt;position:relative;border-bottom:1px solid #e3e7ee;font-size:10pt}
+.chk li:before{content:"";position:absolute;left:2pt;top:5pt;width:11pt;height:11pt;background:#1f4e8c;border-radius:2pt}
+.chk li:after{content:"";position:absolute;left:6pt;top:7pt;width:3pt;height:6pt;border:solid #fff;border-width:0 2pt 2pt 0;transform:rotate(45deg)}
+.foot{position:absolute;bottom:0;left:0;right:0;font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:3pt}
+.dot{font-size:13pt;color:#1f4e8c}
+</style>
+<div class=pg>
+<h1>Can it really be built?</h1>
+<p class=sub>Saakshi, implementation and feasibility plan. Short answer: the core already runs. The rest is rollout.</p>
+<h2>Rollout in three steps</h2>
+<svg viewBox="0 0 720 330" width="100%" font-family="Helvetica,Arial" font-size="12">
+<defs><marker id=a markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#1f4e8c"/></marker></defs>
+<line x1=30 y1=55 x2=700 y2=55 stroke="#1f4e8c" stroke-width=3 marker-end="url(#a)"/>
+<g fill="#1f4e8c"><circle cx=110 cy=55 r=13 /><circle cx=360 cy=55 r=13 /><circle cx=610 cy=55 r=13 /></g>
+<g fill="#fff" font-weight=bold text-anchor="middle"><text x=110 y=60>1</text><text x=360 y=60>2</text><text x=610 y=60>3</text></g>
+<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.5"><rect x=15 y=90 width=190 height=215 rx=8 /><rect x=265 y=90 width=190 height=215 rx=8 /><rect x=515 y=90 width=190 height=215 rx=8 /></g>
+<g text-anchor="middle" font-weight=bold font-size=14 fill="#1f4e8c"><text x=110 y=115>Shadow mode</text><text x=360 y=115>Relays and cells</text><text x=610 y=115>Mandate</text></g>
+<g text-anchor="middle" font-size=11 fill="#444"><text x=110 y=132>on one small exam</text><text x=360 y=132>at real centres</text><text x=610 y=132>in the tender</text></g>
+<g font-size=11.5 fill="#1a1f2b">
+<text x=28 y=162>• Runs beside the</text><text x=36 y=177>current system</text>
+<text x=28 y=197>• Only watches and</text><text x=36 y=212>records. Changes</text><text x=36 y=227>nothing for students</text>
+<text x=28 y=247>• Prove: zero lost,</text><text x=36 y=262>clean audit</text>
+<text x=278 y=162>• Relay in each centre</text>
+<text x=278 y=182>• 3 cells in national</text><text x=286 y=197>data centres</text>
+<text x=278 y=217>• Seat app on exam PCs</text>
+<text x=278 y=237>• Invigilators trained</text>
+<text x=278 y=257>• Grow to bigger exams</text>
+<text x=528 y=162>• Saakshi protocol is</text><text x=536 y=177>a rule in the RFP</text>
+<text x=528 y=197>• Vendors must pass</text><text x=536 y=212>the conformance kit</text>
+<text x=528 y=232>• Open source,</text><text x=536 y=247>Apache-2.0</text>
+<text x=528 y=267>• NTA owns the keys</text></g>
+</svg>
+<div class=box><b>Why shadow mode first?</b> Nobody has to trust us on day one. The old system keeps running. We only compare.</div>
+<h2>Who does what</h2>
+<table><tr><th>Who</th><th class=c>Policy and keys</th><th class=c>Run control and cells</th><th class=c>Run centres</th><th class=c>Watch from outside</th></tr>
+<tr><td><b>NTA</b></td><td class=c>Owns</td><td class=c>Approves</td><td class=c>Approves</td><td class=c>Gets reports</td></tr>
+<tr><td><b>NIC</b></td><td class=c>Advises</td><td class=c>Owns</td><td class=c>-</td><td class=c>-</td></tr>
+<tr><td><b>Vendors</b></td><td class=c>-</td><td class=c>-</td><td class=c>Own, must pass the kit</td><td class=c>-</td></tr>
+<tr><td><b>Witnesses</b></td><td class=c>-</td><td class=c>-</td><td class=c>-</td><td class=c>Own, outside the exam path</td></tr></table>
+<div class=foot>https://github.com/anirudh12032008/saakshi</div>
+</div>
+
+<div class=pg>
+<h1 style="font-size:20pt">What already works</h1>
+<p class=sub>Measured on one Apple M5 Mac with 3 real cells and 99 simulated centres. Tested on macOS and Windows.</p>
+<div class=tiles>
+<div class=t><b>20,000</b><span>candidates in the load test</span></div>
+<div class=t><b>227,882</b><span>entries stored, 0 rejected</span></div>
+<div class=t><b>20 / 20</b><span>chaos runs passed</span></div>
+<div class=t><b>0</b><span>answers lost out of 16,000</span></div></div>
+<div class=tiles>
+<div class=t><b>44 ms</b><span>median ingest (p50)</span></div>
+<div class=t><b>168 ms</b><span>p99 ingest</span></div>
+<div class=t><b>~1 s</b><span>recovery, median 0.96 to 1.23 s</span></div>
+<div class=t><b>1,000 / 1,000</b><span>tampered records located</span></div></div>
+<h2>Checklist</h2>
+<ul class=chk>
+<li>Seat app signs and saves every answer, even offline</li>
+<li>Relay in the centre cannot read answers</li>
+<li>Three cells verify and countersign; a wiped cell rebuilds from relays</li>
+<li>Spare relay takes over during an exam</li>
+<li>Paper released only when 2 of 3 custodians agree; offline unlock code works</li>
+<li>Candidate moves to another seat and keeps the time they had</li>
+<li>Audit page shows exactly which record was edited</li>
+<li>Analytics flags likely cheating; no honest candidate flagged (synthetic data)</li>
+<li>476 workspace tests and 76 analytics tests pass</li></ul>
+<h2>Flow we proved</h2>
+<svg viewBox="0 0 720 90" width="100%" font-family="Helvetica,Arial" font-size="12">
+<defs><marker id=b markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#1f4e8c"/></marker></defs>
+<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.5"><rect x=5 y=15 width=125 height=55 rx=6 /><rect x=165 y=15 width=125 height=55 rx=6 /><rect x=325 y=15 width=125 height=55 rx=6 /><rect x=485 y=15 width=110 height=55 rx=6 /><rect x=620 y=15 width=95 height=55 rx=6 /></g>
+<g stroke="#1f4e8c" stroke-width="2" marker-end="url(#b)"><line x1=130 y1=42 x2=163 y2=42 /><line x1=290 y1=42 x2=323 y2=42 /><line x1=450 y1=42 x2=483 y2=42 /><line x1=595 y1=42 x2=618 y2=42 /></g>
+<g text-anchor="middle"><text x=67 y=38 font-weight=bold>Seat</text><text x=67 y=54>one tick</text><text x=227 y=38 font-weight=bold>Relay</text><text x=227 y=54>two ticks</text><text x=387 y=38 font-weight=bold>Cell</text><text x=387 y=54>blue ticks</text><text x=540 y=38 font-weight=bold>Audit</text><text x=540 y=54>sealed</text><text x=667 y=38 font-weight=bold>Decide</text><text x=667 y=54>fair result</text></g></svg>
+<div class=box><b>Honest limits.</b> Everything ran on one machine over loopback, not a real WAN. Analytics numbers use synthetic data. Power-loss and 20k over a real network are not yet measured.</div>
+<div class=foot>https://github.com/anirudh12032008/saakshi</div>
+</div>
+
+<div class=pg>
+<h1 style="font-size:20pt">What it needs, and what could go wrong</h1>
+<h2>Hardware we know about</h2>
+<table><tr><th>Part</th><th>What is needed</th><th>Evidence</th></tr>
+<tr><td>Exam PC (seat)</td><td>Windows 10 x64 or macOS 12, 4 GB RAM, dual core. Camera optional</td><td>Minimum spec in plan</td></tr>
+<tr><td>Seat load</td><td>2.3% CPU median (max 4.3%), 166 MiB memory</td><td>Measured</td></tr>
+<tr><td>Centre link</td><td>About 1.06 MB per candidate per hour</td><td>Measured</td></tr>
+<tr><td>Centre relay</td><td>One small machine per centre, plus a spare running the same program</td><td>By design</td></tr>
+<tr><td>Cells</td><td>3 independent processes in national data centres</td><td>Ran 3 on one Mac</td></tr>
+<tr><td>Bigger exams</td><td>About 10 cells for 1 million candidates at once</td><td>Assumption, not measured</td></tr></table>
+<div class=box><b>Cost.</b> Saakshi is open source (Apache-2.0), so there is no licence fee. A full rupee cost per candidate has not been worked out yet. We will not quote a number we have not measured.</div>
+<h2>Risks and fixes</h2>
+<table><tr><th style="width:38%">Risk</th><th>What we do</th></tr>
+<tr><td>Camera check fails on some PCs</td><td>Invigilator confirms identity by hand instead</td></tr>
+<tr><td>Windows hardware arrives late</td><td>Packaged app is tested automatically on Windows; demo falls back to the Mac</td></tr>
+<tr><td>Rules change and break old records</td><td>Protocol v1 is frozen and checked with fixed test vectors</td></tr>
+<tr><td>Speed claims do not hold up</td><td>Publish only measured numbers; say where they were measured</td></tr>
+<tr><td>Fear of false cheating flags</td><td>Thresholds published before the exam; a human signs every decision</td></tr>
+<tr><td>Too much scope</td><td>Shadow mode first; grow only after each step passes</td></tr>
+<tr><td>Real network is slower than our test</td><td>Seats keep working offline and sync later; early warning when sync lags</td></tr>
+<tr><td>One signature does not prove who chose an answer</td><td>Stated openly; identity check at entry and invigilator attestation</td></tr></table>
+<div class=foot>https://github.com/anirudh12032008/saakshi</div>
+</div>
