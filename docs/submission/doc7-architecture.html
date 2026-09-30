@@ -1,33 +1,24 @@
-<!doctype html><meta charset=utf-8><title>Saakshi technology architecture</title>
-<style>
-@page{size:A4;margin:14mm 14mm}
-body{font:10.5pt/1.4 -apple-system,Helvetica,Arial,sans-serif;color:#1a1f2b;margin:0}
-h1{font-size:25pt;margin:0 0 3pt}h2{font-size:14.5pt;border-bottom:2px solid #1f4e8c;padding-bottom:3pt;margin:0 0 8pt;color:#1f4e8c}
-.pg{page-break-after:always}.pg:last-child{page-break-after:auto}
-.pitch{font-size:12pt;color:#333;margin:4pt 0 10pt}
-.box{background:#eef3fa;border-left:4px solid #1f4e8c;padding:6pt 10pt;margin:8pt 0}
-table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:6pt 0}th,td{border:1px solid #c5ccd8;padding:4pt 6pt;text-align:left;vertical-align:top}th{background:#eef3fa}
-.tiles{display:flex;gap:8pt;margin:8pt 0}.t{flex:1;border:1px solid #c5ccd8;border-top:4px solid #1f4e8c;padding:6pt;text-align:center;background:#fff}
-.t b{display:block;font-size:19pt;color:#1f4e8c}.t span{font-size:8.5pt;color:#444}
-.num{display:inline-block;background:#1f4e8c;color:#fff;border-radius:50%;width:14pt;height:14pt;text-align:center;font-size:9pt;line-height:14pt;margin-right:4pt}
-.steps{columns:2;column-gap:14pt;font-size:10pt;margin:6pt 0}.steps div{margin-bottom:4pt;break-inside:avoid}
-small{color:#555;font-size:8.5pt}a{color:#1f4e8c}
-footer{font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:4pt;margin-top:8pt}
-</style>
-<svg width=0 height=0 style="position:absolute"><defs><marker id=a markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#1f4e8c"/></marker></defs></svg>
-
-<div class=pg>
-<h1>How Saakshi is built</h1>
-<div class=pitch>Technology architecture: the parts, the tools we chose, how it stays safe and how it scales.</div>
-<div class=box>Big idea: <b>the seat signs every answer, and nothing in the middle is trusted.</b> Each part only has to be checked, never believed.</div>
-<h2>The whole system on one page</h2>
-<svg viewBox="0 0 720 470" width="100%" font-family="Helvetica,Arial" font-size="12">
-<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.6">
+<!doctype html><meta charset=utf-8><title>Saakshi technology architecture</title><style>@page{size:13.333in 7.5in;margin:0}*{box-sizing:border-box}
+body{margin:0;font:14pt/1.35 Helvetica,Arial,sans-serif;color:#111}
+.s{width:13.333in;height:7.5in;padding:.45in .7in;position:relative;overflow:hidden;page-break-after:always;background:#fff}
+.t0{background:#000;color:#fff;display:flex;flex-direction:column;justify-content:center;padding:0 1in}
+.t0 .dv{font-size:22pt;margin:0}.t0 .big{font-size:96pt;font-weight:bold;margin:0;line-height:1.05}.t0 .tag{font-size:22pt;margin:10pt 0}
+.t0 hr{border:0;border-top:1px solid #fff;width:100%;margin:18pt 0}.t0 .g{color:#aaa;font-size:15pt}.t0 i{font-size:15pt;margin-top:10pt}
+.lab{font-size:10pt;color:#777;letter-spacing:.5pt}h1{font-size:30pt;margin:8pt 0 12pt;font-weight:bold}
+.pn{position:absolute;right:.6in;bottom:.3in;font-size:10pt;color:#777}
+table{border-collapse:collapse;width:100%;font-size:12pt}th{background:#000;color:#fff;text-align:left;padding:6pt 8pt}td{border-bottom:1px solid #ccc;padding:5pt 8pt;vertical-align:top}
+.tiles{display:flex;gap:12pt;margin:8pt 0}.t{flex:1;border:1px solid #ccc;padding:8pt;text-align:center}.t b{display:block;font-size:24pt}.t span{font-size:11pt;color:#444}
+.num{display:inline-block;background:#000;color:#fff;border-radius:50%;width:16pt;height:16pt;text-align:center;font-size:10pt;line-height:16pt;margin-right:5pt}
+.steps div{margin-bottom:5pt;font-size:12pt}small{color:#555;font-size:10pt}a{color:#111}
+.row{display:flex;gap:.4in}.row>*{flex:1}.box{background:#f2f2f2;border-left:4px solid #000;padding:8pt 12pt;margin:0 0 8pt}svg{max-height:5.4in}</style><svg width=0 height=0 style="position:absolute"><defs><marker id=a markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#111"/></marker></defs></svg>
+<section class="s t0"><p class=dv>साक्षी</p><p class=big>Saakshi</p><p class=tag>A resilient, provable computer-based testing ecosystem</p><hr><div class=g>Hackathon Challenge 6 · Technology Architecture</div><i>Team Kawaai: Anirudh, Bhumika, Arjav</i></section>
+<section class=s><div class=lab>7 · TECHNOLOGY ARCHITECTURE</div><h1>The whole system on one page</h1><div class=row><div style="flex:1.7"><svg viewBox="0 0 720 470" width="100%" style="max-height:5.6in" font-family="Helvetica,Arial" font-size="12">
+<g fill="#f2f2f2" stroke="#111" stroke-width="1.6">
 <rect x=10 y=30 width=120 height=80 rx=8/><rect x=185 y=30 width=120 height=80 rx=8/>
 <rect x=390 y=10 width=130 height=64 rx=8/><rect x=390 y=92 width=130 height=64 rx=8/><rect x=390 y=174 width=130 height=64 rx=8/>
 <rect x=580 y=92 width=130 height=64 rx=8/><rect x=580 y=230 width=130 height=64 rx=8/></g>
-<rect x=10 y=320 width=700 height=140 rx=8 fill="#fff" stroke="#c5ccd8"/>
-<g stroke="#1f4e8c" stroke-width="2" marker-end="url(#a)" fill="none">
+<rect x=10 y=320 width=700 height=140 rx=8 fill="#fff" stroke="#ccc"/>
+<g stroke="#111" stroke-width="2" marker-end="url(#a)" fill="none">
 <line x1=130 y1=70 x2=183 y2=70 /><line x1=305 y1=60 x2=388 y2=42 /><line x1=305 y1=70 x2=388 y2=124 /><line x1=305 y1=80 x2=388 y2=204 />
 <line x1=520 y1=124 x2=578 y2=124 /><line x1=645 y1=156 x2=645 y2=228 /></g>
 <g text-anchor="middle" fill="#1a1f2b">
@@ -39,8 +30,8 @@ footer{font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:4pt;m
 <text x=645 y=120 font-weight=bold>4 Control</text><text x=645 y=138>seals the record</text>
 <text x=645 y=258 font-weight=bold>5 Witness</text><text x=645 y=276>checks the seal</text>
 <text x=157 y=22>LAN</text><text x=345 y=26>WAN</text></g>
-<text x=655 y=200 font-size=10.5 fill="#1f4e8c">proof</text>
-<g font-size=11 text-anchor="middle"><text x=360 y=312 font-weight=bold fill="#1f4e8c">Who can see what</text></g>
+<text x=655 y=200 font-size=10.5 fill="#111">proof</text>
+<g font-size=11 text-anchor="middle"><text x=360 y=312 font-weight=bold fill="#111">Who can see what</text></g>
 <g font-size=11>
 <text x=30 y=345>Seat: holds the candidate's answers and the signing key.</text>
 <text x=30 y=367>Relay: sees only locked envelopes. It can store and forward, nothing else.</text>
@@ -49,27 +40,19 @@ footer{font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:4pt;m
 <text x=30 y=433>Witness: a separate process that signs only a record that was never rewritten.</text>
 <text x=30 y=452 fill="#555" font-size=10>In the demo control and witness share one machine. A separate organisation for the witness comes next.</text></g>
 <g><circle cx=175 cy=70 r=0/></g>
-</svg>
-<h2 style="margin-top:10pt">The data flow, step by step</h2>
-<div class=steps>
+</svg></div><div style="flex:1"><div class=box>Big idea: <b>the seat signs every answer, and nothing in the middle is trusted.</b> Each part only has to be checked, never believed.</div><h3 style="margin:10pt 0 6pt">The data flow, step by step</h3><div class=steps>
 <div><span class=num>1</span>The candidate taps an answer. The seat signs it and saves it to disk.</div>
 <div><span class=num>2</span>The seat sends it over the local network to the centre relay.</div>
 <div><span class=num>3</span>The relay checks the signature and the chain, then sends a copy to the cells.</div>
 <div><span class=num>4</span>A cell unlocks the answer, checks it and signs a receipt back.</div>
-<div><span class=num>5</span>Control seals each shift into one fingerprint. The witness checks it.</div>
-</div>
-</div>
-
-<div class=pg>
-<h2>One answer, three ticks</h2>
-<p>Like a chat app, the candidate sees how far the answer has travelled. Each tick needs a real check, not a promise.</p>
-<svg viewBox="0 0 720 500" width="100%" font-family="Helvetica,Arial" font-size="12">
-<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.5"><rect x=40 y=8 width=120 height=30 rx=6/><rect x=300 y=8 width=120 height=30 rx=6/><rect x=560 y=8 width=120 height=30 rx=6/></g>
+<div><span class=num>5</span>Control seals each shift into one fingerprint. The witness checks it.</div></div></div><div class=pn>2</div></section>
+<section class=s><div class=lab>7 · TECHNOLOGY ARCHITECTURE · ONE ANSWER</div><h1>One answer, three ticks</h1><p style="margin:0 0 6pt;font-size:12pt">Like a chat app, the candidate sees how far the answer has travelled. Each tick needs a real check, not a promise.</p><div class=row><div style="flex:1.2"><svg viewBox="0 0 720 500" width="100%" font-family="Helvetica,Arial" font-size="12">
+<g fill="#f2f2f2" stroke="#111" stroke-width="1.5"><rect x=40 y=8 width=120 height=30 rx=6/><rect x=300 y=8 width=120 height=30 rx=6/><rect x=560 y=8 width=120 height=30 rx=6/></g>
 <g text-anchor="middle" font-weight=bold><text x=100 y=28>Seat</text><text x=360 y=28>Centre relay</text><text x=620 y=28>Cell</text></g>
-<g stroke="#9aa5b8" stroke-dasharray="4 4"><line x1=100 y1=38 x2=100 y2=490/><line x1=360 y1=38 x2=360 y2=490/><line x1=620 y1=38 x2=620 y2=490/></g>
-<g stroke="#1f4e8c" stroke-width="2" marker-end="url(#a)" fill="none">
+<g stroke="#999" stroke-dasharray="4 4"><line x1=100 y1=38 x2=100 y2=490/><line x1=360 y1=38 x2=360 y2=490/><line x1=620 y1=38 x2=620 y2=490/></g>
+<g stroke="#111" stroke-width="2" marker-end="url(#a)" fill="none">
 <line x1=360 y1=150 x2=105 y2=150 /><line x1=104 y1=110 x2=354 y2=110 /><line x1=364 y1=220 x2=614 y2=220 /><line x1=616 y1=320 x2=366 y2=320 /><line x1=356 y1=380 x2=106 y2=380 /></g>
-<g fill="#fff" stroke="#c5ccd8"><rect x=110 y=56 width=180 height=36 rx=5/><rect x=372 y=160 width=180 height=40 rx=5/><rect x=420 y=252 width=190 height=50 rx=5/></g>
+<g fill="#fff" stroke="#ccc"><rect x=110 y=56 width=180 height=36 rx=5/><rect x=372 y=160 width=180 height=40 rx=5/><rect x=420 y=252 width=190 height=50 rx=5/></g>
 <g font-size=11.5>
 <text x=118 y=72>Answer is signed</text><text x=118 y=86>and saved to disk</text>
 <text x=200 y=104>send (signed, locked)</text>
@@ -80,26 +63,21 @@ footer{font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:4pt;m
 <text x=440 y=214>forward to cells</text>
 <text x=440 y=314>signed receipt</text>
 <text x=150 y=372>receipt passed on</text></g>
-<line x1=360 y1=172 x2=105 y2=172 stroke="#1f4e8c" stroke-width="2" marker-end="url(#a)"/>
+<line x1=360 y1=172 x2=105 y2=172 stroke="#111" stroke-width="2" marker-end="url(#a)"/>
 <g font-size=22 font-weight=bold>
-<text x=30 y=150 fill="#8a94a6">&#10003;</text>
-<text x=22 y=178 fill="#8a94a6">&#10003;&#10003;</text>
+<text x=30 y=150 fill="#777">&#10003;</text>
+<text x=22 y=178 fill="#777">&#10003;&#10003;</text>
 <text x=22 y=420 fill="#1f6fe0">&#10003;&#10003;</text></g>
 <rect x=110 y=400 width=420 height=70 rx=6 fill="#eaf2ff" stroke="#1f6fe0" stroke-width="1.5"/>
 <g font-size=11.5><text x=120 y=420 font-weight=bold fill="#1f6fe0">Blue double tick</text>
 <text x=120 y=438>The seat checks the cell's receipt against the cell key it already</text>
 <text x=120 y=454>trusts. A fake receipt from the relay cannot turn a tick blue.</text></g>
 <text x=30 y=213 font-size=11 fill="#555">Seat keeps working</text><text x=30 y=227 font-size=11 fill="#555">even if the network drops.</text>
-</svg>
-<table><tr><th style="width:16%">Tick</th><th>What it means</th><th>If it fails here</th></tr>
+</svg></div><div style="flex:1"><table><tr><th style="width:16%">Tick</th><th>What it means</th><th>If it fails here</th></tr>
 <tr><td>&#10003;</td><td>Signed and saved on the seat's own disk</td><td>Nothing is lost except the last few seconds. The candidate moves to another seat.</td></tr>
 <tr><td>&#10003;&#10003;</td><td>The centre relay holds a checked copy</td><td>The relay buffers. Answers keep flowing when the link is back.</td></tr>
-<tr><td style="color:#1f6fe0"><b>&#10003;&#10003; blue</b></td><td>A cell has opened, checked and signed for it</td><td>Safe even if the relay or one cell is destroyed.</td></tr></table>
-</div>
-
-<div class=pg>
-<h2>Technology choices</h2>
-<table><tr><th style="width:22%">Part</th><th style="width:30%">What we use</th><th>Why, in plain words</th></tr>
+<tr><td style="color:#1f6fe0"><b>&#10003;&#10003; blue</b></td><td>A cell has opened, checked and signed for it</td><td>Safe even if the relay or one cell is destroyed.</td></tr></table></div></div><div class=pn>3</div></section>
+<section class=s><div class=lab>7 · TECHNOLOGY ARCHITECTURE · CHOICES</div><h1>Technology choices</h1><table style="font-size:11.5pt"><tr><th style="width:22%">Part</th><th style="width:30%">What we use</th><th>Why, in plain words</th></tr>
 <tr><td>Exam app on the seat</td><td>Electron, React, TypeScript</td><td>One app for macOS and Windows. It can run offline and look at running programs on the machine.</td></tr>
 <tr><td>Servers (relay, cell, control, witness)</td><td>One Bun program with four modes</td><td>One thing to ship and test. Each mode is a different job.</td></tr>
 <tr><td>Storage</td><td>SQLite, with full sync to disk on every write</td><td>No database server to run. An answer that was acknowledged survives a power cut.</td></tr>
@@ -108,11 +86,10 @@ footer{font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:4pt;m
 <tr><td>Tamper log</td><td>Merkle tree (RFC 9162)</td><td>One short fingerprint proves the whole record is unchanged.</td></tr>
 <tr><td>Key custody</td><td>Shamir secret sharing, 2 of 3</td><td>No single person can open the paper before the exam.</td></tr>
 <tr><td>Risk analytics</td><td>Python with numpy, scipy, networkx</td><td>Strong maths tools. Control reads the result back as plain data.</td></tr>
-<tr><td>Live views</td><td>Server-sent events</td><td>Simple one-way live updates for control screens, and they replay what was missed.</td></tr></table>
-<h2 style="margin-top:12pt">Security in five layers</h2>
-<svg viewBox="0 0 720 300" width="100%" font-family="Helvetica,Arial" font-size="12">
-<g stroke="#1f4e8c" stroke-width="1.5">
-<rect x=10 y=10 width=470 height=50 rx=6 fill="#1f4e8c"/><rect x=10 y=66 width=470 height=50 rx=6 fill="#3b6aa6"/><rect x=10 y=122 width=470 height=50 rx=6 fill="#6f93c4"/><rect x=10 y=178 width=470 height=50 rx=6 fill="#a7bedd"/><rect x=10 y=234 width=470 height=50 rx=6 fill="#dbe6f4"/></g>
+<tr><td>Live views</td><td>Server-sent events</td><td>Simple one-way live updates for control screens, and they replay what was missed.</td></tr></table><div class=pn>4</div></section>
+<section class=s><div class=lab>7 · TECHNOLOGY ARCHITECTURE · SECURITY</div><h1>Security in five layers</h1><svg viewBox="0 0 720 300" width="100%" style="max-height:3.3in" font-family="Helvetica,Arial" font-size="12">
+<g stroke="#111" stroke-width="1.5">
+<rect x=10 y=10 width=470 height=50 rx=6 fill="#111"/><rect x=10 y=66 width=470 height=50 rx=6 fill="#444"/><rect x=10 y=122 width=470 height=50 rx=6 fill="#666"/><rect x=10 y=178 width=470 height=50 rx=6 fill="#bbb"/><rect x=10 y=234 width=470 height=50 rx=6 fill="#e4e4e4"/></g>
 <g font-weight=bold fill="#fff"><text x=24 y=31>5 Seat gate</text><text x=24 y=87>4 Split custody</text><text x=24 y=143>3 Independent witness</text></g>
 <g font-weight=bold fill="#1a1f2b"><text x=24 y=199>2 Merkle log</text><text x=24 y=255>1 Signing</text></g>
 <g fill="#fff"><text x=24 y=48>Blocks remote desktop and overlay tools by name before the exam</text><text x=24 y=104>2 of 3 people must release the keys. A phoned code works offline</text><text x=24 y=160>Signs only a record that was never rewritten</text></g>
@@ -124,45 +101,31 @@ footer{font-size:8.5pt;color:#555;border-top:1px solid #c5ccd8;padding-top:4pt;m
 <text x=500 y=164>A quiet rewrite of history</text>
 <text x=500 y=220>Edits to the database</text>
 <text x=500 y=276>Answers changed after the fact</text></g>
-</svg>
-<div class=tiles>
+</svg><div class=tiles>
 <div class=t><b>1,000 / 1,000</b><span>tampered records found and located in the tamper lab</span></div>
 <div class=t><b>0</b><span>answers lost in 20 chaos runs</span></div>
-<div class=t><b>0</b><span>honest candidates flagged, and no one is auto-penalised</span></div></div>
-<small>Honest limit: a signature proves the record was not changed after the device made it. It does not prove who chose the answer.</small>
-</div>
-
-<div class=pg>
-<h2>Scalability: what we measured</h2>
-<p>A real load test on one laptop. 99 centres and about 20,000 candidates sent answers to 3 real cells.</p>
-<div class=tiles>
+<div class=t><b>0</b><span>honest candidates flagged, and no one is auto-penalised</span></div></div><small>Honest limit: a signature proves the record was not changed after the device made it. It does not prove who chose the answer.</small><div class=pn>5</div></section>
+<section class=s><div class=lab>7 · TECHNOLOGY ARCHITECTURE · SCALABILITY</div><h1>Scalability: what we measured</h1><p style="margin:0 0 4pt;font-size:12pt">A real load test on one laptop. 99 centres and about 20,000 candidates sent answers to 3 real cells.</p><div class=tiles>
 <div class=t><b>19,803</b><span>candidates unlocked, of 19,803</span></div>
 <div class=t><b>227,882</b><span>answers stored, 0 rejected</span></div>
-<div class=t><b>44 ms</b><span>median time to reach a cell (99th: 168 ms)</span></div></div>
-<div class=tiles>
+<div class=t><b>44 ms</b><span>median time to reach a cell (99th: 168 ms)</span></div></div><div class=tiles>
 <div class=t><b>1.06 MB</b><span>centre to cell traffic per candidate hour</span></div>
 <div class=t><b>2.3%</b><span>seat CPU, median (max 4.3%)</span></div>
-<div class=t><b>166 MiB</b><span>seat memory</span></div></div>
-<svg viewBox="0 0 720 210" width="100%" font-family="Helvetica,Arial" font-size="12">
-<text x=10 y=16 font-weight=bold fill="#1f4e8c">Answers are spread over 3 cells, nearly evenly</text>
-<g fill="#1f4e8c"><rect x=10 y=30 width=386 height=34 rx=4/></g>
-<g fill="#3b6aa6"><rect x=10 y=74 width=379 height=34 rx=4/></g>
-<g fill="#6f93c4"><rect x=10 y=118 width=372 height=34 rx=4/></g>
+<div class=t><b>166 MiB</b><span>seat memory</span></div></div><svg viewBox="0 0 720 210" width="100%" font-family="Helvetica,Arial" font-size="12">
+<text x=10 y=16 font-weight=bold fill="#111">Answers are spread over 3 cells, nearly evenly</text>
+<g fill="#111"><rect x=10 y=30 width=386 height=34 rx=4/></g>
+<g fill="#444"><rect x=10 y=74 width=379 height=34 rx=4/></g>
+<g fill="#666"><rect x=10 y=118 width=372 height=34 rx=4/></g>
 <g fill="#fff" font-weight=bold><text x=18 y=52>Cell 1: 77,338 answers</text><text x=18 y=96>Cell 2: 75,992 answers</text><text x=18 y=140>Cell 3: 74,552 answers</text></g>
 <g font-size=11.5 fill="#1a1f2b"><text x=410 y=52>Add centres: add relays. Each centre has its own.</text><text x=410 y=96>Add load: add cells. Any cell can be rebuilt.</text><text x=410 y=140>Analytics run on an export, off the exam path.</text></g>
 <text x=10 y=180 font-size=10.5 fill="#555">Measured on one Apple M5 Mac with 16 GiB, on the local network, with synthetic candidates. This says nothing about real wide-area links.</text>
 <text x=10 y=198 font-size=10.5 fill="#555">The per-hour traffic figure stretches a 60 second window, so it is not a real exam duty cycle.</text>
-</svg>
-<h2 style="margin-top:8pt">Staying up when things break</h2>
-<div class=tiles>
+</svg><div class=pn>6</div></section>
+<section class=s><div class=lab>7 · TECHNOLOGY ARCHITECTURE · RESILIENCE</div><h1>Staying up when things break</h1><div class=tiles>
 <div class=t><b>20 / 20</b><span>chaos runs passed (cell killed, cell wiped, spare relay)</span></div>
 <div class=t><b>0 of 16,000</b><span>answers lost</span></div>
-<div class=t><b>1 to 1.2 s</b><span>median time to recover</span></div></div>
-<svg viewBox="0 0 720 70" width="100%" font-family="Helvetica,Arial" font-size="11.5">
-<g stroke="#1f4e8c" stroke-width="2" marker-end="url(#a)"><line x1=10 y1=35 x2=705 y2=35 /></g>
-<g fill="#1f4e8c"><circle cx=40 cy=35 r=6/><circle cx=210 cy=35 r=6/><circle cx=400 cy=35 r=6/><circle cx=590 cy=35 r=6/></g>
+<div class=t><b>1 to 1.2 s</b><span>median time to recover</span></div></div><svg viewBox="0 0 720 70" width="100%" font-family="Helvetica,Arial" font-size="11.5">
+<g stroke="#111" stroke-width="2" marker-end="url(#a)"><line x1=10 y1=35 x2=705 y2=35 /></g>
+<g fill="#111"><circle cx=40 cy=35 r=6/><circle cx=210 cy=35 r=6/><circle cx=400 cy=35 r=6/><circle cx=590 cy=35 r=6/></g>
 <g text-anchor="middle"><text x=40 y=20>Link slows</text><text x=210 y=20>Warning first</text><text x=400 y=20>Link cut or cell wiped</text><text x=590 y=20>Rebuilt from relays</text>
-<text x=210 y=58>8 s before the cut</text><text x=400 y=58>Candidates keep answering</text><text x=590 y=58>13 s, 0 answers lost</text></g></svg>
-<small>Tested on macOS and Windows.</small>
-<footer>Repository: <a href="https://github.com/anirudh12032008/saakshi">https://github.com/anirudh12032008/saakshi</a></footer>
-</div>
+<text x=210 y=58>8 s before the cut</text><text x=400 y=58>Candidates keep answering</text><text x=590 y=58>13 s, 0 answers lost</text></g></svg><br><small>Tested on macOS and Windows.</small><p style="font-size:11pt;color:#555;margin-top:30pt">Repository: https://github.com/anirudh12032008/saakshi</p><div class=pn>7</div></section>
