@@ -1,0 +1,88 @@
+<!doctype html><meta charset=utf-8><title>Saakshi working prototype</title>
+<style>
+@page{size:A4;margin:16mm 15mm}
+body{font:10.5pt/1.45 -apple-system,Helvetica,Arial,sans-serif;color:#1a1f2b;margin:0}
+h1{font-size:28pt;margin:0 0 4pt}h2{font-size:15pt;border-bottom:2px solid #1f4e8c;padding-bottom:3pt;margin:0 0 10pt;color:#1f4e8c}
+.pg{page-break-after:always}.pg:last-child{page-break-after:auto}
+.pitch{font-size:13pt;color:#333;margin:6pt 0 14pt}.box{background:#eef3fa;border-left:4px solid #1f4e8c;padding:8pt 12pt;margin:10pt 0}
+table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:8pt 0}th,td{border:1px solid #c5ccd8;padding:4pt 6pt;text-align:left;vertical-align:top}th{background:#eef3fa}
+code{font:9pt Menlo,monospace;background:#f3f4f6;padding:0 2pt}
+figure{margin:0 0 9pt;break-inside:avoid}figure img{width:100%;border:1px solid #c5ccd8;display:block}figcaption{font-size:9pt;color:#444;margin-top:2pt}
+figure img{height:68mm;object-fit:cover;object-position:top}
+a{color:#1f4e8c}
+</style>
+<div class=pg>
+<h1>Saakshi — working prototype</h1>
+<div class=pitch>A resilient, provable CBT exam ecosystem: every answer is signed and hash-chained at the seat, the system survives relay, cell and link failures, and any tampering afterwards is locatable and recoverable.</div>
+<div class=box><b>Repository:</b> <a href="https://github.com/anirudh12032008/saakshi">https://github.com/anirudh12032008/saakshi</a><br>
+Tested on macOS and Windows (Windows: automated CI on windows-latest, incl. end-to-end test of the packaged seat)</div>
+<p>This document shows that Saakshi is running software, not a concept. Five scripted demo acts drive real seat, relay, cell and control processes (not mocks) and each writes an evidence file to <code>docs/evidence/</code>. The design never auto-penalises a candidate: flags go to a human reviewer.</p>
+<p><b>Key limit, stated up front:</b> a seat signature proves a record was not altered after the device produced it, not that the candidate chose it. All analytics figures use synthetic data and all performance figures are loopback on one host.</p>
+<h2 style="margin-top:18pt">Architecture</h2>
+<svg viewBox="0 0 700 250" width="100%" font-family="Helvetica,Arial" font-size="12">
+<defs><marker id=a markerWidth=8 markerHeight=8 refX=7 refY=4 orient=auto><path d="M0,0L8,4L0,8z" fill="#1f4e8c"/></marker></defs>
+<g fill="#eef3fa" stroke="#1f4e8c" stroke-width="1.5"><rect x=5 y=20 width=120 height=70 rx=6/><rect x=160 y=20 width=120 height=70 rx=6/><rect x=315 y=20 width=120 height=70 rx=6/><rect x=470 y=20 width=120 height=70 rx=6/><rect x=470 y=150 width=120 height=70 rx=6/></g>
+<g stroke="#1f4e8c" stroke-width="1.8" marker-end="url(#a)"><line x1=125 y1=55 x2=158 y2=55 /><line x1=280 y1=55 x2=313 y2=55 /><line x1=435 y1=55 x2=468 y2=55 /><line x1=530 y1=90 x2=530 y2=148 /></g>
+<g text-anchor="middle"><text x=65 y=45 font-weight=bold>Seat</text><text x=65 y=62>signs + hash-chains</text><text x=65 y=78>every answer</text>
+<text x=220 y=45 font-weight=bold>Relay</text><text x=220 y=62>untrusted relay</text><text x=220 y=78>cannot read answers</text>
+<text x=375 y=45 font-weight=bold>Cell (x3)</text><text x=375 y=62>opens, verifies,</text><text x=375 y=78>countersigns</text>
+<text x=530 y=45 font-weight=bold>Control</text><text x=530 y=62>seals register (STH)</text><text x=530 y=78>audit, /verify, evidence</text>
+<text x=530 y=175 font-weight=bold>Witness</text><text x=530 y=192>independent co-signer</text><text x=530 y=208>consistency proofs</text>
+<text x=142 y=14>LAN</text><text x=297 y=14>WAN</text><text x=540 y=125 text-anchor="start">STH + proof</text></g></svg>
+<ul>
+<li><b>Seat</b> — Electron app at the exam PC; signs and hash-chains locally, fsyncs, works offline.</li>
+<li><b>Relay</b> — untrusted store-and-forward at the centre; sees only sealed envelopes.</li>
+<li><b>Cell</b> — one of three independent national-DC processes; verifies chains, countersigns, seals a per-shift Merkle register.</li>
+<li><b>Control</b> — signs the tree head, runs the audit, serves <code>/verify</code> and the evidence pack.</li>
+<li><b>Witness</b> — separate process that cosigns a tree head only with a valid RFC 9162 consistency proof; a rewritten register raises a P0 TAMPER incident. In the demo it shares a machine with control; independent custody is roadmap.</li></ul>
+</div>
+<div class=pg>
+<h2>What runs today</h2>
+<table><tr><th>Act</th><th>What it proves</th><th>Measured number</th><th>Evidence file</th></tr>
+<tr><td>1 Before</td><td>Integrity gate blocks a seat running AnyDesk and an overlay tool by name; re-check turns green; face flag goes to human review</td><td>2 tools named and blocked; 1 face flag cleared by reviewer</td><td><code>stage5-act1.txt</code>, <code>stage5-gate-selftest.json</code></td></tr>
+<tr><td>2 T0</td><td>2-of-3 custody release; centre with cut link unlocks via phoned offline code; forged relay key rejected</td><td>308 candidates, 7 centres, 6,586 entries committed</td><td><code>stage8-act2.txt</code></td></tr>
+<tr><td>3 During</td><td>WAN cut, cell wipe and rebuild, seat force-quit and move; candidates keep answering</td><td>RPO 0; RTO 1.3 to 1.9 s across three drill runs</td><td><code>stage4-chaos.jsonl</code>, <code>stage4-act3.txt</code></td></tr>
+<tr><td>4 After</td><td>Rogue DB edit is located; /verify shows "Q17: record says C, the seat committed B" and recovers B; evidence pack manifest verifies</td><td>1,000 of 1,000 byte-flip locations found</td><td><code>stage0-tamper-lab.txt</code></td></tr>
+<tr><td>5 Decide</td><td>Analytics on the cells' own export flag likely cheating and decide compensate, re-test or re-conduct</td><td>203,031 entries; 53 flags; no honest candidate flagged; headline: Compensated 0, Re-tested 193, Re-conducted 3 centres, Spared 1,190 (synthetic)</td><td><code>stage6-act5.txt</code>, <code>stage6-act5-full.txt</code></td></tr></table>
+<h2 style="margin-top:14pt">Measured numbers</h2>
+<p style="font-size:9pt;margin:0">One Apple M5 Mac (16 GiB), 3 real cells on loopback, 99 simulated centres, synthetic G1 cohort. Not real WAN.</p>
+<table><tr><th>Measure</th><th>Result</th><th>Source (docs/evidence/)</th></tr>
+<tr><td>Ingest latency, relay to cell (3,697 calls)</td><td>p50 44.1 ms, p99 168.1 ms</td><td><code>stage7-load.txt</code></td></tr>
+<tr><td>Entries stored / rejected at 20k candidates</td><td>227,882 / 0</td><td><code>stage7-load.txt</code></td></tr>
+<tr><td>Candidates unlocked</td><td>19,803 of 19,803</td><td><code>stage7-load.txt</code></td></tr>
+<tr><td>Relay-to-cell traffic</td><td>about 1.06 MB per candidate-hour</td><td><code>stage7-load.txt</code></td></tr>
+<tr><td>Seat CPU / RSS</td><td>2.3% median (max 4.3%) / 166 MiB</td><td><code>stage7-load.txt</code></td></tr>
+<tr><td>Chaos drill (kill-cell, wipe-cell, spare-relay)</td><td>20/20 pass, 0 of 16,000 answers lost, RTO median 0.96 to 1.23 s</td><td><code>stage8-chaos.txt</code></td></tr>
+<tr><td>Offline-start act</td><td>PASS, 308 candidates at 7 centres, 6,586 entries</td><td><code>stage8-act2.txt</code></td></tr></table>
+<p style="font-size:9pt">Caveats: the per-candidate-hour figure extrapolates a 60 s window; seat CPU/RSS cover the Node main process over about 10 s; everything is loopback on one host.</p>
+</div>
+<div class=pg>
+<h2>The running system</h2>
+<p style="font-size:9.5pt;margin-top:0">Stills from the recorded demo (submitted separately). Burned-in text is the video's narration caption.</p>
+<div class=g>
+<figure><img src=w/act1.jpg><figcaption><b>Act 1.</b> Control board: seat blocked by name (AnyDesk), another amber on battery; review queue shows a cleared face flag.</figcaption></figure>
+<figure><img src=w/act2.jpg><figcaption><b>Act 2.</b> Custody release: 6 of 7 centres green, Centre 42 (link cut) still locked; 308 candidates registered.</figcaption></figure>
+<figure><img src=w/act3.jpg><figcaption><b>Act 3.</b> Incident cards during chaos: Data Centre 2 rebuilding from the relays, "answers lost 0".</figcaption></figure>
+<figure style="break-before:page"><img src=w/act4.jpg><figcaption><b>Act 4.</b> /verify page: "Q17: record says C — the seat committed B"; signed chain and receipt checks shown.</figcaption></figure>
+<figure><img src=w/act5.jpg><figcaption><b>Act 5.</b> Decision headline on the cells' own export: Compensated 0, Re-tested 193, Re-conducted 3 centres, Spared 1,190 (synthetic).</figcaption></figure>
+<figure><img src=w/close.jpg><figcaption><b>Close.</b> Measured-numbers slide: every figure is cited to a file in the evidence folder.</figcaption></figure>
+</div></div>
+<div class=pg>
+<h2>Engineering proof</h2>
+<table><tr><th>Check</th><th>Result</th></tr>
+<tr><td>Workspace tests (<code>pnpm -r test</code>)</td><td>476 passing: core 93, seat 98, server 285</td></tr>
+<tr><td>Analytics tests (pytest)</td><td>76 passed (<code>docs/evidence/stage6-pytest.txt</code>)</td></tr>
+<tr><td>Continuous integration</td><td>Green on macOS and Windows. Windows CI on windows-latest: full workspace tests, packaged-seat build and probe self-test, gate self-test (renamed AnyDesk.exe and overlay tool blocked by name), check that the build refuses <code>--inspect</code> and <code>--remote-debugging-port</code>, and a Playwright end-to-end test of the packaged seat. A separate server job runs on each commit.</td></tr>
+<tr><td>Chaos drill</td><td>20/20 runs pass; 16,000 sent = 16,000 stored, 0 answers lost (<code>stage8-chaos.txt</code>)</td></tr>
+<tr><td>Tamper lab</td><td>1,000 of 1,000 byte-flips located (<code>stage0-tamper-lab.txt</code>)</td></tr>
+<tr><td>Protocol spec</td><td>Frozen spec <code>docs/protocol-v1.md</code> with golden vectors in <code>fixtures/vectors/protocol-v1.json</code>; where spec and code disagree the vectors decide. <code>/verify</code> re-checks the golden vectors in the browser on every load.</td></tr></table>
+<p>Windows claims rest on automated CI only; the scripted acts and chaos/tamper tools were run and evidenced on macOS.</p>
+<h2 style="margin-top:16pt">Next</h2>
+<p>Field pilot on a real WAN with measured throughput and RTO; independent-custody witness under a separate organisation; TLS pinning between components; HSM-held sign-off key; real archive WORM storage; Tamil item bank with native review.</p>
+<h2 style="margin-top:16pt">Links</h2>
+<ul><li>Repository: <a href="https://github.com/anirudh12032008/saakshi">github.com/anirudh12032008/saakshi</a></li>
+<li>README: <a href="https://github.com/anirudh12032008/saakshi/blob/main/README.md">README.md</a> (architecture, quickstart, how to run acts 1 to 5)</li>
+<li>Also in the repo: <code>docs/claims-ledger.md</code>, <code>docs/traceability.md</code>, <code>docs/threat-model.md</code>, <code>docs/protocol-v1.md</code></li>
+<li>Demo video: submitted separately.</li></ul>
+<p style="font-size:9pt;color:#555">Licence: Apache-2.0.</p>
+</div>
