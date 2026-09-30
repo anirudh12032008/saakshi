@@ -10,6 +10,31 @@ Every answer is signed and hash-chained at the exam seat, encrypted to the data 
 
 > We can't promise zero failures. We make every failure recoverable, contained and provable.
 
+## The problem
+
+India's high-stakes exams (JEE, CUET, and NEET from 2027) run on computer-based testing that nobody can independently check. When something goes wrong, no one can prove what happened, so the default response is to re-test everyone.
+
+- **JEE Main 2025:** a candidate's pop-up said 46 questions attempted, the response sheet said 29. It reached the Delhi High Court as the candidate's word against the vendor's PDF.
+- **CUET-UG 2026:** a vendor-side glitch delayed a shift and 3,765 candidates needed a re-test.
+- **NEET-UG 2026:** cancelled after a leak, affecting about 22.7 lakh candidates.
+- **No layer-zero monitoring:** checks run in user space, so a virtual machine or relay software underneath the exam is invisible.
+- **Web-embed clients:** an embedded web exam inherits the browser's attack surface (injected scripts, debug ports, patched pages).
+- **No candidate can check their own recorded answers.**
+
+## What is new
+
+| | Current CBT (JEE) | Saakshi |
+|---|---|---|
+| Proof of each answer | None visible to the candidate | Signed by the seat, countersigned by the data-centre cell, hash-chained like git commits |
+| Candidate verification | Candidate's word vs vendor PDF | Receipt code at submit and an offline `/verify` page that names the edited question |
+| Exam client | Web embed | Native fused app that refuses `--inspect` and remote debugging |
+| Machine monitoring | User-space checks only | Pre-exam gate now, kernel-level monitor planned |
+| Encryption | Transport only | End-to-end: the centre relay carries ciphertext it cannot read |
+| Network outage | Centre server syncs later | Relay buffers answers, offline unlock code, outage predicted |
+| Server failure | Single data-centre path | 3-cell cluster, a wiped cell rebuilds from the relays with 0 lost |
+| Tamper detection | None | Merkle register signed by control and co-signed by an independent witness |
+| Re-exam decision | Ad hoc, often everyone | Published rule from evidence, only harmed candidates re-tested, human sign-off |
+
 ## How it works
 
 Seat (exam PC) → Centre relay (untrusted) → Cells x3 (data centre) → Control → Witness
